@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-pathway-pdfs-4`
+**Feature Branch**: `001-design`
 
 **Created**: 2026-10-29
 
@@ -51,8 +51,8 @@ Each PDF holds, in this order:
    12. its edit history;
    13. with an analysis, the entities and then the interactors found.
 5. **A contents list,** after the sections: the introduction, the analysis's properties
-   (with an analysis), the contents list itself, and each event, every place it appears
-   pointing at its one section. It is left out for a reaction alone or at depth 0.
+   (with an analysis), each event (every place it appears pointing at its one section),
+   and last the contents list itself. It is left out for a reaction alone or at depth 0.
 
 Its figures:
 
@@ -156,8 +156,9 @@ Compare each with `event-pdf`'s by FR-012.
    overlaid with the analysis.
 4. **Given** an identifier that names no event, an unknown token, or a token whose
    result is gone though its date is still within the retention period, **When** a PDF
-   is asked for, **Then** the answer says which of the three, as today, and no PDF is
-   made.
+   is asked for, **Then** the answer says which of the three, by the analysis service's
+   token rules, and no PDF is made. Today's endpoint answers an empty response for
+   either token case; telling them apart is new.
 
 ---
 
@@ -240,6 +241,36 @@ damage the output in each way FR-011 names, and see the check fail on each.
 
 ---
 
+### User Story 6 - The PDFs look like the website (Priority: P2)
+
+A reader opening either PDF sees Reactome as the website presents it. It has the
+website's colours, typefaces and plain, modern layout, and is clean and easy to read.
+Today's book looks dated.
+
+**Why this priority**: the PDFs are part of Reactome's public face. A reader moving
+between the website and the book should see one Reactome. It needs no more than the
+website's own palette, type and spacing, used well.
+
+**Independent Test**: put a page of the book beside the same event's page on the
+website. Check that the colours are the website's theme colours and the typefaces its
+typefaces. Then have the release's owners, and a curator or two, judge a sample of pages
+against today's book.
+
+**Acceptance Scenarios**:
+
+1. **Given** the website's theme, **When** a PDF is written, **Then** its headings,
+   links, rules and highlights use the theme's colours (its primary colour and the
+   colours paired with it), and its text uses the website's typefaces.
+2. **Given** a section, **When** it is laid out, **Then** its parts are set apart by
+   space and type rather than by boxes and borders, with figures given room and
+   consistent margins, running headers and page numbers.
+3. **Given** the cover, **When** it is written, **Then** it is designed in the website's
+   style, with Reactome's logo, the title and the pathway's figure.
+4. **Given** the website's theme changes, **When** the PDFs are next made, **Then** they
+   follow it, from the same source, not a copy.
+
+---
+
 ### Edge Cases
 
 - **An event with no summation, literature or edit history:** its section leaves that
@@ -294,7 +325,8 @@ damage the output in each way FR-011 names, and see the check fail on each.
   The analysis's other options today (resource, expression column, importable only, and
   the diagram and analysis colour profiles) are dropped: the website sends none of them.
   The overlay uses what they default to today: all resources together, no expression
-  column, all identifiers, and the standard colours.
+  column, all resources and not only importable ones, and the website's default
+  colours.
 
 - **FR-007**: The system MUST read:
   - the graph;
@@ -328,10 +360,11 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **FR-012**: The output MUST be compared with `event-pdf`'s for the same graph, by
   meaning:
   - the cover: its title, whether it has a diagram and an excerpt note, and the count of
-    people;
+    distinct names;
   - the introduction: the release and the counts;
-  - with an analysis, the analysis's properties: the values it reports (the analysis's
-    type and the identifiers found), not its explanatory text;
+  - with an analysis, the analysis's properties: the values it reports (such as its type,
+    the identifiers found and in all, the pathways hit, projection, interactors, species,
+    resource and token), not its explanatory text;
   - each event's section: its parts, their text and their order;
   - the contents list's entries and their targets;
   - which events have which kind of figure.
@@ -341,6 +374,14 @@ damage the output in each way FR-011 names, and see the check fail on each.
 
 - **FR-013**: Fixtures, samples and test output in the repository MUST NOT contain
   people's names; authors and curators are replaced by placeholders.
+- **FR-015**: The PDFs MUST take their colours from the website's theme, the same source
+  the website uses, and their text MUST be set in the website's typefaces. Each typeface
+  MUST be under a licence FR-009 allows.
+- **FR-016**: The PDFs' layout MUST be plain and modern:
+  - parts set apart by space and type rather than boxes and borders;
+  - consistent margins, running headers and page numbers;
+  - figures given room;
+  - a cover designed in the website's style.
 - **FR-014**: The website's single-event PDF MUST be reachable for the website to serve.
   How the website routes it, its parameters' names and the form of its error answers are
   specified in WebsiteAngular. Today's depth parameter's name is malformed, so the
@@ -382,6 +423,10 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
   shipped asset is added to test it.
 - **SC-007**: The book's check fails on each fault in FR-011, each seen to fail once.
+- **SC-009**: Every colour in the PDFs is one of the website's theme colours, and every
+  typeface one the website uses, as a check of the PDF's colours and fonts shows. In a
+  side-by-side judgement of a sample of pages, the release's owners prefer the new
+  book's look to today's.
 - **SC-008**: For a sample of events, each PDF figure is the drawing the website makes for
   the same event and analysis from the same data. Both are rendered at the same size by
   the same means, and no more than 1% of their pixels differ.
@@ -407,7 +452,10 @@ damage the output in each way FR-011 names, and see the check fail on each.
   - links from location entries are as today, but events now outside a per-pathway file
     are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
-    each recorded.
+    each recorded;
+  - an unknown or gone analysis token answered as such, where today's endpoint answers
+    an empty response;
+  - the look (User Story 6).
 - **One book's size:** the human book runs to thousands of pages. Whether it is made in
   one pass or in parts joined into one PDF is for the plan to measure.
 - **The analysis result** is read where the analysis service writes it, as the content

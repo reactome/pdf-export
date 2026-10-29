@@ -52,3 +52,9 @@
   - the analysis result is read where the analysis service writes it, as today;
   - the section order and the subpathway figure are as `event-pdf` writes them;
   - the faults the check looks for are defined.
+- **After the third review (#7):** the endpoint's token answers are a departure from today
+  (today answers an empty response). The contents list's own entry comes last. The
+  overlay's defaults and the analysis values are stated more fully.
+- **The look (User Story 6, FR-015, FR-016, SC-009),** added at the user's request: the
+  PDFs take the website's theme colours and typefaces and a plain, modern layout. Today's
+  book "looks a little like it is made with 20 year old tech".
