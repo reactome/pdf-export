@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-design-3`
+**Feature Branch**: `001-design-4`
 
 **Created**: 2026-10-29
 
@@ -265,9 +265,9 @@ of pages with today's book.
 2. **Given** a section, **When** it is laid out, **Then** its parts are set apart by
    space, type and at most thin rules, never boxes or borders, with the margins,
    running headers, page numbers and figure sizes of FR-016.
-3. **Given** the cover, **When** it is written, **Then** it holds the parts the
-   Background lists for a cover (for a pathway, its diagram), laid out in the website's
-   style with Reactome's logo.
+3. **Given** the cover, **When** it is written, **Then** it holds the parts FR-002 lists
+   (the book) or the Background lists (a single-event PDF; for a pathway, its diagram),
+   laid out in the website's style with Reactome's logo.
 4. **Given** a new version of the website's theme, **When** this repository updates to
    it, **Then** the PDFs follow it with no colour value changed in this repository.
 
@@ -325,8 +325,8 @@ of pages with today's book.
 - **FR-006**: The system MUST produce the PDF of one event of any species by stable
   identifier:
   - at depth 0 or 1, 1 by default;
-  - with the cover and introduction of the Background, and, where the Background has a
-    contents list, that list before the sections and nested bookmarks, as in the book;
+  - with the cover and introduction of the Background; nested bookmarks; and, where the
+    Background has a contents list, that list before the sections, as in the book;
   - given an analysis token, with the analysis overlay of the Background, for the event's
     species.
 

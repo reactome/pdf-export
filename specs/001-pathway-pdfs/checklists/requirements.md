@@ -74,3 +74,5 @@
   it first; FR-011's missing-figure fault applies only where the figure's source
   exists; the fallback typeface is named; front pages' running headers are defined;
   dropped analysis options are ignored.
+- **After the sixth review (#10):** bookmarks no longer depend on a contents list
+  (FR-006), and Story 6's cover scenario names the book's cover (FR-002).
