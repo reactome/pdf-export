@@ -16,7 +16,8 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'ImportDeclaration[source.value=/^\\.{1,2}\\/.*\\.js$/]',
+          selector:
+            ':matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/^\\.{1,2}\\/.*\\.js$/]',
           message: 'Import the .ts file: Node runs the TypeScript as it is.',
         },
       ],

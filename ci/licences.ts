@@ -21,7 +21,7 @@ export const ALLOWED: ReadonlySet<string> = new Set([
   'OFL-1.1',
   'CC0-1.0',
   'Zlib',
-  // Blue Oak Model License: permissive, like MIT (some of npm's own tooling uses it).
+  // Blue Oak Model License: permissive, like MIT (minimatch, which ESLint brings, uses it).
   'BlueOak-1.0.0',
 ]);
 
@@ -39,7 +39,8 @@ export interface Installed {
   name?: string;
   version?: string;
   license?: unknown;
-  path?: string;
+  /** Relative to the project, never redacted (npm masks parts of `path` it takes for secrets). */
+  location?: string;
 }
 
 export interface Offender {
@@ -126,8 +127,9 @@ export function offenders(
     const name = pkg.name ?? '(unnamed)';
     const version = pkg.version ?? '';
     const license = declared(pkg.license);
-    if (exceptions.has(name)) continue;
     if (license === null) {
+      // The exception covers a package that declares nothing; a declared licence is always read
+      if (exceptions.has(name)) continue;
       found.push({ name, version, license, reason: 'declares no licence' });
     } else if (!allowed(license, allow)) {
       found.push({ name, version, license, reason: 'not on the allowlist' });
@@ -136,12 +138,13 @@ export function offenders(
   return found.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 }
 
-/** A shipped font package (`@fontsource/*`) without its licence file. */
-export function fontsWithoutLicence(packages: readonly Installed[]): Offender[] {
+/** A shipped font package (`@fontsource/*`) without its licence file, found from the project root. */
+export function fontsWithoutLicence(packages: readonly Installed[], root: string): Offender[] {
   const found: Offender[] = [];
   for (const pkg of packages) {
-    if (!pkg.name?.startsWith('@fontsource/') || !pkg.path) continue;
-    const files = existsSync(pkg.path) ? readdirSync(pkg.path) : [];
+    if (!pkg.name?.startsWith('@fontsource/') || pkg.location === undefined) continue;
+    const folder = join(root, pkg.location);
+    const files = existsSync(folder) ? readdirSync(folder) : [];
     if (!files.some((file) => /^(LICEN[CS]E|OFL)(\.(md|txt))?$/i.test(file))) {
       found.push({
         name: pkg.name,
@@ -159,18 +162,31 @@ export function installed(queryFile?: string): Installed[] {
   const text = queryFile
     ? readFileSync(queryFile, 'utf8')
     : execFileSync('npm', ['query', '*'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  const all = JSON.parse(text) as (Installed & { location?: string })[];
+  const all = JSON.parse(text) as Installed[];
   return all.filter((pkg) => pkg.location !== '');
+}
+
+/** Exceptions that match nothing installed: each is removed once it is not needed. */
+export function unusedExceptions(
+  packages: readonly Installed[],
+  exceptions: ReadonlyMap<string, string> = EXCEPTIONS
+): string[] {
+  const names = new Set(packages.map((pkg) => pkg.name));
+  return [...exceptions.keys()].filter((name) => !names.has(name));
 }
 
 function main(args: readonly string[]): number {
   const at = args.indexOf('--query');
   const queryFile = at === -1 ? undefined : args[at + 1];
-  const packages = installed(queryFile).map((pkg) => ({
-    ...pkg,
-    ...(pkg.path ? {} : { path: join('node_modules', pkg.name ?? '') }),
-  }));
-  const problems = [...offenders(packages), ...fontsWithoutLicence(packages)];
+  if (at !== -1 && (queryFile === undefined || queryFile.startsWith('-'))) {
+    process.stderr.write('--query needs the file of a saved `npm query` answer\n');
+    return 2;
+  }
+  const packages = installed(queryFile);
+  const problems = [...offenders(packages), ...fontsWithoutLicence(packages, process.cwd())];
+  for (const name of unusedExceptions(packages)) {
+    process.stdout.write(`note: the exception for ${name} matches nothing installed\n`);
+  }
   for (const { name, version, license, reason } of problems) {
     process.stderr.write(`${name}@${version}: ${license ?? '(none)'}: ${reason}\n`);
   }

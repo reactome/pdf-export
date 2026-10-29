@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { allowed, declared, fontsWithoutLicence, offenders } from '../../ci/licences.ts';
+import {
+  allowed,
+  declared,
+  fontsWithoutLicence,
+  offenders,
+  unusedExceptions,
+} from '../../ci/licences.ts';
 
 test('a single allowed licence passes, and the GPL family does not', () => {
   for (const ok of ['MIT', 'Apache-2.0', 'BSD-3-Clause', 'ISC', 'OFL-1.1', 'CC0-1.0', '0BSD']) {
@@ -55,23 +61,49 @@ test('every offender is listed, not only the first, with its reason', () => {
   );
 });
 
-test('the theme package is the one documented exception, by name', () => {
+test('the theme package is the one documented exception, by name, and only while it declares none', () => {
   assert.deepEqual(offenders([{ name: 'ngx-reactome-style', version: '0.1.0' }]), []);
   assert.equal(offenders([{ name: 'ngx-reactome-styles', version: '0.1.0' }]).length, 1);
+  // A declared licence is always read, even the excepted package's
+  assert.equal(
+    offenders([{ name: 'ngx-reactome-style', version: '0.2.0', license: 'GPL-3.0' }]).length,
+    1
+  );
 });
 
-test('a shipped font without its licence file is an offender', () => {
+test('an exception that matches nothing installed is reported, to be removed', () => {
+  assert.deepEqual(unusedExceptions([{ name: 'other' }]), ['ngx-reactome-style']);
+  assert.deepEqual(unusedExceptions([{ name: 'ngx-reactome-style' }]), []);
+});
+
+test('a shipped font without its licence file is an offender, found by its location', () => {
   const root = mkdtempSync(join(tmpdir(), 'licences-'));
-  const withFile = join(root, 'roboto');
-  const without = join(root, 'noto-sans');
-  mkdirSync(withFile);
-  mkdirSync(without);
-  writeFileSync(join(withFile, 'LICENSE'), 'SIL Open Font License 1.1');
-  const found = fontsWithoutLicence([
-    { name: '@fontsource/roboto', version: '5.3.0', license: 'OFL-1.1', path: withFile },
-    { name: '@fontsource/noto-sans', version: '5.3.0', license: 'OFL-1.1', path: without },
-    { name: 'not-a-font', version: '1.0.0', license: 'MIT', path: without },
-  ]);
+  mkdirSync(join(root, 'node_modules/@fontsource/roboto'), { recursive: true });
+  mkdirSync(join(root, 'node_modules/@fontsource/noto-sans'), { recursive: true });
+  writeFileSync(join(root, 'node_modules/@fontsource/roboto/OFL.txt'), 'SIL Open Font License 1.1');
+  const found = fontsWithoutLicence(
+    [
+      {
+        name: '@fontsource/roboto',
+        version: '5.3.0',
+        license: 'OFL-1.1',
+        location: 'node_modules/@fontsource/roboto',
+      },
+      {
+        name: '@fontsource/noto-sans',
+        version: '5.3.0',
+        license: 'OFL-1.1',
+        location: 'node_modules/@fontsource/noto-sans',
+      },
+      {
+        name: 'not-a-font',
+        version: '1.0.0',
+        license: 'MIT',
+        location: 'node_modules/@fontsource/noto-sans',
+      },
+    ],
+    root
+  );
   assert.deepEqual(
     found.map((o) => o.name),
     ['@fontsource/noto-sans']
