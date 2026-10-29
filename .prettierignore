@@ -1,0 +1,10 @@
+# Installed by Spec Kit, not authored: a reinstall would fight the formatter. The
+# constitution is this project's own, so it is checked.
+.specify/*
+!.specify/memory
+.specify/memory/*
+!.specify/memory/constitution.md
+.claude
+
+# Build output
+target
