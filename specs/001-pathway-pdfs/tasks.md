@@ -35,7 +35,7 @@ repository root.
 
 **Purpose:** the package, its gates and the fixture everything else is tested on.
 
-- [ ] T001 The package and its gates.
+- [x] T001 The package and its gates. — #20. TypeScript 6.0, ESLint 10 with typescript-eslint 8.72's strict type-checked rules (node:test's calls allowed as floating promises), Prettier 3.9.10 and Node 24.22's `node --test`, with no loader. Each gate was seen failing on a planted fault: a type error (typecheck exit 2), an unused variable (lint exit 1), a misformatted file (format exit 1) and a failing test (test exit 1).
   - `package.json`: Node 24, `"type": "module"`, `"license": "Apache-2.0"`.
   - `tsconfig.json`: strict, with `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` and `noEmit`.
   - ESLint with typescript-eslint's strict rules, in `eslint.config.js`.
@@ -94,7 +94,8 @@ repository root.
 budgets, which decide whether the design stands; then the parts both outputs share.
 
 **Go or no-go:** T005 decides whether the book can meet SC-003 as designed. If it cannot,
-stop and take T006's route before any of Phase 4.
+stop and take T006's route before any of Phase 4. A go that rests on page reuse alone waits
+for WebsiteAngular to ship it (T042).
 
 - [ ] T005 Measure the figures' throughput at the book's scale (research R3, R7). The run conditions:
   - a private copy of the release's graph, with the release's diagram and EHLD files;
@@ -244,7 +245,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
 
 - [ ] T022 [US2] The service, `src/serve.ts` (contracts/service.md).
   - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`.
-  - **Settings:** bind address (loopback by default), port, `--graph`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable (contracts/cli.md).
+  - **Settings:** bind address (loopback by default), port, `--graph`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable where contracts/cli.md gives one.
   - **Answers:**
     - 200 with `Content-Disposition` naming the stable identifier;
     - 400 `bad-depth`, then 400 `not-an-event` or 404 `no-event`, then the token's answer (404 `unknown-token`, 410 `gone-token`), in that order;
@@ -451,7 +452,7 @@ passes.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
-- **US1 (Phase 4)** needs Phase 2 and a go from T005 (or T006's route): T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031.
+- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**
