@@ -113,7 +113,9 @@ diagram and EHLD files.
     220 EHLDs × 2.2–2.4 s and 1,499 selections × 4.1 s make 53,000–55,000 s, so about
     7.4–7.7 h at its concurrency of 2 (more, at its measured 1.65 times);
   - with four reused pages: 16,424 × 0.65 s and 2,889 × 2.8–4.0 s make
-    18,800–22,200 s, so about 1.3–1.5 h.
+    18,800–22,200 s of drawing, so about 1.3–1.5 h if four pages ran four times as fast.
+    They do not: two at once measured 1.65 times one, so four would give less than four
+    times, and the real time would be longer than 1.3–1.5 h.
 - **A licence trap.** The built site carries FoamTree, under Carrot Search's commercial
   licence, in a chunk every render loads. pdf-export cannot ship the built site in its
   own image (constitution II).
@@ -127,7 +129,9 @@ never ships the website's code.
   content service) on the release's graph and files, as a neighbour of pdf-export's
   container.
 - **The service's limits are settings,** for the book's run, rather than the website's
-  defaults: concurrency, queue and timeout. Its cache is turned off for the run.
+  defaults: concurrency, queue and timeout. Its cache is turned off for the book's run.
+  For the website's PDF, the website's own cache is used: it holds that release's
+  figures (R7, SC-005).
 - **pdf-export prefixes every SVG id** before it inlines the figure.
 
 **Alternatives considered.**
@@ -172,7 +176,8 @@ synthetic documents, on this host under load.
     page counters; named pages, one per chapter, for running headers;
     `break-inside: avoid` for figures;
   - does not work: `string-set`, running elements, `target-counter()` and `leader()`.
-- **Contents page numbers** come from a second pass. The first pass prints fixed-width
+- **Contents page numbers** come from a second pass, in the book and in a single-event
+  PDF that has a contents list. The first pass prints fixed-width
   placeholders; each section's page is read back; the front part is printed again. Page
   counts and anchors were identical between the passes.
 - **Page numbers across parts:** `html { counter-reset: page N }` starts a part at N+1.
@@ -195,22 +200,31 @@ synthetic documents, on this host under load.
   - **page numbers and running headers stamped after the join,** not printed: the parts
     are printed without them, and pdf-lib writes each page's number ("12 of 23,541") and
     its chapter's name, which the model knows from where each chapter's parts landed,
-    in an embedded subset of Roboto. SC-009's font check sees that font too. The other
+    in an embedded subset of Roboto, in the compiled theme's on-surface-variant colour,
+    read from the compiled CSS, not written here (FR-015). SC-009's check sees that font
+    and colour too. The other
     way, printing every part, counting, and printing them again with their offsets,
     doubles the printing time. Stamping is to be measured in the first tasks;
   - the contents list numbered by the second pass, its front part only;
   - **the join's memory** re-measured on the real book (pdf-lib holds the whole file):
     120 MB in the synthetic test, perhaps near 1 GB for real. If it does not fit, the
     chapters are joined in groups and the groups joined last.
-- **A single-event PDF:** one pass, tagged, with Chromium's own bookmarks and page
-  numbers from its margin boxes.
+- **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
+  from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
+  are numbered as the book's are: a first print with placeholders, its anchors' pages
+  read back, and a second print. A reaction alone, or depth 0, has no contents list and
+  is printed once. The second print is in SC-005's budget (R7).
 - **The legibility floor** (FR-016): a diagram's label text, 16 px in the render
   service's SVG, never below 5 pt on the page. The figure's scale on the page gives its
   labels' size. A figure that would fall below the floor at the text width gets a
   landscape page of its own, at the largest size the page allows. A diagram so large
   that even that is below the floor is accepted at that size (the PDF's vector drawing
-  can still be zoomed) and listed in the run report. A figure is never split across
-  pages.
+  can still be zoomed) and listed in the run report; FR-016 is amended to say so ("5 pt,
+  or the largest a landscape page allows"). A figure is never split across pages.
+  - At 16 px labels, 5 pt allows a figure about 1,540 of the SVG's pixels wide in
+    portrait and about 2,330 on an A4 landscape page with 20 mm margins (inference,
+    from the page sizes). Many diagrams are wider, so the exception may be common. The
+    first tasks count the release's diagram widths (R7, to measure).
 - **pdf-lib:** the maintained MIT fork `@cantoo/pdf-lib`, if it passes the same tests;
   otherwise pdf-lib 1.17.
 
@@ -301,6 +315,10 @@ synthetic documents, on this host under load.
     `gone-token` (410).
   - What the service itself answers for an expired and a malformed token is confirmed
     against a private instance in the first tasks. CI's stub has a case for each.
+  - **The retention period is a setting** of `serve` (contracts/cli.md), and must match
+    the analysis service's own: if they drift, a token one calls expired the other may
+    still answer. The first tasks read the service's period from its configuration and
+    set the default to it.
 - **The requests carry FR-006's defaults:** all resources together (`TOTAL`), no
   expression column, all identifiers rather than only importable ones.
 - **The found count:** if `/token/{token}`'s summary carries the identifiers found, it
@@ -323,6 +341,11 @@ snapshot in place of 1.2.8: only a Reactome-hosted repository serves 1.2.8, and 
 figures are not what this baseline compares. The release's diagram files, EHLD files and
 EHLD summary were fetched one at a time from the release's download directory, for the
 human pathways that have a diagram: 2,780 files and 221 illustrations, 373 MB.
+
+The EHLD summary named 221 pathways, and all 221 illustrations were fetched; the graph
+counts 220 human pathways with a diagram of their own and an illustration (the table
+below). The one more is unexplained here: another species' pathway, or one whose flag
+the graph does not set. The first tasks identify it.
 
 - **The human book,** by `event-pdf`'s command line (`-Xmx6g`):
 
@@ -374,34 +397,63 @@ human pathways that have a diagram: 2,780 files and 221 illustrations, 373 MB.
 **What this sets.**
 
 - **SC-003:** the book in no more than 1 h 18 min on this host, against this baseline.
-- **SC-005:** each single-event PDF in no more time than these, warm.
+  SC-003 compares on the same machine: if the release's book is made on another, the
+  baseline is run again there, and its time is the budget.
+- **SC-005:** each single-event PDF in no more time than these, warm. Measured with the
+  render service's cache off: a cached figure is not a measurement (constitution V).
+  - **The risk:** a figure alone takes 2.6–4.1 s through the service (R3), and a pathway
+    at depth 1 has a figure for itself and for each child, two drawn at once. A pathway
+    with five children would take 7–12 s in figures alone, against `event-pdf`'s
+    1.3–9.5 s. A reaction's one figure (2.6 s) is over its 0.5–1.7 s.
+  - **A budget per stage,** for a pathway at depth 1 with n figures: reading the graph
+    0.3 s; figures n × 2.6–4.1 s, halved at two at once; the first print 0.7 s; the
+    contents' second print 0.7 s; the analysis, with a token, 0.5 s.
+  - **The answers, in order:** the figures asked in parallel within the service's
+    limits; the website's own render cache, which is legitimate for the website's PDF
+    (the website serves that release's figures, and has drawn the popular ones); many
+    figures per page load (R10).
+  - If the measurement still exceeds `event-pdf`'s times, SC-005 is amended with the
+    user, with the numbers.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages, still over SC-003's whole budget.
 - **A budget per stage,** within SC-003's 78 minutes on this host:
 
-  | Stage                                          | Budget | Why                                                                              |
-  | ---------------------------------------------- | ------ | -------------------------------------------------------------------------------- |
-  | Figures                                        | 45 min | the largest; may overlap the graph reads and printing                            |
-  | Reading the graph                              | 4 min  | batched queries, one per level and part                                          |
-  | Printing the parts                             | 14 min | about 20 ms a page in the synthetic test, four at once; real figures are heavier |
-  | Join, links, outline, page numbers and headers | 6 min  | 6 s for 4,930 synthetic pages, scaled, with room                                 |
-  | The contents' second pass                      | 2 min  | the front part only                                                              |
-  | `check-book`                                   | 7 min  | 84 s for 4,930 pages, scaled to 23,541 (inference)                               |
+  | Stage                                          | Budget | Why                                                                                                              |
+  | ---------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------- |
+  | Figures                                        | 44 min | the largest; may overlap the graph reads and printing                                                            |
+  | Reading the graph                              | 4 min  | batched queries, one per level and part                                                                          |
+  | Printing the parts                             | 13 min | about 11 ms a page four at once (18 ms one at a time) in the synthetic test; real figures are heavier            |
+  | Join, links, outline, page numbers and headers | 6 min  | 6 s for 4,930 synthetic pages, scaled, with room                                                                 |
+  | The contents' second pass                      | 2 min  | the front part only                                                                                              |
+  | `check-book`                                   | 9 min  | 84 s for 4,930 pages scales to 6.7 min for 23,541 (inference), before the graph and text checks; 2 min of margin |
+
+  The stages sum to 78 minutes, the whole of SC-003's budget, with no margin of their
+  own; the figures gave a minute and printing a minute to `check-book`'s margin.
 
 - **Go or no-go, first:** the first task measures the render service's throughput at the
   book's scale, on the machine the release would use, with its concurrency raised and
-  its pages reused. If the figures cannot be drawn within 45 minutes, before any of the
-  book's code is written past the foundations, the fallbacks are, in order:
-  1. a figure cache keyed by the release and the stable identifier, shared with the
-     website's own render cache, so the book reuses what the website has already drawn
-     for the release;
-  2. many figures per page load, through an in-page API on the render page
-     (WebsiteAngular, R10), which saves the page loads that dominate a reaction's time;
-  3. SC-003 amended with the release's owners.
+  its pages reused. 44 minutes for 19,313 figures is about 7.3 figures a second: at
+  R3's reused-page times that is 7–8 pages at once if they scaled linearly, and two at
+  once gave only 1.65 times one. **On the plan's own data a no-go is likely.** If the
+  figures cannot be drawn within 44 minutes, before any of the book's code is written past
+  the foundations, the routes are, in order:
+  1. **many figures per page load,** through an in-page API on the render page
+     (WebsiteAngular, R10), which saves the page loads that dominate a reaction's time.
+     This is the realistic route;
+  2. SC-003 amended with the release's owners, with the measurement.
 
-  More render workers on the same machine compete with printing for its cores, so they
-  are a lever only within the 45 minutes, not a way past them.
+  A shared figure cache is not a route for the book: at release time the website has not
+  yet drawn the new release, so it would hold little, and the book's run turns the cache
+  off so every figure is drawn from the release's data (contracts/render.md). More render
+  workers on the same machine compete with printing for its cores, so they are a lever
+  only within the 44 minutes, not a way past them.
+
+- **To measure in the first tasks:** the render service's throughput (above); the
+  diagrams' widths, from the release's diagram files, for FR-016's floor (R4); the one
+  illustration the graph does not count (above); what the analysis service answers for
+  an expired and a malformed token, and its retention period (R6); the join's memory and
+  stamping (R4).
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), it is split within its chapter, at section boundaries.
@@ -434,7 +486,8 @@ embedded.
   (contracts/cli.md).
 - **SC-008's figure comparison** draws both by the same means, as SC-008 asks: the
   render service's SVG is printed alone by the same Chromium to a one-page PDF at the
-  figure's size on the page, and both that and the book's page are rasterised by pdf.js
+  figure's size on the page, on a page with the same `@font-face` rules as the book's
+  (the image has no fallback font, so without them its text would be lost), and both that and the book's page are rasterised by pdf.js
   inside that Chromium, at the same scale, the book's cropped to the figure's box. No
   more than 1% of pixels may differ. Run on a sample, in development.
 - **FR-012's comparison** (`compare`) reduces both sides to the parts FR-012 lists. Its
@@ -444,8 +497,10 @@ embedded.
   - It treats list order as a recorded difference.
   - It prints counts and hashes of names, never names (FR-013).
   - It is run in development against `event-pdf`'s output, never in the release.
-- **SC-009's check** prints a sample with figures hidden, and compares every colour with
-  the compiled theme and every font with FR-015's.
+- **SC-009's check** prints a sample with figures hidden, takes it through the same join
+  and stamping as the book, and compares every colour on the result's own pages with the
+  compiled theme and every font with FR-015's, so the stamped page numbers and headers
+  are checked too.
 
 **Alternatives considered.** Poppler's or MuPDF's tools: GPL and AGPL, so not
 dependencies, though a person may use them to look.
@@ -484,8 +539,8 @@ packaging.
 - **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
   the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
-- **If R7's go/no-go needs it:** an in-page API on the render page to draw many figures
-  per page load, and a render cache the book can share.
+- **If R7's go/no-go needs it, as is likely:** an in-page API on the render page to draw
+  many figures per page load.
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
   in its own process.

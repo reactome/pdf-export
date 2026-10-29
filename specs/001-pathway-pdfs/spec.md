@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-plan-2`
+**Feature Branch**: `001-plan-3`
 
 **Created**: 2026-10-29
 
@@ -405,7 +405,8 @@ of pages with today's book.
     single-event PDF), or on front pages (introduction, analysis properties,
     contents) that part's name, and a page number on every page but the cover;
   - no figure split across pages, and none shrunk below the size the plan sets for
-    legibility;
+    legibility, or below the largest a landscape page of its own allows; a figure still
+    below that size is listed in the run report;
   - a cover in the website's style (User Story 6, scenario 3).
 
 ### Key Entities
@@ -469,7 +470,10 @@ of pages with today's book.
   for the book. The release's owners agree the switch.
 - **The render service beside the book's step:** the figures come from the website's
   render service, with its content service, run on the release's graph and files beside
-  the book's step (plan, research R3). The release's owners agree it.
+  the book's step (plan, research R3). That service loads FoamTree, under a commercial
+  licence: pdf-export ships none of it, but cannot draw figures without the service
+  until WebsiteAngular's render bundle without FoamTree exists (plan, Complexity
+  Tracking). The release's owners agree both.
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;

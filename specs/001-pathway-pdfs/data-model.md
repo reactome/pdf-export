@@ -100,7 +100,8 @@ Cases).
 
 - `entries`: the introduction, the analysis properties (with an analysis), each place an
   event appears pointing at its one full Section, and last the contents list itself.
-- `pages`: each entry's page, filled by the second pass (research R4).
+- `pages`: each entry's page, filled by the second pass (research R4), in the book and
+  in a single-event PDF alike.
 - Left out for a reaction alone or at depth 0, as today. Bookmarks are written in every
   PDF (FR-006).
 

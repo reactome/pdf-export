@@ -61,10 +61,11 @@ pathway; their covers' distinct names are counted across the folder.
 
 The single-event service (contracts/service.md).
 
-| Flag                                       | Environment        | Meaning                                                                             |
-| ------------------------------------------ | ------------------ | ----------------------------------------------------------------------------------- |
-| `--port`                                   | `PORT`             | default 4370                                                                        |
-| `--bind`                                   | `BIND_ADDRESS`     | default `127.0.0.1`; in its own container, an address the content service can reach |
-| `--graph`, `--render`, `--files`, `--site` |                    | as for `book`                                                                       |
-| `--analysis`                               | `ANALYSIS_SERVICE` | the analysis service's base URL                                                     |
-| `--concurrency`                            |                    | PDFs made at once; default 2                                                        |
+| Flag                                       | Environment        | Meaning                                                                                                  |
+| ------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `--port`                                   | `PORT`             | default 4370                                                                                             |
+| `--bind`                                   | `BIND_ADDRESS`     | default `127.0.0.1`; in its own container, an address the content service can reach                      |
+| `--graph`, `--render`, `--files`, `--site` |                    | as for `book`                                                                                            |
+| `--analysis`                               | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                          |
+| `--retention`                              | `TOKEN_RETENTION`  | how long an analysis token is kept, in days; must match the analysis service's own setting (research R6) |
+| `--concurrency`                            |                    | PDFs made at once; default 2                                                                             |

@@ -61,11 +61,13 @@ service, private ones on the private graph:
 Each opens, has the parts of the spec's Background in order and has bookmarks.
 `compare` against `event-pdf`'s PDF of the same event shows only recorded differences.
 
-- **SC-005:** each is timed warm, on the second of two requests, against research R7's
-  single-event times for the same events.
+- **SC-005:** each is timed warm, on the second of two requests with the render
+  service's cache off (a cached figure is not a measurement), stage by stage against
+  research R7's budget, and in all against R7's single-event times for the same
+  events.
 - **SC-008:** for a sample of figures, the book's or the PDF's figure against the render
-  service's SVG, both drawn by pdf.js at the same scale (research R8): no more than 1%
-  of pixels differ.
+  service's SVG printed alone on a page with the same `@font-face` rules, both drawn by
+  pdf.js at the same scale (research R8): no more than 1% of pixels differ.
 
 - **The errors:** an unknown identifier, a non-event, a bad depth, an unknown token, a
   malformed token, an expired token and a token gone within the period each give
@@ -86,9 +88,10 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 
 ## 5. The look (Story 6)
 
-- **SC-009, the check:** a sample of pages printed with figures hidden. Every colour must
-  be in the compiled theme, and every font one FR-015 names, the stamped page numbers'
-  Roboto included.
+- **SC-009, the check:** a sample of pages printed with figures hidden and taken through
+  the same join and stamping as the book. Every colour on the result's pages must be in
+  the compiled theme, and every font one FR-015 names, the stamped page numbers and
+  headers included.
 - **SC-009, the judgement:** 12 random pages, including a cover, a contents page and a
   pathway section with its figure, set beside today's book for the judges.
 
