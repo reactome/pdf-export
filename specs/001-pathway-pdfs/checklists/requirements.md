@@ -84,3 +84,8 @@
   which the plan's fonts need; FR-016's floor allows the largest a landscape page gives,
   with figures still below it listed; the render service's Assumption names its FoamTree
   dependency.
+- **After the plan's third review (#14):** SC-005 is measured cold, so the website's cache
+  is no answer to it; the single-event figure times corrected (2.2–5.0 s, 1.65 at two at
+  once); the gate table's render-service line matches Complexity Tracking; FR-016's
+  floor reads as one; the EHLD summary's extra entry explained (an event the graph does
+  not hold) and the preflight told to ignore such entries.

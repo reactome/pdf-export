@@ -21,7 +21,9 @@ Writes the release's book (Story 1).
 | `--report`   |                                | where the run report (data-model.md) is written, as JSON                                             |
 
 - **The preflight,** before anything is printed: from the graph and the EHLD summary it
-  lists the release's files the figures need, and a file missing is a fault
+  lists the release's files the figures need (the events from the graph; which are
+  illustrations from the summary, ignoring an entry for an event the graph does not
+  hold), and a file missing is a fault
   `missing-file <name>`, the step ending with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers is a fault `uncovered-character <code point>
 <stId>` (research R5).

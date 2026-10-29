@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-plan-3`
+**Feature Branch**: `001-plan-4`
 
 **Created**: 2026-10-29
 
@@ -404,9 +404,9 @@ of pages with today's book.
   - a running header naming the top-level pathway (in the book) or the event (in a
     single-event PDF), or on front pages (introduction, analysis properties,
     contents) that part's name, and a page number on every page but the cover;
-  - no figure split across pages, and none shrunk below the size the plan sets for
-    legibility, or below the largest a landscape page of its own allows; a figure still
-    below that size is listed in the run report;
+  - no figure split across pages, and none shrunk below the legibility size the plan
+    sets, unless it is already at the largest a landscape page of its own allows, in
+    which case it is listed in the run report;
   - a cover in the website's style (User Story 6, scenario 3).
 
 ### Key Entities

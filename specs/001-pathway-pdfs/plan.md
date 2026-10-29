@@ -1,6 +1,6 @@
 # Implementation Plan: Reactome's pathway PDFs from the graph
 
-**Branch**: `001-plan-3` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-plan-4` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/001-pathway-pdfs/spec.md`
 
@@ -73,7 +73,7 @@ fonts above), run by the release and beside the website's services.
 - **SC-005:** a single-event PDF at depth 1 in no more time than `event-pdf`'s, warm:
   0.5–1.7 s for a reaction, 1.3–9.5 s for most pathways, 46 s for Signal Transduction
   (R7). Measured with the render service's cache off. **At risk:** a figure alone takes
-  2.6–4.1 s through the service, so figures alone may exceed these; R7 gives a budget
+  2.2–5.0 s through the service, so figures alone may exceed these; R7 gives a budget
   per stage and the answers, and SC-005 is amended with the user if the measurement
   says so.
 - **Figures dominate:** 19,313 for the human book (R7). From the render service's times,
@@ -117,8 +117,8 @@ _GATE: checked before research and again after design._
 | VII. No names                      | The fixture graph uses placeholders. The comparison prints counts and hashes (R8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Pass                                                                  |
 
 **After design:** unchanged. The render service is a new dependency of the release's
-step, which constitution I–VII allow, with II's limitation above. The release's owners
-agree it (spec, Assumptions; R3).
+step, a tracked violation of II (Complexity Tracking) until R10's render bundle without
+FoamTree exists. The release's owners agree it (spec, Assumptions; R3).
 
 ## Project Structure
 

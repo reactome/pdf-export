@@ -130,8 +130,8 @@ never ships the website's code.
   container.
 - **The service's limits are settings,** for the book's run, rather than the website's
   defaults: concurrency, queue and timeout. Its cache is turned off for the book's run.
-  For the website's PDF, the website's own cache is used: it holds that release's
-  figures (R7, SC-005).
+  For the website's PDF, the website's own cache serves what it holds, a benefit in
+  service outside SC-005, which is measured cold (R7).
 - **pdf-export prefixes every SVG id** before it inlines the figure.
 
 **Alternatives considered.**
@@ -344,8 +344,11 @@ human pathways that have a diagram: 2,780 files and 221 illustrations, 373 MB.
 
 The EHLD summary named 221 pathways, and all 221 illustrations were fetched; the graph
 counts 220 human pathways with a diagram of their own and an illustration (the table
-below). The one more is unexplained here: another species' pathway, or one whose flag
-the graph does not set. The first tasks identify it.
+below). The one more is a stable identifier the release's graph does not hold at all:
+the summary still names an illustration whose pathway is gone. So the preflight lists
+the files the figures need from the graph's events, and takes from the summary only
+which of them are illustrations; a summary entry for an event the graph does not hold
+is ignored, not a missing file.
 
 - **The human book,** by `event-pdf`'s command line (`-Xmx6g`):
 
@@ -401,22 +404,24 @@ the graph does not set. The first tasks identify it.
   baseline is run again there, and its time is the budget.
 - **SC-005:** each single-event PDF in no more time than these, warm. Measured with the
   render service's cache off: a cached figure is not a measurement (constitution V).
-  - **The risk:** a figure alone takes 2.6–4.1 s through the service (R3), and a pathway
-    at depth 1 has a figure for itself and for each child, two drawn at once. A pathway
-    with five children would take 7–12 s in figures alone, against `event-pdf`'s
+  - **The risk:** a figure alone takes 2.2–5.0 s through the service (R3: reactions
+    2.6 s, illustrations 2.2–2.4 s, diagrams 3.4–5.0 s, selections 4.1 s), and a pathway
+    at depth 1 has a figure for itself and for each child, two drawn at once, which R3
+    measured at 1.65 times one, not twice. A pathway with five children (six figures)
+    would take about 9.5–15 s in figures alone (inference), against `event-pdf`'s
     1.3–9.5 s. A reaction's one figure (2.6 s) is over its 0.5–1.7 s.
   - **A budget per stage,** for a pathway at depth 1 with n figures: reading the graph
-    0.3 s; figures n × 2.6–4.1 s, halved at two at once; the first print 0.7 s; the
+    0.3 s; figures n × 2.2–5.0 s, divided by 1.65 at two at once; the first print 0.7 s; the
     contents' second print 0.7 s; the analysis, with a token, 0.5 s.
   - **The answers, in order:** the figures asked in parallel within the service's
-    limits; the website's own render cache, which is legitimate for the website's PDF
-    (the website serves that release's figures, and has drawn the popular ones); many
-    figures per page load (R10).
+    limits; many figures per page load (R10). The website's render cache helps readers
+    in service, but SC-005 is measured cold, so it is no answer to the criterion.
   - If the measurement still exceeds `event-pdf`'s times, SC-005 is amended with the
     user, with the numbers.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
-  with four reused pages, still over SC-003's whole budget.
+  with four reused pages if four pages ran four times as fast, which they do not, still
+  over SC-003's whole budget.
 - **A budget per stage,** within SC-003's 78 minutes on this host:
 
   | Stage                                          | Budget | Why                                                                                                              |
