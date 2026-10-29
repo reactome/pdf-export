@@ -1,0 +1,10 @@
+# Build output and dependencies
+node_modules/
+target/
+dist/
+
+# Output and references: they hold people's names (constitution VII)
+output/
+reference/
+*.pdf
+!fixtures/**/*.pdf
