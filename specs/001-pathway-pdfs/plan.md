@@ -1,6 +1,6 @@
 # Implementation Plan: Reactome's pathway PDFs from the graph
 
-**Branch**: `001-plan-4` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-plan-5` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/001-pathway-pdfs/spec.md`
 

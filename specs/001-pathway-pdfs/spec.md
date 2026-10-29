@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-plan-4`
+**Feature Branch**: `001-plan-5`
 
 **Created**: 2026-10-29
 
@@ -285,8 +285,9 @@ of pages with today's book.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
 - **A release file missing:** a diagram the graph needs but the files lack, or an EHLD
-  the summary names but the files lack. The step fails and names it (Story 5,
-  scenario 3).
+  the summary names for a pathway the graph holds, but the files lack. (An entry for an
+  event the graph does not hold is ignored: plan, research R7.) The step fails and names
+  it (Story 5, scenario 3).
 - **An analysis token unknown, malformed, older than the retention period, or gone
   within it:** a malformed token, or one older than the retention period, is answered
   as unknown; one whose result is gone within the period is answered as gone (Story 2,

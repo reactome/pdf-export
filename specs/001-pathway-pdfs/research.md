@@ -408,7 +408,7 @@ is ignored, not a missing file.
     2.6 s, illustrations 2.2–2.4 s, diagrams 3.4–5.0 s, selections 4.1 s), and a pathway
     at depth 1 has a figure for itself and for each child, two drawn at once, which R3
     measured at 1.65 times one, not twice. A pathway with five children (six figures)
-    would take about 9.5–15 s in figures alone (inference), against `event-pdf`'s
+    would take about 8–18 s in figures alone (inference), against `event-pdf`'s
     1.3–9.5 s. A reaction's one figure (2.6 s) is over its 0.5–1.7 s.
   - **A budget per stage,** for a pathway at depth 1 with n figures: reading the graph
     0.3 s; figures n × 2.2–5.0 s, divided by 1.65 at two at once; the first print 0.7 s; the
