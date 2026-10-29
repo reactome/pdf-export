@@ -1,0 +1,25 @@
+name: pdf-export ci
+
+on:
+    workflow_dispatch:
+    pull_request:
+        types:
+            - opened
+            - synchronize
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+jobs:
+    # Markdown, YAML and JSON as Prettier writes them (.prettierrc). The build, tests,
+    # lint and licence check join with the code (spec 001).
+    format:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Formatted
+              run: npx --yes prettier@3.9.10 --check .
