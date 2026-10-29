@@ -52,3 +52,27 @@
   - the analysis result is read where the analysis service writes it, as today;
   - the section order and the subpathway figure are as `event-pdf` writes them;
   - the faults the check looks for are defined.
+- **After the third review (#7):** the endpoint's token answers are a departure from today
+  (today answers an empty response). The contents list's own entry comes last. The
+  overlay's defaults and the analysis values are stated more fully.
+- **The look (User Story 6, FR-015, FR-016, SC-009),** added at the user's request: the
+  PDFs take the website's theme colours and typefaces and a plain, modern layout. Today's
+  book "looks a little like it is made with 20 year old tech".
+- **After the fourth review (#8):**
+  - the theme's colours cover the PDFs' own text and layout; figures, illustrations,
+    overlays and the logo keep their own (SC-008), so SC-009 and SC-008 can both pass;
+  - the theme is a dependency, followed when this repository updates it;
+  - the typefaces are named (Roboto, Roboto Mono, a fallback), the light theme chosen,
+    and the theme package's undeclared licence recorded;
+  - FR-016's layout rules are checkable; running headers and page numbers are left out
+    of FR-012's comparison;
+  - the token departure sits under the endpoint's answers, and the token states map onto
+    Story 2's cases;
+  - FR-015, FR-016 and SC-009 follow FR-014 and SC-008.
+- **After the fifth review (#9):** the book's one cover is defined (FR-002) and compared
+  by its names (FR-012); every PDF has bookmarks and, where it has a contents list, puts
+  it first; FR-011's missing-figure fault applies only where the figure's source
+  exists; the fallback typeface is named; front pages' running headers are defined;
+  dropped analysis options are ignored.
+- **After the sixth review (#10):** bookmarks no longer depend on a contents list
+  (FR-006), and Story 6's cover scenario names the book's cover (FR-002).

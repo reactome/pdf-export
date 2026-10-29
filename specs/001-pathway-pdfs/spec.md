@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-pathway-pdfs-4`
+**Feature Branch**: `001-design-4`
 
 **Created**: 2026-10-29
 
@@ -51,8 +51,8 @@ Each PDF holds, in this order:
    12. its edit history;
    13. with an analysis, the entities and then the interactors found.
 5. **A contents list,** after the sections: the introduction, the analysis's properties
-   (with an analysis), the contents list itself, and each event, every place it appears
-   pointing at its one section. It is left out for a reaction alone or at depth 0.
+   (with an analysis), each event (every place it appears pointing at its one section),
+   and last the contents list itself. It is left out for a reaction alone or at depth 0.
 
 Its figures:
 
@@ -146,8 +146,8 @@ Compare each with `event-pdf`'s by FR-012.
 **Acceptance Scenarios**:
 
 1. **Given** a pathway's stable identifier and a depth of 0 or 1, **When** its PDF is
-   asked for, **Then** it holds the parts of the Background, in that order, to that
-   depth.
+   asked for, **Then** it holds the parts of the Background to that depth, with the
+   contents list and bookmarks placed as FR-006 says.
 2. **Given** a reaction's stable identifier, **When** its PDF is asked for, **Then** it
    holds a cover (with no diagram and no excerpt note), an introduction and the
    reaction's section.
@@ -156,8 +156,9 @@ Compare each with `event-pdf`'s by FR-012.
    overlaid with the analysis.
 4. **Given** an identifier that names no event, an unknown token, or a token whose
    result is gone though its date is still within the retention period, **When** a PDF
-   is asked for, **Then** the answer says which of the three, as today, and no PDF is
-   made.
+   is asked for, **Then** the answer says which of the three, by the analysis service's
+   token rules, and no PDF is made. Today's endpoint answers an empty response for
+   either token case; telling them apart is new.
 
 ---
 
@@ -240,6 +241,38 @@ damage the output in each way FR-011 names, and see the check fail on each.
 
 ---
 
+### User Story 6 - The PDFs look like the website (Priority: P2)
+
+A reader opening either PDF sees Reactome as the website presents it. It has the
+website's colours, typefaces and plain, modern layout, and is clean and easy to read.
+Today's book looks dated.
+
+**Why this priority**: the PDFs are part of Reactome's public face. A reader moving
+between the website and the book should see one Reactome. It needs no more than the
+website's own palette, type and spacing, used well.
+
+**Independent Test**: put a page of the book beside the same event's page on the
+website. Check that the colours of the PDF's own text and layout are the website's
+theme colours and its typefaces those FR-015 names; figures, illustrations, overlays
+and the logo keep their own colours. Then have the judges of SC-009 compare a sample
+of pages with today's book.
+
+**Acceptance Scenarios**:
+
+1. **Given** the website's light theme, **When** a PDF is written, **Then** its
+   headings, links, thin rules and highlights use the theme's colours (its primary
+   colour and the colours paired with it), and its text uses the typefaces FR-015 names.
+2. **Given** a section, **When** it is laid out, **Then** its parts are set apart by
+   space, type and at most thin rules, never boxes or borders, with the margins,
+   running headers, page numbers and figure sizes of FR-016.
+3. **Given** the cover, **When** it is written, **Then** it holds the parts FR-002 lists
+   (the book) or the Background lists (a single-event PDF; for a pathway, its diagram),
+   laid out in the website's style with Reactome's logo.
+4. **Given** a new version of the website's theme, **When** this repository updates to
+   it, **Then** the PDFs follow it with no colour value changed in this repository.
+
+---
+
 ### Edge Cases
 
 - **An event with no summation, literature or edit history:** its section leaves that
@@ -255,7 +288,9 @@ damage the output in each way FR-011 names, and see the check fail on each.
   the summary names but the files lack. The step fails and names it (Story 5,
   scenario 3).
 - **An analysis token unknown, malformed, older than the retention period, or gone
-  within it:** the answer says which of Story 2, scenario 4's cases it is.
+  within it:** a malformed token, or one older than the retention period, is answered
+  as unknown; one whose result is gone within the period is answered as gone (Story 2,
+  scenario 4).
 - **A release file missing for a single-event PDF:** the PDF is made without that figure,
   as today, and the absence is logged; only the book's step fails on it.
 
@@ -266,7 +301,10 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **FR-001**: The system MUST produce the release's book as a single PDF holding each of
   human's top-level pathways in full depth.
 - **FR-002**: The book MUST have:
-  - a cover and an introduction;
+  - one cover: Reactome's logo, the title "The Reactome Book" and the release, no
+    diagram and no excerpt note, the names across every event in the book (sorted, each
+    once), and the institutions, licence and date of the Background's cover;
+  - an introduction;
   - a contents list before the sections;
   - nested bookmarks;
   - the top-level pathways in order of their names, ignoring case.
@@ -287,14 +325,16 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **FR-006**: The system MUST produce the PDF of one event of any species by stable
   identifier:
   - at depth 0 or 1, 1 by default;
-  - with the cover, introduction and contents list of the Background;
+  - with the cover and introduction of the Background; nested bookmarks; and, where the
+    Background has a contents list, that list before the sections, as in the book;
   - given an analysis token, with the analysis overlay of the Background, for the event's
     species.
 
   The analysis's other options today (resource, expression column, importable only, and
   the diagram and analysis colour profiles) are dropped: the website sends none of them.
-  The overlay uses what they default to today: all resources together, no expression
-  column, all identifiers, and the standard colours.
+  The overlay uses today's defaults for the rest: all resources together, no
+  expression column, and all identifiers rather than only importable ones. Its colours
+  are the website's default analysis colours, a change from today's, with FR-008.
 
 - **FR-007**: The system MUST read:
   - the graph;
@@ -323,21 +363,26 @@ damage the output in each way FR-011 names, and see the check fail on each.
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
   - a section with no name or no stable identifier;
-  - a pathway or reaction with no figure;
+  - a pathway's or reaction's full section with no figure, where the figure's source
+    exists (its own or an ancestor's diagram file, its EHLD, or for a reaction the
+    graph);
   - a broken internal link.
 - **FR-012**: The output MUST be compared with `event-pdf`'s for the same graph, by
   meaning:
-  - the cover: its title, whether it has a diagram and an excerpt note, and the count of
-    people;
+  - a single-event PDF's cover: its title, whether it has a diagram and an excerpt note,
+    and the count of distinct names; the book's one cover: the count of distinct names
+    across today's files' covers;
   - the introduction: the release and the counts;
-  - with an analysis, the analysis's properties: the values it reports (the analysis's
-    type and the identifiers found), not its explanatory text;
+  - with an analysis, the analysis's properties: the values it reports (such as its type,
+    the identifiers found and in all, the pathways hit, projection, interactors, species,
+    resource and token), not its explanatory text;
   - each event's section: its parts, their text and their order;
   - the contents list's entries and their targets;
   - which events have which kind of figure.
 
-  Bytes, layout and the look of figures are not compared. Every difference MUST be fixed
-  or recorded with its reason. A comparison MUST NOT print people's names.
+  Bytes, layout, running headers, page numbers and the look of figures are not compared.
+  Every difference MUST be fixed or recorded with its reason. A comparison MUST NOT
+  print people's names.
 
 - **FR-013**: Fixtures, samples and test output in the repository MUST NOT contain
   people's names; authors and curators are replaced by placeholders.
@@ -345,6 +390,22 @@ damage the output in each way FR-011 names, and see the check fail on each.
   How the website routes it, its parameters' names and the form of its error answers are
   specified in WebsiteAngular. Today's depth parameter's name is malformed, so the
   website in effect always asks for depth 1.
+- **FR-015**: The PDFs' own text and layout (headings, body text, links, rules,
+  highlights and backgrounds) MUST take their colours from the website's published light
+  theme, used as a dependency rather than a hand-kept copy of its values. Figures,
+  illustrations, analysis overlays and Reactome's logo keep their own colours (FR-008).
+  The text MUST be set in the website's typefaces, Roboto, with Roboto Mono for
+  identifiers, and Noto Sans only for characters they lack. Each typeface is embedded
+  and under a licence FR-009 allows.
+- **FR-016**: The PDFs' layout MUST have:
+  - parts set apart by space, type and at most thin rules, with no boxes or borders;
+  - the same margins on every page;
+  - a running header naming the top-level pathway (in the book) or the event (in a
+    single-event PDF), or on front pages (introduction, analysis properties,
+    contents) that part's name, and a page number on every page but the cover;
+  - no figure split across pages, and none shrunk below the size the plan sets for
+    legibility;
+  - a cover in the website's style (User Story 6, scenario 3).
 
 ### Key Entities
 
@@ -385,6 +446,14 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **SC-008**: For a sample of events, each PDF figure is the drawing the website makes for
   the same event and analysis from the same data. Both are rendered at the same size by
   the same means, and no more than 1% of their pixels differ.
+- **SC-009**: Every colour in the PDFs' own text and layout is one of the website's
+  light theme's palette colours, its foreground and background colours included, and
+  every typeface one FR-015 names, Noto Sans only for characters the others lack, as a
+  check of the PDF's colours and fonts shows; figures, illustrations, overlays and the
+  logo are left to SC-008. In a side-by-side judgement of at least 12 pages chosen at
+  random, including a cover, a contents page and a pathway section with its figure, a
+  majority of the judges (the release's owners and the curators they ask) prefer the new
+  look to today's.
 
 ## Assumptions
 
@@ -397,8 +466,9 @@ damage the output in each way FR-011 names, and see the check fail on each.
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
 - **Expected differences from `event-pdf`** (FR-012):
-  - the bookmarks;
-  - the contents list before the sections, not after;
+  - the bookmarks, in every PDF;
+  - the contents list before the sections, not after, in every PDF that has one;
+  - the book's one cover, in place of a cover per file;
   - short entries at every later place an event recurs in the book, where today's files
     write nothing there;
   - in one book, links that now reach events in other top-level pathways, where each
@@ -407,7 +477,15 @@ damage the output in each way FR-011 names, and see the check fail on each.
   - links from location entries are as today, but events now outside a per-pathway file
     are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
-    each recorded.
+    each recorded;
+  - the look: layout, colours and typefaces (User Story 6).
+- **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
+  is answered as such, where today's endpoint answers an empty response for both; and
+  the analysis options FR-006 drops are ignored if sent.
+- **The website's theme** is used as a package dependency. Its package declares no
+  licence today, though its repository is CC0; the theme's owners are asked to declare
+  it in the package, and until then CI's licence check is told it is CC0, with the
+  reason.
 - **One book's size:** the human book runs to thousands of pages. Whether it is made in
   one pass or in parts joined into one PDF is for the plan to measure.
 - **The analysis result** is read where the analysis service writes it, as the content
@@ -419,5 +497,5 @@ damage the output in each way FR-011 names, and see the check fail on each.
   `event-pdf` run against it for the reference output. The release's published book is
   fetched one file at a time, only when a comparison needs it, and kept out of the
   repository. No request goes to a production service.
-- **graph-core** has no licence, so it is not a dependency (constitution II). The plan
-  chooses how the graph is read.
+- **Reactome's Java graph library** has no licence, so it is not a dependency
+  (constitution II). The plan chooses how the graph is read.
