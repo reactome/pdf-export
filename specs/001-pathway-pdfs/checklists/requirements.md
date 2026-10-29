@@ -80,3 +80,6 @@
   FR-010 names the render service beside the book's step, list order and the top-level
   pathways' order join the expected differences, and the book's size is settled as
   parts joined (research R2, R3, R4, R6).
+- **After the plan's review (#12):** FR-015 and SC-009 name the Noto Sans family, which
+  the plan's fonts need; the render service beside the book's step moves from FR-010 to
+  the Assumptions, for the release's owners to agree.

@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-plan`
+**Feature Branch**: `001-plan-2`
 
 **Created**: 2026-10-29
 
@@ -358,8 +358,7 @@ of pages with today's book.
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
   files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder. The figures come from the website's render service on the same release, run
-  beside it (plan, research R3).
+  folder.
 - **FR-011**: A check MUST fail the book's step on any of these:
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
@@ -396,7 +395,8 @@ of pages with today's book.
   theme, used as a dependency rather than a hand-kept copy of its values. Figures,
   illustrations, analysis overlays and Reactome's logo keep their own colours (FR-008).
   The text MUST be set in the website's typefaces, Roboto, with Roboto Mono for
-  identifiers, and Noto Sans only for characters they lack. Each typeface is embedded
+  identifiers, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2 and Noto Sans
+  Math) only for characters they lack. Each typeface is embedded
   and under a licence FR-009 allows.
 - **FR-016**: The PDFs' layout MUST have:
   - parts set apart by space, type and at most thin rules, with no boxes or borders;
@@ -449,7 +449,8 @@ of pages with today's book.
   the same means, and no more than 1% of their pixels differ.
 - **SC-009**: Every colour in the PDFs' own text and layout is one of the website's
   light theme's palette colours, its foreground and background colours included, and
-  every typeface one FR-015 names, Noto Sans only for characters the others lack, as a
+  every typeface one FR-015 names, the Noto Sans family only for characters the others
+  lack, as a
   check of the PDF's colours and fonts shows; figures, illustrations, overlays and the
   logo are left to SC-008. In a side-by-side judgement of at least 12 pages chosen at
   random, including a cover, a contents page and a pathway section with its figure, a
@@ -466,6 +467,9 @@ of pages with today's book.
   at it.
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
+- **The render service beside the book's step:** the figures come from the website's
+  render service, with its content service, run on the release's graph and files beside
+  the book's step (plan, research R3). The release's owners agree it.
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;

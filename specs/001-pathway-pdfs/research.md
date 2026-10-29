@@ -102,12 +102,18 @@ diagram and EHLD files.
   - Two figures on one page share ids such as `clip-1`. Inlined together, they change
     each other's drawing: 13.6% of one figure's pixels in one measurement. Every id is
     prefixed per figure.
-- **Time per figure** (through beta's render service, uncached): diagrams 3.4–5.0 s, a
-  subpathway's selection 4.1 s, a reaction 2.6 s, an EHLD 2.2–2.4 s. On a page that is
-  reused, a reaction takes 0.65 s and a diagram 2.8–4.0 s.
-- **The human book's figures:** 19,313, counted from the graph (R7). That is about 9 h
-  through the service as it is, at its concurrency of 2, or 1.5–2 h with four reused
-  pages (inference, from these times).
+- **Time per figure** (through beta's render service, uncached; beta's service is shared
+  and was under the site's own load, so these are not a quiet machine's times): diagrams
+  3.4–5.0 s, a subpathway's selection 4.1 s, a reaction 2.6 s, an EHLD 2.2–2.4 s. On a
+  page that is reused, a reaction takes 0.65 s and a diagram 2.8–4.0 s. Two renders at
+  once gave 1.65 times one's throughput.
+- **The human book's figures:** 19,313, counted from the graph (R7). Inference, from
+  these times:
+  - through the service as it is: 16,424 reactions × 2.6 s, 1,170 diagrams × 3.4–5.0 s,
+    220 EHLDs × 2.2–2.4 s and 1,499 selections × 4.1 s make 53,000–55,000 s, so about
+    7.4–7.7 h at its concurrency of 2 (more, at its measured 1.65 times);
+  - with four reused pages: 16,424 × 0.65 s and 2,889 × 2.8–4.0 s make
+    18,800–22,200 s, so about 1.3–1.5 h.
 - **A licence trap.** The built site carries FoamTree, under Carrot Search's commercial
   licence, in a chunk every render loads. pdf-export cannot ship the built site in its
   own image (constitution II).
@@ -115,12 +121,12 @@ diagram and EHLD files.
 **Decision.** pdf-export asks a render service for each figure, over HTTP, as SVG. It
 never ships the website's code.
 
-- **For the website's PDF:** beta's render service, beside the content service that
-  calls pdf-export.
+- **For the website's PDF:** the deployment's own render service, beside the content
+  service that calls pdf-export, on the same graph.
 - **For the book:** the release step runs WebsiteAngular's render service (with its
   content service) on the release's graph and files, as a neighbour of pdf-export's
   container.
-- **The service's limits are settings,** for the book's run, rather than beta's
+- **The service's limits are settings,** for the book's run, rather than the website's
   defaults: concurrency, queue and timeout. Its cache is turned off for the run.
 - **pdf-export prefixes every SVG id** before it inlines the figure.
 
@@ -131,9 +137,14 @@ never ships the website's code.
   better long-term shape and needs a WebsiteAngular spec; it is noted under R10.
 - _The old Java exporters' figures:_ against constitution IV.
 
-**Open, for the release's owners:** the release step then needs WebsiteAngular's render
-and content services on the release's graph. The time measured in R7 decides whether the
-book is made beside the website's own release testing, or by its own step.
+**For the release's owners** (spec, Assumptions): the release step then needs
+WebsiteAngular's render and content services on the release's graph. The time measured
+in R7 decides whether the book is made beside the website's own release testing, or by
+its own step.
+
+**A limitation** (constitution II): the render service loads FoamTree, under a commercial
+licence. pdf-export ships none of it, but cannot make figures without that service
+running, until WebsiteAngular's render bundle without FoamTree exists (R10).
 
 ## R4. Layout and printing: HTML and paged CSS, printed by Chromium in parts
 
@@ -148,8 +159,9 @@ synthetic documents, on this host under load.
 - **Joining breaks internal links** (pdf-lib's `copyPages`). This works instead, and
   resolved 21,375 links of 21,375:
   - every internal link is printed as a placeholder URI;
-  - a 1-pixel probe link inside each target gives its page;
-  - after the join, each placeholder becomes a real destination and the probes are
+  - a 1-pixel probe link inside each target gives its page, and its position on the page;
+  - after the join, each placeholder becomes a real destination (`/XYZ`, at the probe's
+    height, so a link lands on its heading, not the top of the page) and the probes are
     removed.
 - **Bookmarks.** Chromium writes nested bookmarks only with `outline` and `tagged`
   together. A joined file loses them, and its tagging. pdf-lib has no outline API, but
@@ -164,7 +176,8 @@ synthetic documents, on this host under load.
   placeholders; each section's page is read back; the front part is printed again. Page
   counts and anchors were identical between the passes.
 - **Page numbers across parts:** `html { counter-reset: page N }` starts a part at N+1.
-  "Of M" must be literal text.
+  "Of M" must be literal text. With parts printed a few at a time, no part but the first
+  knows its N, and none knows M, until all are printed.
 - **A single-event PDF of about 30 pages** printed in 0.7 s with bookmarks and tagging,
   on a browser already running.
 - **A trap:** `setContent` cannot load fonts from `file://`, and the text silently falls
@@ -179,8 +192,25 @@ synthetic documents, on this host under load.
   - links rewritten, and the outline written by pdf-export, which it needs anyway: in the
     book, an event's later places point at its one section (FR-004), which Chromium's
     headings would not do;
-  - the contents list numbered by the second pass.
-- **A single-event PDF:** one pass, tagged, with Chromium's own bookmarks.
+  - **page numbers and running headers stamped after the join,** not printed: the parts
+    are printed without them, and pdf-lib writes each page's number ("12 of 23,541") and
+    its chapter's name, which the model knows from where each chapter's parts landed,
+    in an embedded subset of Roboto. SC-009's font check sees that font too. The other
+    way, printing every part, counting, and printing them again with their offsets,
+    doubles the printing time. Stamping is to be measured in the first tasks;
+  - the contents list numbered by the second pass, its front part only;
+  - **the join's memory** re-measured on the real book (pdf-lib holds the whole file):
+    120 MB in the synthetic test, perhaps near 1 GB for real. If it does not fit, the
+    chapters are joined in groups and the groups joined last.
+- **A single-event PDF:** one pass, tagged, with Chromium's own bookmarks and page
+  numbers from its margin boxes.
+- **The legibility floor** (FR-016): a diagram's label text, 16 px in the render
+  service's SVG, never below 5 pt on the page. The figure's scale on the page gives its
+  labels' size. A figure that would fall below the floor at the text width gets a
+  landscape page of its own, at the largest size the page allows. A diagram so large
+  that even that is below the floor is accepted at that size (the PDF's vector drawing
+  can still be zoomed) and listed in the run report. A figure is never split across
+  pages.
 - **pdf-lib:** the maintained MIT fork `@cantoo/pdf-lib`, if it passes the same tests;
   otherwise pdf-lib 1.17.
 
@@ -213,17 +243,26 @@ synthetic documents, on this host under load.
 
 **Decision.**
 
-- **Colours:** the build compiles the theme to CSS variables, from the theme package
-  pinned in the lockfile, and the stylesheet uses only those variables. No colour value
+- **Colours:** the build compiles the theme to CSS variables, from `ngx-reactome-style`,
+  pinned in the lockfile to the commit the website's lockfile pins, with
+  `@angular/material` and `@angular/cdk` at the website's version; they are raised
+  together. The stylesheet uses only those variables. No colour value
   is written in pdf-export's own code (FR-015). The page is surface-container-lowest
   (white). The theme's `color-mix()` surfaces are not used, since their colours are not
   in the palette.
 - **Fonts:**
   - Roboto (300, 400, 500 and 600, so the diagrams' labels get their own weight) and
     Roboto Mono, from `@fontsource`;
-  - Noto Sans, plus Noto Sans Symbols 2 and Noto Sans Math for arrows and signs, all
-    OFL-1.1;
-  - the container carries no other font, so nothing can fall back to one;
+  - the Noto Sans family, Noto Sans with Noto Sans Symbols 2 and Noto Sans Math for
+    arrows and signs, all OFL-1.1 (FR-015 and SC-009 amended to name the family);
+  - the container carries no other font, so nothing can fall back to one. Chromium's
+    system dependencies, as `playwright install-deps` installs them, bring fonts such as
+    `fonts-liberation`; the image leaves them out, and its build lists the fonts it has
+    and fails on any other;
+  - with no fallback, a character none of the fonts covers would be drawn as an empty
+    box, still silently. So before printing, each text's characters are checked against
+    the fonts' character maps (`fontkit`, MIT), and one no font covers is a fault,
+    named by its code point and its section's stable identifier;
   - the check of FR-011 and SC-009 lists every font in the PDF.
 
 **Alternatives considered.**
@@ -253,6 +292,20 @@ synthetic documents, on this host under load.
 
 **Decision.**
 
+- **The token is checked here first,** before the service is asked: its form (the
+  Base64 the service issues), and the date it carries against the retention period.
+  - The identifier is checked first: an unknown or non-event identifier is answered as
+    such whatever the token.
+  - A malformed token, or one older than the retention period: `unknown-token` (404).
+  - The service's 404: `unknown-token`. Its 410, for a result gone within the period:
+    `gone-token` (410).
+  - What the service itself answers for an expired and a malformed token is confirmed
+    against a private instance in the first tasks. CI's stub has a case for each.
+- **The requests carry FR-006's defaults:** all resources together (`TOTAL`), no
+  expression column, all identifiers rather than only importable ones.
+- **The found count:** if `/token/{token}`'s summary carries the identifiers found, it
+  is read there. Otherwise from `/download/{token}/result.json`, which can be large for
+  a big analysis. Which one is confirmed in the first tasks.
 - pdf-export reads the analysis through the analysis service's API, at an address that
   is a setting. It is the same service, reading the same files by the same rules, and
   the render page reads it too, so a PDF's figures and its text agree.
@@ -322,12 +375,34 @@ human pathways that have a diagram: 2,780 files and 221 illustrations, 373 MB.
 
 - **SC-003:** the book in no more than 1 h 18 min on this host, against this baseline.
 - **SC-005:** each single-event PDF in no more time than these, warm.
-- **Figures:** 19,313 for the book. At R3's measured times, through the render service
-  as it is, that is about 9 hours at its concurrency of 2. So the release's run needs the
-  service's concurrency raised and its pages reused, as R3 decides. With four reused pages
-  the estimate is 1.5–2 hours, still over SC-003's budget. The first tasks measure the
-  render service's throughput with those settings. If it cannot meet the budget, the
-  plan's answer is more render workers, not fewer figures.
+- **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
+  through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
+  with four reused pages, still over SC-003's whole budget.
+- **A budget per stage,** within SC-003's 78 minutes on this host:
+
+  | Stage                                          | Budget | Why                                                                              |
+  | ---------------------------------------------- | ------ | -------------------------------------------------------------------------------- |
+  | Figures                                        | 45 min | the largest; may overlap the graph reads and printing                            |
+  | Reading the graph                              | 4 min  | batched queries, one per level and part                                          |
+  | Printing the parts                             | 14 min | about 20 ms a page in the synthetic test, four at once; real figures are heavier |
+  | Join, links, outline, page numbers and headers | 6 min  | 6 s for 4,930 synthetic pages, scaled, with room                                 |
+  | The contents' second pass                      | 2 min  | the front part only                                                              |
+  | `check-book`                                   | 7 min  | 84 s for 4,930 pages, scaled to 23,541 (inference)                               |
+
+- **Go or no-go, first:** the first task measures the render service's throughput at the
+  book's scale, on the machine the release would use, with its concurrency raised and
+  its pages reused. If the figures cannot be drawn within 45 minutes, before any of the
+  book's code is written past the foundations, the fallbacks are, in order:
+  1. a figure cache keyed by the release and the stable identifier, shared with the
+     website's own render cache, so the book reuses what the website has already drawn
+     for the release;
+  2. many figures per page load, through an in-page API on the render page
+     (WebsiteAngular, R10), which saves the page loads that dominate a reaction's time;
+  3. SC-003 amended with the release's owners.
+
+  More render workers on the same machine compete with printing for its cores, so they
+  are a lever only within the 45 minutes, not a way past them.
+
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), it is split within its chapter, at section boundaries.
 
@@ -349,11 +424,22 @@ embedded.
 
 **Decision.**
 
-- **FR-011's check** (`check-book`) reads the book with pdfjs: every top-level pathway
-  present, every event in the contents and the bookmarks, every section named and
-  identified, every figure present where its source exists, every link landing on a
-  page. Each fault is seen to fail once (SC-007).
-- **FR-012's comparison** (`compare`) reduces both PDFs to the parts FR-012 lists.
+- **FR-011's check** (`check-book`) reads the book with pdfjs. The book is untagged
+  (R4), so it finds the sections by the outline pdf-export wrote and the text at each
+  outline entry's destination, not by a structure tree. It checks every top-level
+  pathway present, every event in the contents and the bookmarks, every section named
+  and every section with its stable identifier (two faults), every figure present where
+  its source exists, and every link landing on a page. Each fault is seen to fail once
+  (SC-007). The release's files are checked before printing, by `book`'s preflight
+  (contracts/cli.md).
+- **SC-008's figure comparison** draws both by the same means, as SC-008 asks: the
+  render service's SVG is printed alone by the same Chromium to a one-page PDF at the
+  figure's size on the page, and both that and the book's page are rasterised by pdf.js
+  inside that Chromium, at the same scale, the book's cropped to the figure's box. No
+  more than 1% of pixels may differ. Run on a sample, in development.
+- **FR-012's comparison** (`compare`) reduces both sides to the parts FR-012 lists. Its
+  reference may be a folder of today's files, as today's book is 29 of them: their
+  covers' distinct names are counted across all of them.
   - It normalises the cover's hidden characters and white space.
   - It treats list order as a recorded difference.
   - It prints counts and hashes of names, never names (FR-013).
@@ -372,7 +458,11 @@ dependencies, though a person may use them to look.
   - `pdf-export book`, the release's command line: graph, files, render service and
     output path in, `TheReactomeBook.pdf` and a run report out;
   - `pdf-export serve`, an HTTP service for the website: `GET /event/{stId}.pdf` with
-    depth and token, answering a PDF or the errors of Story 2's scenario 4.
+    depth and token, answering a PDF or the errors of Story 2's scenario 4. Its bind
+    address is a setting, loopback by default: in its own container it binds where the
+    content service can reach it.
+- **The website's address** for FR-003's links to its pages is a setting (`--site`),
+  written into the links and never fetched.
 - **WebsiteAngular's content service calls it** as it calls the Java library service
   for SBML. The website's part (routes, parameters, envelope, caching) is in
   WebsiteAngular's specs (FR-014).
@@ -394,6 +484,8 @@ packaging.
 - **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
   the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
+- **If R7's go/no-go needs it:** an in-page API on the render page to draw many figures
+  per page load, and a render cache the book can share.
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
   in its own process.

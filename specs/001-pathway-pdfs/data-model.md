@@ -8,6 +8,10 @@ that apply to it.
 
 - `version`: from `(:DBInfo).version`.
 - `counts`: the distinct pathways and reactions the PDF holds, for the introduction.
+- `files`: the release's folder (`--files`): its EHLD summary, read to choose figures,
+  and the diagram and EHLD files the preflight expects (contracts/cli.md).
+- `site`: the website's address, for FR-003's links to its pages (a setting, never
+  fetched).
 
 ## Event
 
@@ -47,7 +51,8 @@ diseases, inferred from, figure, summations, before and after, references, edit 
 then what the analysis found.
 
 **State:** each event has exactly one full Section per PDF. An event's subtree is written
-beneath its first place only.
+beneath its first place only. At a later place, the outline and the contents list hold
+the short entry alone, pointing at the full section, and not its subtree again.
 
 ## Figure
 
@@ -59,6 +64,9 @@ beneath its first place only.
 - `source`: the stable identifier the render service draws, with `highlight` ids for
   `ancestor`.
 - `svg`: the drawing, every id prefixed with the section's anchor.
+- `scale`: its size on the page, from which its labels' size follows (16 px in the SVG).
+  At least 5 pt, or a landscape page of its own; below that only for a diagram too large
+  for any page, listed in the run report (research R4).
 - `overlay`: the analysis token, when there is one.
 
 **Choosing a pathway's figure** (research R2, as graph-core does today):
@@ -116,11 +124,15 @@ Cases).
 From the analysis service's API (research R6).
 
 - `token`, `type`, `species`, `resource` (`TOTAL`), `projection`, `interactors`.
-- `identifiersFound`, `identifiersTotal`, `pathwaysHit`.
+- **Requested with FR-006's defaults:** all resources together, no expression column, all
+  identifiers rather than only importable ones.
+- `identifiersFound`, `identifiersTotal`, `pathwaysHit`. Found from the summary if it
+  carries it, otherwise from the result file (research R6).
 - `found(pathwayStId)`: the entities and interactors found. A reaction uses its first
   parent pathway's, filtered to the reaction's own identifiers.
-- **Errors:** unknown (404, or a malformed token) and gone (410), each answered as
-  Story 2's scenario 4 says.
+- **Errors:** checked here before the service is asked (research R6): a malformed token
+  or one past the retention period is unknown; the service's 404 is unknown, its 410
+  gone. The identifier is checked first.
 
 ## Run report
 
@@ -128,5 +140,8 @@ What the book's step and the service log.
 
 - `release`, the time taken, the page count and the size.
 - Figures by kind, and those missing, by stable identifier.
+- Figures below the legibility floor, by stable identifier.
+- Release files missing, by name, from the preflight.
+- Each stage's time, against research R7's budget.
 - Each FR-011 check, and its result.
 - No names (FR-013).

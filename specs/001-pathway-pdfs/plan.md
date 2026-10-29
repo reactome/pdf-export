@@ -1,6 +1,6 @@
 # Implementation Plan: Reactome's pathway PDFs from the graph
 
-**Branch**: `001-plan` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-plan-2` | **Date**: 2026-10-29 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/001-pathway-pdfs/spec.md`
 
@@ -32,20 +32,24 @@ in TypeScript on Node (research R1).
 
 **Primary Dependencies**, each under a licence FR-009 allows:
 
-| Dependency                                                                        | Licence                        | Role                               |
-| --------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------- |
-| `neo4j-driver`                                                                    | Apache-2.0                     | reading the graph                  |
-| `playwright-core` with Chromium                                                   | Apache-2.0, BSD                | layout and printing                |
-| `@cantoo/pdf-lib`, or pdf-lib 1.17                                                | MIT                            | joining parts, links, outline      |
-| `pdfjs-dist`                                                                      | Apache-2.0                     | the checks                         |
-| `sass`, `@angular/material`, `@angular/cdk` and the website's theme package       | MIT, and CC0 by its repository | compiling the theme, at build time |
-| `@fontsource` Roboto, Roboto Mono, Noto Sans, Noto Sans Symbols 2, Noto Sans Math | OFL-1.1                        | fonts                              |
-| `express`                                                                         | MIT                            | the website's service              |
+| Dependency                                                                                                   | Licence                        | Role                                                          |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
+| `neo4j-driver`                                                                                               | Apache-2.0                     | reading the graph                                             |
+| `playwright-core` with Chromium                                                                              | Apache-2.0, BSD                | layout and printing                                           |
+| `@cantoo/pdf-lib`, or pdf-lib 1.17                                                                           | MIT                            | joining parts, links, outline                                 |
+| `pdfjs-dist`                                                                                                 | Apache-2.0                     | the checks                                                    |
+| `sass`, `@angular/material`, `@angular/cdk`, and `ngx-reactome-style`, the website's theme package           | MIT, and CC0 by its repository | compiling the theme, at build time                            |
+| `@fontsource` Roboto, Roboto Mono, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2, Noto Sans Math) | OFL-1.1                        | fonts                                                         |
+| `fontkit`                                                                                                    | MIT                            | the characters each font covers, checked before printing (R5) |
+| `express`                                                                                                    | MIT                            | the website's service                                         |
 
 **Storage**: none of its own. It reads:
 
 - the graph (Bolt);
-- the release's diagram and EHLD files and EHLD summary, through the render service;
+- the release's files from a folder (`--files`, contracts/cli.md): the EHLD summary,
+  which it reads itself to choose each pathway's figure, and the diagram and EHLD files,
+  which its preflight lists before anything is printed (Story 5, scenario 3). The render
+  service draws from the same files;
 - analysis results, through the analysis service.
 
 It writes the PDF.
@@ -68,19 +72,22 @@ fonts above), run by the release and beside the website's services.
 - **SC-005:** a single-event PDF at depth 1 in no more time than `event-pdf`'s, warm:
   0.5–1.7 s for a reaction, 1.3–9.5 s for most pathways, 46 s for Signal Transduction
   (R7).
-- **Figures dominate:** 19,313 for the human book (R7). At the render service's measured
-  times they alone would take 1.5–2 hours with four reused pages, over SC-003's budget,
-  so the service's throughput is measured first and scaled out with more workers if
-  needed (R3, R7).
+- **Figures dominate:** 19,313 for the human book (R7). From the render service's times,
+  measured on beta's shared service, they alone would take about 1.3–1.5 hours with four
+  reused pages (inference), over SC-003's whole budget. R7 sets a budget per stage, with
+  45 minutes for the figures, and the first task measures the service's throughput
+  against it, with named fallbacks if it falls short.
 
 **Constraints**:
 
 - **Memory:**
   - The book's printing peaks under 2.5 GB at four parts at once (R4: 2.1 GB measured
     with synthetic parts; real figures are heavier, so it is re-measured).
+  - The join holds the whole book in memory: 120 MB in the synthetic test, and perhaps
+    near 1 GB for the real book (inference). It is re-measured in the first tasks (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service and the analysis service. Fonts are
-  local (R5).
+  local (R5). The website's address (`--site`) is written into links, never fetched.
 - **No names** in fixtures, logs or comparison output (FR-013).
 
 **Scale/Scope**: the human book holds every top-level pathway in full depth (R7):
@@ -93,18 +100,19 @@ fonts above), run by the release and beside the website's services.
 
 _GATE: checked before research and again after design._
 
-| Principle                          | How the plan meets it                                                                                                                                                                                                                                                                                                     | Status                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| I. One implementation              | One package; the book's command line and the website's service share every module but their entry points (R9).                                                                                                                                                                                                            | Pass                              |
-| II. Loose licences only            | Every dependency is allowed. graph-core is not used (R2). The website's built code, which carries FoamTree under a commercial licence, is never shipped: figures come from its service (R3). The theme package's missing licence field is the one documented exception (CC0 by its repository). CI checks licences (R11). | Pass, with the exception recorded |
-| III. The graph, nothing relational | The graph, the release's files, and the analysis service's API, which reads its own result files (R6).                                                                                                                                                                                                                    | Pass                              |
-| IV. The pathway browser's look     | Figures are the website's render service's SVGs (R3). Two kinds it cannot draw yet are recorded differences until WebsiteAngular adds them (R10).                                                                                                                                                                         | Pass, with R10's gaps tracked     |
-| V. Verify the instrument           | Each check (FR-011, FR-012, SC-009, the licence check) is shown failing on a planted fault before it is relied on. Every fix comes with a test seen failing.                                                                                                                                                              | Pass                              |
-| VI. No production                  | A private copy of the release's graph. The published book is fetched once, only for comparison. The render and analysis services are beta's or private ones, never production's.                                                                                                                                          | Pass                              |
-| VII. No names                      | The fixture graph uses placeholders. The comparison prints counts and hashes (R8).                                                                                                                                                                                                                                        | Pass                              |
+| Principle                          | How the plan meets it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Status                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| I. One implementation              | One package; the book's command line and the website's service share every module but their entry points (R9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Pass                                                       |
+| II. Loose licences only            | The check's boundary: the package's dependencies and every asset it ships into the PDFs (fonts, the compiled theme) are checked by CI (R11), and all are allowed; graph-core is not used (R2). Chromium, and the base image's system packages, are run, not linked, and their notices are kept in the image; `npm query` does not see them. The theme package's missing licence field is the one documented exception (CC0 by its repository). **A limitation:** the website's built code, which carries FoamTree under a commercial licence, is never shipped, but the book's figures need the website's render service running, and it loads FoamTree. Until WebsiteAngular's render bundle without FoamTree exists (R10), anyone reusing this exporter needs that service. | Pass for what is shipped; the run-time limitation recorded |
+| III. The graph, nothing relational | The graph, the release's files, and the analysis service's API, which reads its own result files (R6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Pass                                                       |
+| IV. The pathway browser's look     | Figures are the website's render service's SVGs (R3). Two kinds it cannot draw yet are recorded differences until WebsiteAngular adds them (R10).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Pass, with R10's gaps tracked                              |
+| V. Verify the instrument           | Each check (FR-011, FR-012, SC-009, the licence check) is shown failing on a planted fault before it is relied on. Every fix comes with a test seen failing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Pass                                                       |
+| VI. No production                  | A private copy of the release's graph. The published book is fetched once, only for comparison. The render and analysis services are the deployment's own, on the same graph (a private stack for runs), never production's.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Pass                                                       |
+| VII. No names                      | The fixture graph uses placeholders. The comparison prints counts and hashes (R8).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Pass                                                       |
 
 **After design:** unchanged. The render service is a new dependency of the release's
-step, which constitution I–VII allow. It is raised with the release's owners (R3, open).
+step, which constitution I–VII allow, with II's limitation above. The release's owners
+agree it (spec, Assumptions; R3).
 
 ## Project Structure
 
@@ -158,8 +166,13 @@ Dockerfile
 ## Order of work
 
 1. **Measure** (done in research, R7): `event-pdf`'s human book and a sample of single
-   events, the figures by kind, the EHLD gap, and the overlays on reactions. What is left
-   to measure first is the render service's throughput at the book's scale (R3).
+   events, the figures by kind, the EHLD gap, and the overlays on reactions. What is
+   left is measured first, each against R7's budgets:
+   - the render service's throughput at the book's scale, with its go/no-go threshold
+     (R7);
+   - what the analysis service answers for an expired and a malformed token, on a
+     private instance (R6);
+   - the join's memory, and stamping page numbers after it (R4).
 2. **Foundations:**
    - the package, TypeScript, lint, Prettier and CI;
    - the licence check, shown failing;

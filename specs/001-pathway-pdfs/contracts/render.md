@@ -1,7 +1,7 @@
 # Contract: what pdf-export asks of the render service
 
-The website's render service (WebsiteAngular `tools/render/service.ts`) answers
-`GET /render/{name}.{ext}` with a drawing. pdf-export uses it as follows (research R3).
+The website's render service (WebsiteAngular `tools/render/service.ts`), the
+deployment's own, on the same graph, answers `GET /render/{name}.{ext}` with a drawing. pdf-export uses it as follows (research R3).
 What it cannot do yet is listed in research R10, and is asked of WebsiteAngular there.
 
 ## Requests
@@ -24,6 +24,8 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
   - a single-event PDF goes on without it.
 - **The text** is set in Roboto. pdf-export's page supplies the font, at weights 300 to
   600 (research R5).
+- **The labels are 16 px** in the SVG, from which pdf-export sets the figure's scale
+  against the legibility floor (research R4).
 
 ## Settings for the book's run (research R3)
 

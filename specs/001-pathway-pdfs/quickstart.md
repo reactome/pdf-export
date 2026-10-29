@@ -18,7 +18,7 @@ one. A run's output stays outside the repository when it holds people's names.
 `event-pdf` at its pinned commit, against the private graph.
 
 - **The human book:**
-  `java -Xmx8g -jar event-pdf-exec.jar --host bolt://127.0.0.1:<port> --user <u> --password <p> --dbname graph.db --diagram <files>/diagram --ehld <files>/ehld --summary <files>/ehld/svgsummary.txt --output <out>/TheReactomeBook`.
+  `java -Xmx6g -jar event-pdf-exec.jar --host bolt://127.0.0.1:<port> --user <u> --password <p> --dbname graph.db --diagram <files>/diagram --ehld <files>/ehld --summary <files>/ehld/svgsummary.txt --output <out>/TheReactomeBook`.
   Record the wall time, peak memory, and the page count and size of each file and in all.
 - **Single events,** as the content service makes them: the harness, with the
   identifier, depth 1 and an optional token. Record the time and pages for a sample of
@@ -28,7 +28,13 @@ one. A run's output stays outside the repository when it holds people's names.
   - the subpathways whose figure would be an EHLD with events selected;
   - whether `event-pdf` overlays reactions.
 
-Expected: numbers for SC-003, SC-005 and research R3 and R4. Measured for release 98 in research R7.
+Expected: numbers for SC-003, SC-005 and research R3 and R4. Measured for release 98 in
+research R7.
+
+- **Then, first of the new work** (research R7): the render service's throughput at the
+  book's scale against the 45-minute figures budget, go or no-go; the analysis service's
+  answers for an expired and a malformed token on a private instance (R6); the join's
+  memory and stamping after it (R4).
 
 ## 2. CI's own runs
 
@@ -44,8 +50,8 @@ Expected: numbers for SC-003, SC-005 and research R3 and R4. Measured for releas
 
 ## 3. A single-event PDF (Story 2)
 
-With `pdf-export serve` beside a render service and an analysis service (private, or
-beta's for the render service, a few requests spaced apart):
+With `pdf-export serve` beside the deployment's own render service and an analysis
+service, private ones on the private graph:
 
 - `GET /event/<pathway>.pdf?depth=0` and `?depth=1`;
 - `GET /event/<reaction>.pdf`;
@@ -55,8 +61,16 @@ beta's for the render service, a few requests spaced apart):
 Each opens, has the parts of the spec's Background in order and has bookmarks.
 `compare` against `event-pdf`'s PDF of the same event shows only recorded differences.
 
-- **The errors:** an unknown identifier, a non-event, a bad depth, an unknown token and a
-  malformed token each give contracts/service.md's answer.
+- **SC-005:** each is timed warm, on the second of two requests, against research R7's
+  single-event times for the same events.
+- **SC-008:** for a sample of figures, the book's or the PDF's figure against the render
+  service's SVG, both drawn by pdf.js at the same scale (research R8): no more than 1%
+  of pixels differ.
+
+- **The errors:** an unknown identifier, a non-event, a bad depth, an unknown token, a
+  malformed token, an expired token and a token gone within the period each give
+  contracts/service.md's answer, and a bad identifier with a bad token gives the
+  identifier's.
 
 ## 4. The book (Story 1)
 
@@ -73,12 +87,16 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 ## 5. The look (Story 6)
 
 - **SC-009, the check:** a sample of pages printed with figures hidden. Every colour must
-  be in the compiled theme, and every font one FR-015 names.
+  be in the compiled theme, and every font one FR-015 names, the stamped page numbers'
+  Roboto included.
 - **SC-009, the judgement:** 12 random pages, including a cover, a contents page and a
   pathway section with its figure, set beside today's book for the judges.
 
 ## 6. The release's step (Story 5)
 
-- The image runs with the graph, the render service and an output folder, and writes one
-  PDF.
+- The image runs with the graph, the release's files, the render service and an output
+  folder, and writes one PDF.
 - A planted fault fails the step.
+- **Story 5, scenario 3:** a release file removed from the folder fails the preflight,
+  naming the file, before anything is printed, and no book is written.
+- The image's fonts are only FR-015's (its build lists them).

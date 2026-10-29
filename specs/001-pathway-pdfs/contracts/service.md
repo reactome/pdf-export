@@ -19,6 +19,11 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 | 410    | the token's result is gone within the retention period                                              | JSON `{ "reason": "gone-token" }`                                                    |
 | 503    | the graph, the render service or the analysis service cannot answer, or the service is at its limit | JSON `{ "reason": "unavailable" }`                                                   |
 
+- **The order of checks:** the depth, then the identifier, then the token. An unknown or
+  non-event identifier is answered as such whatever the token.
+- **The token** is checked here before the analysis service is asked (research R6): its
+  form, and its date against the retention period. A malformed or expired token is
+  `unknown-token`; the service's 404 is `unknown-token` and its 410 `gone-token`.
 - **The reasons** are for the content service, which writes WebsiteAngular's envelope.
   They never carry a path, a host or a name.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
