@@ -66,8 +66,9 @@ repository root.
     - reactions of three kinds.
   - **Sharing and links:**
     - an event shared by two pathways (FR-004);
-    - an inferred event and its source;
+    - an event inferred from two sources in different species (inferredFrom sorted by species, then name);
     - reactions with `precedingEvent`, one pointing at an event outside a single-event PDF.
+  - **Order:** at least one list (children, compartments or literature) whose relationship `order` differs from database-id order, so a read without `ORDER BY` is seen to fail.
   - **Literature:** of each kind (article, book, web page); an event with more than five references; a reference with more than six authors.
   - **Edits:** of each kind; one with no date; one with no author; two sharing a date (the grouping rules).
   - **Text:** a summation whose HTML must be sanitised.
@@ -102,15 +103,15 @@ stop and take T006's route before any of Phase 4.
   - a sample of at least 2,000 figures in the book's mix: 85% reactions, 6% own diagrams, 1% illustrations, 8% selections.
 
   Measure two things:
-  - **(a) The render service as it is,** at `RENDER_CONCURRENCY` 1, 2, 4 and 8. The service deliberately opens a fresh page per render, because a reused page leaks state such as a stale analysis token.
+  - **(a) The render service as it is,** at `RENDER_CONCURRENCY` 1, 2, 4 and 8, with `RENDER_QUEUE` raised to match so the run measures renders, not 503s. The service deliberately opens a fresh page per render, because a reused page leaks state such as a stale analysis token.
   - **(b) Page reuse,** through a harness on WebsiteAngular's `render-core` in `ci/measure/`: 1, 2, 4 and 8 reused pages, each reset between figures, with any leak checked by comparing a figure drawn after another with the same figure drawn fresh.
 
   Record figures per second, CPU and memory, and the extrapolation to 19,313 figures, in research R7. The script's output carries no names.
-  - **Go** if (a) or (b) fits 19,313 figures in 44 minutes.
+  - **Go** if (a) fits 19,313 figures in 44 minutes. A go on (b) alone is conditional: page reuse must ship in WebsiteAngular's render service first (T042), and Phase 4 then waits for it.
   - **No-go** otherwise: record the numbers, raise research R7's routes with the user, and take T006.
 
 - [ ] T006 Only if T005 is a no-go: the route the user chooses (research R7).
-  - **Many figures per page load:** an in-page API on the render page, raised in WebsiteAngular (T042), and T014's client changed to send a batch per page.
+  - **Many figures per page load:** an in-page API on the render page, raised in WebsiteAngular (T042, raised at once rather than waiting for Polish), and, once it ships, T014's client changed to send a batch per page.
   - **Or:** SC-003 amended with the release's owners, with T005's numbers.
 
   Record which here.
@@ -127,7 +128,7 @@ stop and take T006's route before any of Phase 4.
 
   Also record its retention period, and whether its summary carries the count of identifiers found (otherwise `/download/{token}/result.json` is needed). Recorded answers are scrubbed of host names, paths and identifiers before they are committed.
 
-- [ ] T010 The analysis stub, `test/stubs/analysis.ts`, after T009. It is a small HTTP server on loopback that answers T009's recorded, scrubbed answers:
+- [ ] T010 The analysis stub, `test/stubs/analysis.ts`. It is a small HTTP server on loopback that answers T009's recorded, scrubbed answers:
   - 404 (unknown);
   - 410 (gone within retention);
   - found entities and interactors on a reaction's first parent pathway;
@@ -135,10 +136,10 @@ stop and take T006's route before any of Phase 4.
   - `result.json` if T009 says it is needed;
   - a 503, for the `unavailable` answer.
 
-  Until T009 is done, it answers contract-shaped placeholders.
+  It can be written before T009, answering contract-shaped placeholders; T009's recorded answers replace them, and the task is ticked only then.
 
 - [ ] T011 [P] Measure the join and stamping at the book's size (research R4).
-  - Print synthetic parts totalling 23,541 pages, with figures in the real book's mix (T005's SVGs).
+  - Print synthetic parts totalling 23,541 pages, with figures in the real book's mix (T005's SVGs, so after T005).
   - Join them with `@cantoo/pdf-lib`, or pdf-lib 1.17 if the fork fails the tests.
   - Rewrite the links through placeholder URIs and probes recording page and y.
   - Write a nested outline, and stamp page numbers and headers in embedded Roboto.
@@ -243,7 +244,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
 
 - [ ] T022 [US2] The service, `src/serve.ts` (contracts/service.md).
   - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`.
-  - **Settings:** bind address (loopback by default), port, `--graph`, `--render`, `--analysis`, `--files`, `--retention` and the concurrency limit.
+  - **Settings:** bind address (loopback by default), port, `--graph`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable (contracts/cli.md).
   - **Answers:**
     - 200 with `Content-Disposition` naming the stable identifier;
     - 400 `bad-depth`, then 400 `not-an-event` or 404 `no-event`, then the token's answer (404 `unknown-token`, 410 `gone-token`), in that order;
@@ -304,9 +305,9 @@ passes.
 
   Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering.
 
-- [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in the joined book and reprint only the front part. Tests: every entry's number is its target's page, across parts.
+- [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in the joined book and reprint only the front part. The reprinted front part is swapped in before T026's links and T027's stamping run, so its links are rewritten and its pages stamped like the rest. Tests: every entry's number is its target's page, across parts; the contents' links land; the front pages carry their headers and numbers.
 - [ ] T029 [US1] `book` end to end, `src/cli.ts` (contracts/cli.md).
-  - **Flags:** `--graph`, `--database`, `--render`, `--files`, `--species`, `--out`, `--parallel`, `--report` and the website base URL. Credentials come from `NEO4J_USER` and `NEO4J_PASSWORD`, never the command line.
+  - **Flags and their environment variables** (contracts/cli.md): `--graph` (`NEO4J_URI`), `--database` (`NEO4J_DATABASE`), `--render` (`RENDER_SERVICE`), `--site` (`REACTOME_SITE`), `--files`, `--species`, `--out`, `--parallel` and `--report`. Credentials come from `NEO4J_USER` and `NEO4J_PASSWORD`, never the command line.
   - **Writing:** the file is written beside its name and moved into place.
   - **The run report:** the release; each stage's time; pages and size; figures by kind; the figures below the legibility floor; missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
 
@@ -387,7 +388,7 @@ passes.
   Tests on fixture PDFs: each part's difference is caught, and no name is printed.
 
 - [ ] T036 [US5] The fixture's output as a baseline (the constitution's quality gate for a change to what is written).
-  - `ci/fixture/expected.json` holds the fixture book and a fixture single-event PDF, reduced by T035's `compare`.
+  - `ci/fixture/expected.json` holds the fixture book and a fixture single-event PDF, reduced by T035's `compare`; `compare` gains `--reduced <file>` to take a reduced form as the reference, added to contracts/cli.md in this task (the fixture PDFs are not committed).
   - CI compares each PR's output with it, and fails on any difference that the PR does not also update.
 
   Show it failing on a changed section.
@@ -429,7 +430,7 @@ passes.
   Link it here.
 
 - [ ] T043 [P] Ask the theme package's owners to declare its licence in the package. Link the issue here, and drop T002's exception once it is declared.
-- [ ] T044 Remove the scratch baselines once T040 is recorded: `event-pdf`'s book and single-event PDFs, the release's files and the private graph copy. They are kept outside the repository, and they hold names.
+- [ ] T044 Remove the scratch baselines once T033, T039 and T040 are recorded: `event-pdf`'s book and single-event PDFs, the release's files and the private graph copy. They are kept outside the repository, and they hold names.
 - [ ] T045 Check the success criteria, SC-001 to SC-009, and record the result here.
 
 ---
@@ -442,29 +443,29 @@ passes.
   - T004 after T003.
 - **Phase 2:**
   - **Measurements:**
-    - T005 first: the go or no-go for Phase 4, with T006 only on a no-go.
-    - T007, T008, T009 and T011 in parallel with T005.
-    - T010 after T009; T012 only if T011 needs it.
+    - T005 first: the go or no-go for Phase 4. On a no-go, T042 is raised at once and T006 follows it (T006's client change also needs T014).
+    - T007, T008 and T009 in parallel with T005; T011 after T005 (it uses T005's SVGs).
+    - T010 written alongside, finished after T009; T012 only if T011 needs it.
   - **Shared code:**
     - T013 → T015 → T018 → T019.
     - T014 after T004; T016 and T017 alongside T013 and T015.
-    - T018 needs T016 and T017.
+    - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
 - **US1 (Phase 4)** needs Phase 2 and a go from T005 (or T006's route): T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031.
 - **US6:** T032 needs T027; T033 needs T031.
-- **US3:** T034 needs T019 and T031.
+- **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**
   - T035 after T031; T036 after T035.
   - T037 after T029.
   - T038 after T037.
   - T039 after T037.
   - T040 after T035.
-- **Polish:** T041 at any time; T042 after T005 (and T006); T043 at any time; T044 after T040; T045 last.
+- **Polish:** T041 at any time; T042 after T005 (at once on a no-go, or on a go that rests on page reuse); T043 at any time; T044 after T033, T039 and T040; T045 last.
 
 ## Parallel opportunities
 
 - T002 and T003.
-- The measurements: T005, T007, T008, T009 and T011.
+- The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
 - US2 and US1 once Phase 2 is done.
 
