@@ -76,3 +76,16 @@
   dropped analysis options are ignored.
 - **After the sixth review (#10):** bookmarks no longer depend on a contents list
   (FR-006), and Story 6's cover scenario names the book's cover (FR-002).
+- **Amended by the plan:** FR-007 reads the analysis through its service; the render
+  service beside the book's step is an Assumption the release's owners agree, not a
+  requirement; list order and the top-level pathways' order join the expected
+  differences; and the book's size is settled as parts joined (research R2, R3, R4, R6).
+- **After the plan's reviews (#12, #13):** FR-015 and SC-009 name the Noto Sans family,
+  which the plan's fonts need; FR-016's floor allows the largest a landscape page gives,
+  with figures still below it listed; the render service's Assumption names its FoamTree
+  dependency.
+- **After the plan's third review (#14):** SC-005 is measured cold, so the website's cache
+  is no answer to it; the single-event figure times corrected (2.2–5.0 s, 1.65 at two at
+  once); the gate table's render-service line matches Complexity Tracking; FR-016's
+  floor reads as one; the EHLD summary's extra entry explained (an event the graph does
+  not hold) and the preflight told to ignore such entries.

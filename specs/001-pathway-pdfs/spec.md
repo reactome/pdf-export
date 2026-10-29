@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-design-4`
+**Feature Branch**: `001-plan-5`
 
 **Created**: 2026-10-29
 
@@ -285,8 +285,9 @@ of pages with today's book.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
 - **A release file missing:** a diagram the graph needs but the files lack, or an EHLD
-  the summary names but the files lack. The step fails and names it (Story 5,
-  scenario 3).
+  the summary names for a pathway the graph holds, but the files lack. (An entry for an
+  event the graph does not hold is ignored: plan, research R7.) The step fails and names
+  it (Story 5, scenario 3).
 - **An analysis token unknown, malformed, older than the retention period, or gone
   within it:** a malformed token, or one older than the retention period, is answered
   as unknown; one whose result is gone within the period is answered as gone (Story 2,
@@ -339,8 +340,8 @@ of pages with today's book.
 - **FR-007**: The system MUST read:
   - the graph;
   - the release's diagram files, EHLD files and EHLD summary;
-  - for an overlay, the analysis result the token names, from where the analysis
-    service writes it.
+  - for an overlay, the analysis result the token names, through the analysis service
+    that holds it (plan, research R6).
 
   It MUST NOT read a relational database.
 
@@ -395,7 +396,8 @@ of pages with today's book.
   theme, used as a dependency rather than a hand-kept copy of its values. Figures,
   illustrations, analysis overlays and Reactome's logo keep their own colours (FR-008).
   The text MUST be set in the website's typefaces, Roboto, with Roboto Mono for
-  identifiers, and Noto Sans only for characters they lack. Each typeface is embedded
+  identifiers, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2 and Noto Sans
+  Math) only for characters they lack. Each typeface is embedded
   and under a licence FR-009 allows.
 - **FR-016**: The PDFs' layout MUST have:
   - parts set apart by space, type and at most thin rules, with no boxes or borders;
@@ -403,8 +405,9 @@ of pages with today's book.
   - a running header naming the top-level pathway (in the book) or the event (in a
     single-event PDF), or on front pages (introduction, analysis properties,
     contents) that part's name, and a page number on every page but the cover;
-  - no figure split across pages, and none shrunk below the size the plan sets for
-    legibility;
+  - no figure split across pages, and none shrunk below the legibility size the plan
+    sets, unless it is already at the largest a landscape page of its own allows, in
+    which case it is listed in the run report;
   - a cover in the website's style (User Story 6, scenario 3).
 
 ### Key Entities
@@ -448,7 +451,8 @@ of pages with today's book.
   the same means, and no more than 1% of their pixels differ.
 - **SC-009**: Every colour in the PDFs' own text and layout is one of the website's
   light theme's palette colours, its foreground and background colours included, and
-  every typeface one FR-015 names, Noto Sans only for characters the others lack, as a
+  every typeface one FR-015 names, the Noto Sans family only for characters the others
+  lack, as a
   check of the PDF's colours and fonts shows; figures, illustrations, overlays and the
   logo are left to SC-008. In a side-by-side judgement of at least 12 pages chosen at
   random, including a cover, a contents page and a pathway section with its figure, a
@@ -465,6 +469,12 @@ of pages with today's book.
   at it.
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
+- **The render service beside the book's step:** the figures come from the website's
+  render service, with its content service, run on the release's graph and files beside
+  the book's step (plan, research R3). That service loads FoamTree, under a commercial
+  licence: pdf-export ships none of it, but cannot draw figures without the service
+  until WebsiteAngular's render bundle without FoamTree exists (plan, Complexity
+  Tracking). The release's owners agree both.
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;
@@ -478,7 +488,12 @@ of pages with today's book.
     are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
     each recorded;
-  - the look: layout, colours and typefaces (User Story 6).
+  - the look: layout, colours and typefaces (User Story 6);
+  - the order of lists: today's PDFs list an event's children, compartments, literature
+    (and so which five references are shown), summations, diseases and the events
+    before and after in the database's order; the new ones in the curators' order
+    (plan, research R2);
+  - top-level pathways by name, not by database identifier (FR-002).
 - **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
   is answered as such, where today's endpoint answers an empty response for both; and
   the analysis options FR-006 drops are ignored if sent.
@@ -486,11 +501,11 @@ of pages with today's book.
   licence today, though its repository is CC0; the theme's owners are asked to declare
   it in the package, and until then CI's licence check is told it is CC0, with the
   reason.
-- **One book's size:** the human book runs to thousands of pages. Whether it is made in
-  one pass or in parts joined into one PDF is for the plan to measure.
-- **The analysis result** is read where the analysis service writes it, as the content
-  service reads it today. Its format is the plan's to handle. Tests use a private
-  instance, never production.
+- **One book's size:** the human book runs to thousands of pages. It is printed in parts
+  and joined into one PDF (plan, research R4).
+- **The analysis result** is read through the analysis service, which reads the files
+  it writes by its own rules; its stored format is Java's own (plan, research R6). Tests
+  use a private instance or a stub, never production.
 - **The website's part:** routing, the depth choice, the token and the error answers live
   in WebsiteAngular's specs. This spec provides the means.
 - **Comparison inputs:** a private copy of the release's graph (release 98), with
