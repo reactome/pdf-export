@@ -179,7 +179,6 @@ Dockerfile
      baseline is run again there);
    - a single-event PDF's stages, with the render service's cache off (R7, SC-005);
    - the diagrams' widths against FR-016's floor (R4);
-   - the one illustration the graph does not count (R7);
    - what the analysis service answers for an expired and a malformed token, and its
      retention period, on a private instance (R6);
    - the join's memory, and stamping page numbers after it (R4).
