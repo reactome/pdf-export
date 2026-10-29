@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-design-2`
+**Feature Branch**: `001-design-3`
 
 **Created**: 2026-10-29
 
@@ -146,8 +146,8 @@ Compare each with `event-pdf`'s by FR-012.
 **Acceptance Scenarios**:
 
 1. **Given** a pathway's stable identifier and a depth of 0 or 1, **When** its PDF is
-   asked for, **Then** it holds the parts of the Background, in that order, to that
-   depth.
+   asked for, **Then** it holds the parts of the Background to that depth, with the
+   contents list and bookmarks placed as FR-006 says.
 2. **Given** a reaction's stable identifier, **When** its PDF is asked for, **Then** it
    holds a cover (with no diagram and no excerpt note), an introduction and the
    reaction's section.
@@ -301,7 +301,10 @@ of pages with today's book.
 - **FR-001**: The system MUST produce the release's book as a single PDF holding each of
   human's top-level pathways in full depth.
 - **FR-002**: The book MUST have:
-  - a cover and an introduction;
+  - one cover: Reactome's logo, the title "The Reactome Book" and the release, no
+    diagram and no excerpt note, the names across every event in the book (sorted, each
+    once), and the institutions, licence and date of the Background's cover;
+  - an introduction;
   - a contents list before the sections;
   - nested bookmarks;
   - the top-level pathways in order of their names, ignoring case.
@@ -322,7 +325,8 @@ of pages with today's book.
 - **FR-006**: The system MUST produce the PDF of one event of any species by stable
   identifier:
   - at depth 0 or 1, 1 by default;
-  - with the cover, introduction and contents list of the Background;
+  - with the cover and introduction of the Background, and, where the Background has a
+    contents list, that list before the sections and nested bookmarks, as in the book;
   - given an analysis token, with the analysis overlay of the Background, for the event's
     species.
 
@@ -359,12 +363,15 @@ of pages with today's book.
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
   - a section with no name or no stable identifier;
-  - a pathway or reaction with no figure;
+  - a pathway's or reaction's full section with no figure, where the figure's source
+    exists (its own or an ancestor's diagram file, its EHLD, or for a reaction the
+    graph);
   - a broken internal link.
 - **FR-012**: The output MUST be compared with `event-pdf`'s for the same graph, by
   meaning:
-  - the cover: its title, whether it has a diagram and an excerpt note, and the count of
-    distinct names;
+  - a single-event PDF's cover: its title, whether it has a diagram and an excerpt note,
+    and the count of distinct names; the book's one cover: the count of distinct names
+    across today's files' covers;
   - the introduction: the release and the counts;
   - with an analysis, the analysis's properties: the values it reports (such as its type,
     the identifiers found and in all, the pathways hit, projection, interactors, species,
@@ -373,8 +380,9 @@ of pages with today's book.
   - the contents list's entries and their targets;
   - which events have which kind of figure.
 
-  Bytes, layout, running headers, page numbers and the look of figures are not compared. Every difference MUST be fixed
-  or recorded with its reason. A comparison MUST NOT print people's names.
+  Bytes, layout, running headers, page numbers and the look of figures are not compared.
+  Every difference MUST be fixed or recorded with its reason. A comparison MUST NOT
+  print people's names.
 
 - **FR-013**: Fixtures, samples and test output in the repository MUST NOT contain
   people's names; authors and curators are replaced by placeholders.
@@ -383,17 +391,18 @@ of pages with today's book.
   specified in WebsiteAngular. Today's depth parameter's name is malformed, so the
   website in effect always asks for depth 1.
 - **FR-015**: The PDFs' own text and layout (headings, body text, links, rules,
-  highlights and backgrounds) MUST take their colours from the website's published
-  light theme, used as a dependency rather than a hand-kept copy of its values.
-  Figures, illustrations, analysis overlays and Reactome's logo keep their own colours
-  (FR-008). The text MUST be set in the typefaces the theme names, Roboto, with Roboto
-  Mono for identifiers, and a fallback typeface for characters they lack. Each typeface
-  is embedded and under a licence FR-009 allows.
+  highlights and backgrounds) MUST take their colours from the website's published light
+  theme, used as a dependency rather than a hand-kept copy of its values. Figures,
+  illustrations, analysis overlays and Reactome's logo keep their own colours (FR-008).
+  The text MUST be set in the website's typefaces, Roboto, with Roboto Mono for
+  identifiers, and Noto Sans only for characters they lack. Each typeface is embedded
+  and under a licence FR-009 allows.
 - **FR-016**: The PDFs' layout MUST have:
   - parts set apart by space, type and at most thin rules, with no boxes or borders;
   - the same margins on every page;
   - a running header naming the top-level pathway (in the book) or the event (in a
-    single-event PDF), and a page number on every page but the cover;
+    single-event PDF), or on front pages (introduction, analysis properties,
+    contents) that part's name, and a page number on every page but the cover;
   - no figure split across pages, and none shrunk below the size the plan sets for
     legibility;
   - a cover in the website's style (User Story 6, scenario 3).
@@ -438,11 +447,13 @@ of pages with today's book.
   the same event and analysis from the same data. Both are rendered at the same size by
   the same means, and no more than 1% of their pixels differ.
 - **SC-009**: Every colour in the PDFs' own text and layout is one of the website's
-  light theme colours, and every typeface one FR-015 names, as a check of the PDF's
-  colours and fonts shows; figures, illustrations, overlays and the logo are left to
-  SC-008. In a side-by-side judgement of at least 12 pages chosen at random, including a
-  cover, a contents page and a pathway section with its figure, a majority of the judges
-  (the release's owners and the curators they ask) prefer the new look to today's.
+  light theme's palette colours, its foreground and background colours included, and
+  every typeface one FR-015 names, Noto Sans only for characters the others lack, as a
+  check of the PDF's colours and fonts shows; figures, illustrations, overlays and the
+  logo are left to SC-008. In a side-by-side judgement of at least 12 pages chosen at
+  random, including a cover, a contents page and a pathway section with its figure, a
+  majority of the judges (the release's owners and the curators they ask) prefer the new
+  look to today's.
 
 ## Assumptions
 
@@ -455,8 +466,9 @@ of pages with today's book.
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
 - **Expected differences from `event-pdf`** (FR-012):
-  - the bookmarks;
-  - the contents list before the sections, not after;
+  - the bookmarks, in every PDF;
+  - the contents list before the sections, not after, in every PDF that has one;
+  - the book's one cover, in place of a cover per file;
   - short entries at every later place an event recurs in the book, where today's files
     write nothing there;
   - in one book, links that now reach events in other top-level pathways, where each
@@ -468,7 +480,8 @@ of pages with today's book.
     each recorded;
   - the look: layout, colours and typefaces (User Story 6).
 - **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
-  is answered as such, where today's endpoint answers an empty response for both.
+  is answered as such, where today's endpoint answers an empty response for both; and
+  the analysis options FR-006 drops are ignored if sent.
 - **The website's theme** is used as a package dependency. Its package declares no
   licence today, though its repository is CC0; the theme's owners are asked to declare
   it in the package, and until then CI's licence check is told it is CC0, with the
@@ -484,5 +497,5 @@ of pages with today's book.
   `event-pdf` run against it for the reference output. The release's published book is
   fetched one file at a time, only when a comparison needs it, and kept out of the
   repository. No request goes to a production service.
-- **graph-core** has no licence, so it is not a dependency (constitution II). The plan
-  chooses how the graph is read.
+- **Reactome's Java graph library** has no licence, so it is not a dependency
+  (constitution II). The plan chooses how the graph is read.

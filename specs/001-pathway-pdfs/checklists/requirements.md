@@ -69,3 +69,8 @@
   - the token departure sits under the endpoint's answers, and the token states map onto
     Story 2's cases;
   - FR-015, FR-016 and SC-009 follow FR-014 and SC-008.
+- **After the fifth review (#9):** the book's one cover is defined (FR-002) and compared
+  by its names (FR-012); every PDF has bookmarks and, where it has a contents list, puts
+  it first; FR-011's missing-figure fault applies only where the figure's source
+  exists; the fallback typeface is named; front pages' running headers are defined;
+  dropped analysis options are ignored.
