@@ -1,0 +1,54 @@
+# Specification Quality Checklist: Reactome's pathway PDFs from the graph
+
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+
+**Created**: 2026-10-29
+
+**Feature**: [spec.md](../spec.md)
+
+## Content Quality
+
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+## Requirement Completeness
+
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] All acceptance scenarios are defined
+- [x] Edge cases are identified
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [x] All functional requirements have clear acceptance criteria
+- [x] User scenarios cover primary flows
+- [x] Feature meets measurable outcomes defined in Success Criteria
+- [x] No implementation details leak into specification
+
+## Notes
+
+- **Named constraints:** the container image and CI are named in FR-009 and FR-010 as
+  constraints the release and the project already set, not as design choices. How the
+  graph is read, how figures are drawn and how the PDF is laid out are left to the plan.
+- **No clarification markers:** the open questions in #3, and the decisions the first
+  review raised, have defaults under Assumptions:
+  - the book's scope, name and place;
+  - the switch from the release's file-list check;
+  - the analysis service as the overlay's source;
+  - the website's part in WebsiteAngular.
+- **The background was checked against `event-pdf`'s source** (its main class,
+  exporter, sections and verifier) and the content service's controller, after the
+  first review (#4) found it wrong in places.
+- **Departures from today** are listed under the spec's Assumptions, as the differences
+  the comparison expects.
+- **After the second review (#5):**
+  - the licence rule covers what the exporter ships, not Reactome's content;
+  - the analysis result is read where the analysis service writes it, as today;
+  - the section order and the subpathway figure are as `event-pdf` writes them;
+  - the faults the check looks for are defined.
