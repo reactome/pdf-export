@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-design`
+**Feature Branch**: `001-design-2`
 
 **Created**: 2026-10-29
 
@@ -252,22 +252,24 @@ between the website and the book should see one Reactome. It needs no more than 
 website's own palette, type and spacing, used well.
 
 **Independent Test**: put a page of the book beside the same event's page on the
-website. Check that the colours are the website's theme colours and the typefaces its
-typefaces. Then have the release's owners, and a curator or two, judge a sample of pages
-against today's book.
+website. Check that the colours of the PDF's own text and layout are the website's
+theme colours and its typefaces those FR-015 names; figures, illustrations, overlays
+and the logo keep their own colours. Then have the judges of SC-009 compare a sample
+of pages with today's book.
 
 **Acceptance Scenarios**:
 
-1. **Given** the website's theme, **When** a PDF is written, **Then** its headings,
-   links, rules and highlights use the theme's colours (its primary colour and the
-   colours paired with it), and its text uses the website's typefaces.
+1. **Given** the website's light theme, **When** a PDF is written, **Then** its
+   headings, links, thin rules and highlights use the theme's colours (its primary
+   colour and the colours paired with it), and its text uses the typefaces FR-015 names.
 2. **Given** a section, **When** it is laid out, **Then** its parts are set apart by
-   space and type rather than by boxes and borders, with figures given room and
-   consistent margins, running headers and page numbers.
-3. **Given** the cover, **When** it is written, **Then** it is designed in the website's
-   style, with Reactome's logo, the title and the pathway's figure.
-4. **Given** the website's theme changes, **When** the PDFs are next made, **Then** they
-   follow it, from the same source, not a copy.
+   space, type and at most thin rules, never boxes or borders, with the margins,
+   running headers, page numbers and figure sizes of FR-016.
+3. **Given** the cover, **When** it is written, **Then** it holds the parts the
+   Background lists for a cover (for a pathway, its diagram), laid out in the website's
+   style with Reactome's logo.
+4. **Given** a new version of the website's theme, **When** this repository updates to
+   it, **Then** the PDFs follow it with no colour value changed in this repository.
 
 ---
 
@@ -286,7 +288,9 @@ against today's book.
   the summary names but the files lack. The step fails and names it (Story 5,
   scenario 3).
 - **An analysis token unknown, malformed, older than the retention period, or gone
-  within it:** the answer says which of Story 2, scenario 4's cases it is.
+  within it:** a malformed token, or one older than the retention period, is answered
+  as unknown; one whose result is gone within the period is answered as gone (Story 2,
+  scenario 4).
 - **A release file missing for a single-event PDF:** the PDF is made without that figure,
   as today, and the absence is logged; only the book's step fails on it.
 
@@ -324,9 +328,9 @@ against today's book.
 
   The analysis's other options today (resource, expression column, importable only, and
   the diagram and analysis colour profiles) are dropped: the website sends none of them.
-  The overlay uses what they default to today: all resources together, no expression
-  column, all resources and not only importable ones, and the website's default
-  colours.
+  The overlay uses today's defaults for the rest: all resources together, no
+  expression column, and all identifiers rather than only importable ones. Its colours
+  are the website's default analysis colours, a change from today's, with FR-008.
 
 - **FR-007**: The system MUST read:
   - the graph;
@@ -369,23 +373,30 @@ against today's book.
   - the contents list's entries and their targets;
   - which events have which kind of figure.
 
-  Bytes, layout and the look of figures are not compared. Every difference MUST be fixed
+  Bytes, layout, running headers, page numbers and the look of figures are not compared. Every difference MUST be fixed
   or recorded with its reason. A comparison MUST NOT print people's names.
 
 - **FR-013**: Fixtures, samples and test output in the repository MUST NOT contain
   people's names; authors and curators are replaced by placeholders.
-- **FR-015**: The PDFs MUST take their colours from the website's theme, the same source
-  the website uses, and their text MUST be set in the website's typefaces. Each typeface
-  MUST be under a licence FR-009 allows.
-- **FR-016**: The PDFs' layout MUST be plain and modern:
-  - parts set apart by space and type rather than boxes and borders;
-  - consistent margins, running headers and page numbers;
-  - figures given room;
-  - a cover designed in the website's style.
 - **FR-014**: The website's single-event PDF MUST be reachable for the website to serve.
   How the website routes it, its parameters' names and the form of its error answers are
   specified in WebsiteAngular. Today's depth parameter's name is malformed, so the
   website in effect always asks for depth 1.
+- **FR-015**: The PDFs' own text and layout (headings, body text, links, rules,
+  highlights and backgrounds) MUST take their colours from the website's published
+  light theme, used as a dependency rather than a hand-kept copy of its values.
+  Figures, illustrations, analysis overlays and Reactome's logo keep their own colours
+  (FR-008). The text MUST be set in the typefaces the theme names, Roboto, with Roboto
+  Mono for identifiers, and a fallback typeface for characters they lack. Each typeface
+  is embedded and under a licence FR-009 allows.
+- **FR-016**: The PDFs' layout MUST have:
+  - parts set apart by space, type and at most thin rules, with no boxes or borders;
+  - the same margins on every page;
+  - a running header naming the top-level pathway (in the book) or the event (in a
+    single-event PDF), and a page number on every page but the cover;
+  - no figure split across pages, and none shrunk below the size the plan sets for
+    legibility;
+  - a cover in the website's style (User Story 6, scenario 3).
 
 ### Key Entities
 
@@ -423,13 +434,15 @@ against today's book.
 - **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
   shipped asset is added to test it.
 - **SC-007**: The book's check fails on each fault in FR-011, each seen to fail once.
-- **SC-009**: Every colour in the PDFs is one of the website's theme colours, and every
-  typeface one the website uses, as a check of the PDF's colours and fonts shows. In a
-  side-by-side judgement of a sample of pages, the release's owners prefer the new
-  book's look to today's.
 - **SC-008**: For a sample of events, each PDF figure is the drawing the website makes for
   the same event and analysis from the same data. Both are rendered at the same size by
   the same means, and no more than 1% of their pixels differ.
+- **SC-009**: Every colour in the PDFs' own text and layout is one of the website's
+  light theme colours, and every typeface one FR-015 names, as a check of the PDF's
+  colours and fonts shows; figures, illustrations, overlays and the logo are left to
+  SC-008. In a side-by-side judgement of at least 12 pages chosen at random, including a
+  cover, a contents page and a pathway section with its figure, a majority of the judges
+  (the release's owners and the curators they ask) prefer the new look to today's.
 
 ## Assumptions
 
@@ -453,9 +466,13 @@ against today's book.
     are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
     each recorded;
-  - an unknown or gone analysis token answered as such, where today's endpoint answers
-    an empty response;
-  - the look (User Story 6).
+  - the look: layout, colours and typefaces (User Story 6).
+- **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
+  is answered as such, where today's endpoint answers an empty response for both.
+- **The website's theme** is used as a package dependency. Its package declares no
+  licence today, though its repository is CC0; the theme's owners are asked to declare
+  it in the package, and until then CI's licence check is told it is CC0, with the
+  reason.
 - **One book's size:** the human book runs to thousands of pages. Whether it is made in
   one pass or in parts joined into one PDF is for the plan to measure.
 - **The analysis result** is read where the analysis service writes it, as the content
