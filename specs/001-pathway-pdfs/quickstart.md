@@ -28,7 +28,7 @@ one. A run's output stays outside the repository when it holds people's names.
   - the subpathways whose figure would be an EHLD with events selected;
   - whether `event-pdf` overlays reactions.
 
-Expected: numbers for SC-003, SC-005 and research R3 and R4.
+Expected: numbers for SC-003, SC-005 and research R3 and R4. Measured for release 98 in research R7.
 
 ## 2. CI's own runs
 

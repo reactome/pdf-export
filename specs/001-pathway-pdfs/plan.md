@@ -63,10 +63,15 @@ fonts above), run by the release and beside the website's services.
 
 **Performance Goals**:
 
-- **SC-003:** the book in no more time than `event-pdf` takes, measured first (R7).
-- **SC-005:** a single-event PDF at depth 1 in no more time than `event-pdf`'s.
-- **Figures dominate:** about 18,700 for the human book (inference, R3), so the render
-  service's concurrency is the main lever.
+- **SC-003:** the book in no more time than `event-pdf` takes: 1 h 18 min on this host
+  for release 98 (R7).
+- **SC-005:** a single-event PDF at depth 1 in no more time than `event-pdf`'s, warm:
+  0.5–1.7 s for a reaction, 1.3–9.5 s for most pathways, 46 s for Signal Transduction
+  (R7).
+- **Figures dominate:** 19,313 for the human book (R7). At the render service's measured
+  times they alone would take 1.5–2 hours with four reused pages, over SC-003's budget,
+  so the service's throughput is measured first and scaled out with more workers if
+  needed (R3, R7).
 
 **Constraints**:
 
@@ -78,10 +83,11 @@ fonts above), run by the release and beside the website's services.
   local (R5).
 - **No names** in fixtures, logs or comparison output (FR-013).
 
-**Scale/Scope**: the human book holds every top-level pathway in full depth:
+**Scale/Scope**: the human book holds every top-level pathway in full depth (R7):
 
-- about 2,700 pathways and 16,000 reactions (inference, R3);
-- thousands of pages, measured in R7's task.
+- 29 top-level pathways, 2,889 pathways and 16,424 reactions;
+- 23,541 pages and 1.42 GB as `event-pdf` writes it today; its largest top-level
+  pathway is 3,760 pages.
 
 ## Constitution Check
 
@@ -151,11 +157,9 @@ Dockerfile
 
 ## Order of work
 
-1. **Measure** (R7): `event-pdf`'s human book and a sample of single events on a private
-   copy of release 98's graph. Also:
-   - the counts of figures by kind;
-   - the subpathways whose ancestor has an EHLD;
-   - whether `event-pdf` overlays reactions.
+1. **Measure** (done in research, R7): `event-pdf`'s human book and a sample of single
+   events, the figures by kind, the EHLD gap, and the overlays on reactions. What is left
+   to measure first is the render service's throughput at the book's scale (R3).
 2. **Foundations:**
    - the package, TypeScript, lint, Prettier and CI;
    - the licence check, shown failing;

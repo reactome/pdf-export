@@ -91,9 +91,10 @@ diagram and EHLD files.
   - an analysis overlay by token.
 - **What it cannot draw yet** (WebsiteAngular changes, R10):
   - an ancestor's diagram with events selected when that ancestor has an EHLD, since
-    highlighting an illustration throws and nothing forces the plain diagram;
-  - an overlay on a reaction's own drawing (inference: the reaction component never
-    reads the analysis).
+    highlighting an illustration throws and nothing forces the plain diagram (no human
+    pathway at release 98 needs one, R7);
+  - an overlay on a reaction's own drawing (the reaction component never reads the
+    analysis, and `event-pdf` overlays reactions, R7).
 - **SVG** stays vector in Chromium's PDF when inlined.
   - Diagrams carry text in Roboto without the font embedded, and node shapes as small
     PNGs.
@@ -104,9 +105,9 @@ diagram and EHLD files.
 - **Time per figure** (through beta's render service, uncached): diagrams 3.4–5.0 s, a
   subpathway's selection 4.1 s, a reaction 2.6 s, an EHLD 2.2–2.4 s. On a page that is
   reused, a reaction takes 0.65 s and a diagram 2.8–4.0 s.
-- **The human book's figures** (inference, from the counts): about 2,700 pathway figures
-  and 16,000 reaction figures. That is about 8.8 h through the service as it is, at its
-  concurrency of 2, or 1.5–2 h with four reused pages.
+- **The human book's figures:** 19,313, counted from the graph (R7). That is about 9 h
+  through the service as it is, at its concurrency of 2, or 1.5–2 h with four reused
+  pages (inference, from these times).
 - **A licence trap.** The built site carries FoamTree, under Carrot Search's commercial
   licence, in a chunk every render loads. pdf-export cannot ship the built site in its
   own image (constitution II).
@@ -261,32 +262,74 @@ synthetic documents, on this host under load.
 
 **Alternatives considered.** A Kryo reader in TypeScript: tied to Java's internals.
 
-## R7. How long, and how big: the baseline (measured in the first task)
+## R7. How long, and how big: the baseline
 
-**Not yet measured.** The host had about 6 GB free while this plan was written, and a
-private copy of the release's graph takes 4 GB, so `event-pdf`'s runs wait for room.
+**Measured** on 29 Oct 2026, on a private, read-only copy of release 98's graph on this
+host. `event-pdf` was built at its pinned commit, with `reaction-exporter` 1.2.9's
+snapshot in place of 1.2.8: only a Reactome-hosted repository serves 1.2.8, and the
+figures are not what this baseline compares. The release's diagram files, EHLD files and
+EHLD summary were fetched one at a time from the release's download directory, for the
+human pathways that have a diagram: 2,780 files and 221 illustrations, 373 MB.
 
-- **Ready to run:**
-  - `event-pdf` built at its pinned commit against Maven Central and the local
-    repository;
-  - a small Java harness, kept outside the repository, that makes one event's PDF as
-    the content service's controller does;
-  - the commands, in quickstart.md.
-- **One stand-in.** `event-pdf` needs `reaction-exporter` 1.2.8, which only a
-  Reactome-hosted Maven repository serves; this run used the 1.2.9 snapshot already in
-  the local repository. Its reaction figures may differ from the release's, which this
-  baseline does not compare.
+- **The human book,** by `event-pdf`'s command line (`-Xmx6g`):
 
-**Decision.** The first task measures, on a private copy of release 98's graph, with
-this host otherwise quiet:
+  | Measure              | Value                         |
+  | -------------------- | ----------------------------- |
+  | Wall time            | 1 h 18 min 41 s (4,721 s)     |
+  | Peak resident memory | 4.7 GB                        |
+  | Files                | 29, one per top-level pathway |
+  | Pages                | 23,541                        |
+  | Size                 | 1.42 GB                       |
+  | Smallest file        | 44 pages, 1.1 MB              |
+  | Largest file         | 3,760 pages, 383 MB           |
+  - Two diagrams could not be inserted (an index error in the diagram exporter). The
+    rest of the log is iText's licence notice, 33 times.
+  - The figures are about half the size: the old exporters write raster images.
 
-- **the book:** `event-pdf`'s human book, its time, peak memory, page count and size, per
-  top-level pathway and in all;
-- **single events:** a sample of single-event PDFs at depth 1, as SC-005's baseline;
-- **pdf-export's own figures:** the counts of figures it needs, by kind, from the graph.
+- **Single events at depth 1,** as the content service makes them, timed on the second
+  of two runs in one JVM (the service's JVM is warm):
 
-These set SC-003's and SC-005's numbers, the parts' size (R4) and the render service's
-settings (R3).
+  | Event                                          | Pages  | Time         |
+  | ---------------------------------------------- | ------ | ------------ |
+  | Five reactions, one of each kind               | 3 each | 0.5–1.7 s    |
+  | Pathways with 1–34 reactions beneath them      | 5–19   | 1.3–3.8 s    |
+  | Pathways with 143–1,150 reactions beneath them | 10–15  | 4.4–9.5 s    |
+  | Signal Transduction                            | 30     | 46 s (15 MB) |
+
+  A cold JVM, as the command line starts, took 11–21 s for a reaction.
+
+- **The figures the human book needs,** from the graph:
+
+  | Kind                                                                | Count  |
+  | ------------------------------------------------------------------- | ------ |
+  | Pathways with a diagram of their own                                | 1,390  |
+  | of which illustrations (EHLD)                                       | 220    |
+  | Pathways drawn in their nearest ancestor's diagram, events selected | 1,499  |
+  | of which that ancestor has an EHLD                                  | 0      |
+  | Reactions                                                           | 16,424 |
+  | In all                                                              | 19,313 |
+
+  None of release 98's human pathways needs an ancestor's illustration with events
+  selected, which the render service cannot draw (R10). That gap does not touch the human
+  book at this release; the book's check would find it if it ever does.
+
+- **Overlays on reactions:** `event-pdf` overlays the analysis on a reaction's figure too
+  (`Diagrams.insertReaction` passes the result to the diagram exporter). So the render
+  service's reaction drawing needs its overlay (R10) before the website's PDF matches
+  today's with an analysis.
+
+**What this sets.**
+
+- **SC-003:** the book in no more than 1 h 18 min on this host, against this baseline.
+- **SC-005:** each single-event PDF in no more time than these, warm.
+- **Figures:** 19,313 for the book. At R3's measured times, through the render service
+  as it is, that is about 9 hours at its concurrency of 2. So the release's run needs the
+  service's concurrency raised and its pages reused, as R3 decides. With four reused pages
+  the estimate is 1.5–2 hours, still over SC-003's budget. The first tasks measure the
+  render service's throughput with those settings. If it cannot meet the budget, the
+  plan's answer is more render workers, not fewer figures.
+- **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
+  part (R4), it is split within its chapter, at section boundaries.
 
 ## R8. The checks: by meaning, with tools under loose licences
 
@@ -345,11 +388,11 @@ packaging.
 ## R10. What WebsiteAngular must change (its own specs)
 
 - **The plain diagram on demand.** A render option to draw an ancestor's diagram, not
-  its EHLD, with events selected. Until it exists, those subpathways' figures are the
-  ancestor's EHLD without a selection, recorded as a difference. Their count is taken
-  in R7's task.
-- **An overlay on a reaction's drawing,** if `event-pdf` overlays reactions today
-  (checked in R7's task).
+  its EHLD, with events selected. Release 98's human book needs none (R7), so this
+  waits until a release does. Until then such a figure would be the ancestor's EHLD
+  without a selection, recorded as a difference.
+- **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
+  the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
