@@ -1,0 +1,368 @@
+# Feature Specification: Reactome's pathway PDFs from the graph
+
+**Feature Branch**: `001-pathway-pdfs`
+
+**Created**: 2026-10-29
+
+**Status**: Draft
+
+**Input**: User description: "Reactome's pathway PDFs from the graph, replacing reactome/event-pdf (plan: #3). Two outputs from one implementation: the release's book, as one PDF instead of today's folder of per-pathway PDFs, with a table of contents, bookmarks and links between pathways; and the website's PDF of one pathway or reaction, on request. Content as event-pdf writes today, proven against it by meaning. Data from the graph only, with the release's own files where needed. Figures in the new website's pathway-browser look. Every dependency under a non-restrictive licence, checked in CI. Runs as the release's step, with a check of the book that can fail on wrong content. Public repository: no people's names in fixtures."
+
+## Background: what `event-pdf` writes today
+
+`reactome/event-pdf` makes both of Reactome's pathway PDFs, with the same sections
+for each:
+
+- **The release's book**, `TheReactomeBook`:
+  - one PDF for each of human's top-level pathways, in full depth;
+  - written to a folder that is archived for download.
+- **The website's PDF** of one pathway or reaction:
+  - made on request, for an event of any species;
+  - at depth 0 (the event alone) or 1 (it and its direct children), 1 by default;
+  - optionally overlaid with an analysis result, given by its token.
+
+Every PDF has:
+
+- **a cover:** Reactome's logo, the event's name, its diagram, the authors of all the
+  events in it, the institutions, a disclaimer and the date; and, for a PDF of depth 1
+  or less, a note that it is an excerpt, pointing at the book;
+- **an introduction:** about Reactome, its references, the release and the counts of
+  pathways and reactions;
+- **with an analysis:** a section on the analysis's properties;
+- **a section for each event,** an event written once even where several pathways hold
+  it, with:
+  - its name, linked to its page on the website;
+  - its stable identifier;
+  - its figure;
+  - its location (the pathways above it, linked);
+  - for a reaction, its type, and the events before and after it in the document;
+  - what it was inferred from;
+  - its summation;
+  - its first five literature references;
+  - its edit history;
+  - its compartments and diseases;
+  - with an analysis, the entities and interactors found;
+- **a contents list** (except for a reaction alone, or depth 0), linking each entry to
+  its section.
+
+Its figures are:
+
+- the pathway diagram, or instead the illustrated diagram (EHLD) where the release's
+  EHLD summary names one;
+- the reaction diagram.
+
+All are drawn by the Java exporters, in the old pathway browser's look. It reads:
+
+- the graph;
+- the release's diagram files, EHLD files and EHLD summary;
+- for an overlay, the analysis result.
+
+PDFs have no bookmarks (outline) today.
+
+The release then checks the folder: that it exists, that every file named in the
+previous release's list is there, and that no file shrank by more than a tolerance.
+
+Four things are to change:
+
+- **One book:** the release's book becomes a single PDF.
+- **The new look:** figures are drawn as the new website's pathway browser draws them.
+- **Loose licences:** `event-pdf` is AGPL-3.0, depends on GPL-3.0 code, and embeds a
+  proprietary font.
+- **A check of content:** the release's check reads names and sizes, not content.
+
+## User Scenarios & Testing _(mandatory)_
+
+### User Story 1 - The release's book is one PDF from the graph (Priority: P1)
+
+A reader downloads Reactome's book for a release and gets one PDF:
+
+- a cover and an introduction;
+- a contents list;
+- each of human's top-level pathways, in full depth;
+- nested bookmarks;
+- the links listed in FR-003.
+
+It is made from the release's graph during the release.
+
+**Why this priority**: the book is a release deliverable, and replacing it retires
+`event-pdf` from the release.
+
+**Independent Test**: make the book from a private copy of a release's graph, and
+check that:
+
+- it opens as one PDF;
+- its contents list and bookmarks name every top-level pathway and every event beneath
+  them;
+- each event's section agrees by meaning with `event-pdf`'s for the same release.
+
+**Acceptance Scenarios**:
+
+1. **Given** a release's graph and files, **When** the book is made, **Then** one PDF
+   is written, holding every human top-level pathway, in the order of FR-002, and every
+   event beneath them.
+2. **Given** the book, **When** a reader opens its bookmarks, **Then** each pathway and
+   reaction has one, nested as the events nest.
+3. **Given** an event held by several pathways, **When** the book is made, **Then** its
+   section appears once. Each of its other places shows a short entry (name and stable
+   identifier) linked to the section.
+4. **Given** the book and `event-pdf`'s output for the same release, **When** they are
+   compared by meaning (FR-012), **Then** they agree, apart from differences recorded
+   with their reason.
+
+---
+
+### User Story 2 - The website's PDF of one pathway or reaction (Priority: P1)
+
+A website user asks for the PDF of the pathway or reaction they are looking at. They
+can ask with an analysis overlay. They get one PDF with the same parts and content as
+today, in the new look.
+
+**Why this priority**: the website offers this download today, with and without an
+analysis. Retiring `event-pdf` leaves it with nothing to serve unless this replaces it.
+
+**Independent Test**: on a private copy of the graph, ask for the PDF of:
+
+- a pathway at depth 0 and at depth 1;
+- a reaction;
+- a non-human event;
+- a pathway with an analysis token.
+
+Compare each with `event-pdf`'s by meaning.
+
+**Acceptance Scenarios**:
+
+1. **Given** a pathway's stable identifier and a depth of 0 or 1, **When** its PDF is
+   asked for, **Then** it holds a cover, an introduction, a contents list (at depth 1),
+   and the pathway's section and its children's to that depth.
+2. **Given** a reaction's stable identifier, **When** its PDF is asked for, **Then** it
+   holds a cover, an introduction and the reaction's section.
+3. **Given** an analysis token, **When** a PDF is asked for with it, **Then** it holds
+   the analysis's properties, the entities and interactors found per event, and figures
+   overlaid with the analysis.
+4. **Given** an identifier that names no event, or a token that names no analysis,
+   **When** a PDF is asked for, **Then** the answer says which, and no PDF is made.
+
+---
+
+### User Story 3 - Figures in the new website's look (Priority: P2)
+
+A reader of either PDF sees every figure as the website's pathway browser shows it.
+That covers the pathway diagrams, the illustrated (EHLD) diagrams and the reaction
+diagrams, and with an analysis, their overlays. Nothing is in the old look.
+
+**Why this priority**: the old look makes the PDFs read like a different Reactome from
+the website. It matters to readers, but the content can be proven before it looks new.
+
+**Independent Test**: for a sample of events, put each PDF figure beside the website's
+own drawing of the same event, and judge it by SC-008.
+
+**Acceptance Scenarios**:
+
+1. **Given** a pathway with a diagram, **When** its section is written, **Then** its
+   figure is the website's drawing of that diagram.
+2. **Given** a pathway the EHLD summary names, **When** its section is written,
+   **Then** the illustration is shown as the website shows it.
+3. **Given** a reaction, **When** its section is written, **Then** its figure is drawn
+   as the website draws the reaction.
+
+---
+
+### User Story 4 - Only non-restrictive licences (Priority: P1)
+
+Anyone can reuse this exporter, and the PDFs it makes, under any licence. Nothing it
+uses is under a restrictive licence, and neither is anything a PDF embeds.
+
+**Why this priority**: the restrictive licences of `event-pdf`, its dependencies and its
+font are a reason it is being replaced. A replacement that brings one back fails its
+purpose.
+
+**Independent Test**: CI lists the licence of every dependency and of every asset the
+PDFs embed (fonts, images, text), and fails on any not in the allowed list. A
+deliberately added restrictive one is seen to fail it.
+
+**Acceptance Scenarios**:
+
+1. **Given** the dependencies and the embedded assets, **When** CI checks their
+   licences, **Then** every one is under an allowed licence.
+2. **Given** a dependency or asset under the GPL family, under a commercial or
+   proprietary licence, or with none, **When** it is added, **Then** CI fails and names
+   it.
+
+---
+
+### User Story 5 - The release's step, with a check that can fail (Priority: P2)
+
+The release team runs the book's step as they run today's:
+
+- a container image;
+- the release's graph and files as inputs;
+- the book written to the release's output.
+
+A check then fails the step if the book's content is wrong.
+
+**Why this priority**: the book reaches readers only through the release. Today's check
+reads file names and sizes. A book of the right size and the wrong content passes it,
+and once the book is one file, the names it checks will no longer exist.
+
+**Independent Test**: run the step's command against a private copy of the graph. Then
+damage the output in each way FR-011 names, and see the check fail on each.
+
+**Acceptance Scenarios**:
+
+1. **Given** the release's graph and files, **When** the step runs, **Then** it writes
+   the book and the check passes.
+2. **Given** a book with one of FR-011's faults, **When** the check runs, **Then** it
+   fails and names the fault.
+
+---
+
+### Edge Cases
+
+- **An event with no figure, summation, literature or edit history:** its section leaves
+  that part out, as today, and the run does not fail.
+- **An event held by many pathways:** written once in the book, with linked entries
+  elsewhere (Story 1, scenario 3). In a single-event PDF, as today: once, the contents
+  list pointing to it.
+- **Very large pathways** (hundreds of events) and **the human book's size** (thousands
+  of pages): the book still completes within SC-003. It is still one file, and it opens
+  and searches in the readers of SC-004.
+- **Text with HTML, special characters or very long names:** written legibly, with no
+  markup shown as text.
+- **A release file missing:** a diagram the graph names but the files lack, or an EHLD
+  the summary names but the files lack. The step names which, and the check fails
+  rather than publishing a book with holes.
+- **An analysis token that has expired or was never made:** the website's answer says
+  so (Story 2, scenario 4).
+
+## Requirements _(mandatory)_
+
+### Functional Requirements
+
+- **FR-001**: The system MUST produce the release's book as a single PDF holding each of
+  human's top-level pathways in full depth.
+- **FR-002**: The book MUST have:
+  - a cover and an introduction;
+  - a contents list;
+  - nested bookmarks for every pathway and reaction;
+  - the top-level pathways in alphabetical order of their names, as today's folder
+    lists them.
+- **FR-003**: Each PDF MUST link:
+  - each contents entry to its section;
+  - each event's location (the pathways above it), what it was inferred from, and for a
+    reaction the events before and after it, to their sections where the PDF holds them;
+  - each event's name to its page on the website.
+- **FR-004**: An event held by more than one pathway MUST be written in full once in a
+  PDF. In the book, its other places MUST show a short entry (name and stable
+  identifier) linked to that section.
+- **FR-005**: For each event, the system MUST write what `event-pdf` writes, as the
+  Background lists it: its name, stable identifier, figure, location, type and the
+  events before and after it (reactions), what it was inferred from, summation, first
+  five literature references, edit history, compartments and diseases.
+- **FR-006**: The system MUST produce the PDF of one event of any species by stable
+  identifier:
+  - at depth 0 or 1, 1 by default;
+  - with a cover, an introduction and (except for a reaction or depth 0) a contents list;
+  - with an analysis overlay when given an analysis token: the analysis's properties,
+    the entities and interactors found per event, and overlaid figures.
+- **FR-007**: The system MUST read:
+  - the graph;
+  - the release's diagram files, EHLD files and EHLD summary;
+  - for an overlay, the analysis result named by its token.
+
+  It MUST NOT read a relational database.
+
+- **FR-008**: Every figure MUST be drawn as the new website's pathway browser draws it:
+  pathway diagrams, EHLD illustrations, reaction diagrams, and their analysis overlays.
+- **FR-009**: Every dependency, and every font, image and text the PDFs embed, MUST be
+  under a non-restrictive licence (MIT, BSD, Apache-2.0, ISC, OFL for fonts, or
+  similar). CI MUST fail on any other, including none. Text and images MUST NOT be
+  copied from `event-pdf`, which is AGPL-3.0; where its wording is kept, it is
+  rewritten.
+- **FR-010**: The book's step MUST run as a container image with the release's graph and
+  files as inputs, as today's step does, and write the book as one PDF in place of the
+  folder.
+- **FR-011**: A check MUST fail the book's step on wrong content:
+  - a missing top-level pathway;
+  - an event missing from the contents list or the bookmarks;
+  - an empty section;
+  - a broken internal link;
+  - a figure that failed to draw.
+- **FR-012**: The output MUST be compared with `event-pdf`'s for the same graph,
+  by meaning:
+  - each event's section: its parts, its text, their order;
+  - the contents list's entries and their targets;
+  - which events have which kind of figure.
+
+  Bytes, layout and the look of figures are not compared. Every difference MUST be
+  fixed or recorded with its reason. A comparison MUST NOT print people's names.
+
+- **FR-013**: Fixtures, samples and test output in the repository MUST NOT contain
+  people's names; authors and curators are replaced by placeholders.
+- **FR-014**: The website's single-event PDF MUST be reachable for the website to serve.
+  How the website routes it, and the form of its error answers, is specified in
+  WebsiteAngular.
+
+### Key Entities
+
+- **Event**: a pathway or a reaction, with the parts FR-005 lists and the events it
+  holds.
+- **Book**: the release's single PDF: cover, introduction, contents, sections,
+  bookmarks and links.
+- **Single-event PDF**: one event's PDF for the website, at depth 0 or 1, with or
+  without an analysis.
+- **Section**: one event's pages.
+- **Figure**: an event's diagram, illustration or reaction drawing, in the website's
+  look, overlaid with an analysis when there is one.
+- **Release files**: the diagram files, EHLD files and EHLD summary the release
+  publishes beside the graph.
+- **Analysis result**: a submitted analysis, named by its token, read for an overlay.
+
+## Success Criteria _(mandatory)_
+
+### Measurable Outcomes
+
+- **SC-001**: For a release, the book holds 100% of human's top-level pathways and every
+  event beneath them. Each event is reachable from the contents list and from the
+  bookmarks.
+- **SC-002**: Compared with `event-pdf`'s output for the same private graph by FR-012,
+  the book and a sample of single-event PDFs agree, apart from differences recorded
+  with their reason.
+- **SC-003**: The book is made in no more time than `event-pdf` takes to make today's
+  book from the same private graph on the same machine, measured as the baseline.
+- **SC-004**: The book opens, and its bookmarks and links work, in three readers: a
+  browser's built-in viewer (Chromium's and Firefox's) and a desktop viewer on Linux.
+- **SC-005**: A single-event PDF at depth 1 is made in no more time than `event-pdf`
+  takes for the same event on the same private graph, for a sample of pathways and
+  reactions.
+- **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
+  asset is added to test it.
+- **SC-007**: The book's check fails on each fault in FR-011, each seen to fail once.
+- **SC-008**: For a sample of events, each figure is the website's own drawing of that
+  event (the same drawing, from the same data), confirmed by putting the two side by
+  side.
+
+## Assumptions
+
+- **The book's scope:** human's top-level pathways, as today. Other species' books are
+  out of scope for spec 001.
+- **The book's name and place:** `TheReactomeBook.pdf`, published where today's archive
+  is, without an archive around it (a PDF compresses its own content). The release's
+  owners agree the name. The website's download page and the excerpt note on the cover
+  point at it.
+- **The release's check:** the check of FR-011 replaces the release's file-list check
+  for the book. The release's owners agree the switch, since the old list names files
+  the new step does not write.
+- **Bookmarks** are new: today's PDFs have none, so the comparison (FR-012) expects them
+  as a difference.
+- **One book's size:** the human book runs to thousands of pages. Whether it is made in
+  one pass or in parts joined into one PDF is for the plan to measure.
+- **The analysis result:** read from the website's own analysis service by token, as the
+  content service reads it today. Tests use a private instance, never production.
+- **The website's part:** routing, the depth choice, the token and the error answers live
+  in WebsiteAngular's specs. This spec provides the means.
+- **Comparison inputs:** a private copy of the release's graph (release 98), with
+  `event-pdf` run against it for the reference output. The release's published book is
+  fetched one file at a time, only when a comparison needs it, and kept out of the
+  repository. No request goes to a production service.
+- **graph-core** has no licence, so it is not a dependency (constitution II). The plan
+  chooses how the graph is read.
