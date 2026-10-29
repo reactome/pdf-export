@@ -32,7 +32,7 @@ Expected: numbers for SC-003, SC-005 and research R3 and R4. Measured for releas
 research R7.
 
 - **Then, first of the new work** (research R7): the render service's throughput at the
-  book's scale against the 45-minute figures budget, go or no-go; the analysis service's
+  book's scale against the 44-minute figures budget, go or no-go; the analysis service's
   answers for an expired and a malformed token on a private instance (R6); the join's
   memory and stamping after it (R4).
 

@@ -455,10 +455,9 @@ is ignored, not a missing file.
   only within the 44 minutes, not a way past them.
 
 - **To measure in the first tasks:** the render service's throughput (above); the
-  diagrams' widths, from the release's diagram files, for FR-016's floor (R4); the one
-  illustration the graph does not count (above); what the analysis service answers for
-  an expired and a malformed token, and its retention period (R6); the join's memory and
-  stamping (R4).
+  diagrams' widths, from the release's diagram files, for FR-016's floor (R4); what the
+  analysis service answers for an expired and a malformed token, and its retention
+  period (R6); the join's memory and stamping (R4).
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), it is split within its chapter, at section boundaries.
