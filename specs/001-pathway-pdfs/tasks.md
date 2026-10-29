@@ -46,7 +46,7 @@ repository root.
 
   Show each gate failing once (a type error, a lint error, a misformatted file, a failing test), and say so in the PR.
 
-- [ ] T002 [P] The licence check, `ci/licences.ts` (research R11).
+- [x] T002 [P] The licence check, `ci/licences.ts` (research R11). — #21. BlueOak-1.0.0 joins the allowlist: permissive, like MIT, and one of npm's tools uses it. Development packages are checked too. 99 packages pass today. Seen failing with two planted packages installed, one GPL-3.0 and one with no licence: both listed, exit 1. Seven unit tests: SPDX AND, OR and WITH, an unreadable expression, the old licence forms, every offender listed, the exception by exact name, and a font without its licence file.
   - It reads `npm query '*'` and allows MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, 0BSD, OFL-1.1, CC0-1.0 and Zlib, including SPDX expressions such as `(MIT AND Zlib)`.
   - It lists every offender, not only the first.
   - It carries one documented exception: the website's theme package, which is CC0 by its repository and declares no licence.

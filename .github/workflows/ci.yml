@@ -45,3 +45,8 @@ jobs:
 
             - name: Unit tests
               run: npm test
+
+            # Every installed package's licence, and every shipped font's licence file
+            # (T002, FR-009, constitution II).
+            - name: Licences
+              run: node ci/licences.ts
