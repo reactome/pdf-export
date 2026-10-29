@@ -1,6 +1,6 @@
 # Feature Specification: Reactome's pathway PDFs from the graph
 
-**Feature Branch**: `001-design-4`
+**Feature Branch**: `001-plan`
 
 **Created**: 2026-10-29
 
@@ -339,8 +339,8 @@ of pages with today's book.
 - **FR-007**: The system MUST read:
   - the graph;
   - the release's diagram files, EHLD files and EHLD summary;
-  - for an overlay, the analysis result the token names, from where the analysis
-    service writes it.
+  - for an overlay, the analysis result the token names, through the analysis service
+    that holds it (plan, research R6).
 
   It MUST NOT read a relational database.
 
@@ -358,7 +358,8 @@ of pages with today's book.
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
   files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder.
+  folder. The figures come from the website's render service on the same release, run
+  beside it (plan, research R3).
 - **FR-011**: A check MUST fail the book's step on any of these:
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
@@ -478,7 +479,12 @@ of pages with today's book.
     are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
     each recorded;
-  - the look: layout, colours and typefaces (User Story 6).
+  - the look: layout, colours and typefaces (User Story 6);
+  - the order of lists: today's PDFs list an event's children, compartments, literature
+    (and so which five references are shown), summations, diseases and the events
+    before and after in the database's order; the new ones in the curators' order
+    (plan, research R2);
+  - top-level pathways by name, not by database identifier (FR-002).
 - **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
   is answered as such, where today's endpoint answers an empty response for both; and
   the analysis options FR-006 drops are ignored if sent.
@@ -486,11 +492,11 @@ of pages with today's book.
   licence today, though its repository is CC0; the theme's owners are asked to declare
   it in the package, and until then CI's licence check is told it is CC0, with the
   reason.
-- **One book's size:** the human book runs to thousands of pages. Whether it is made in
-  one pass or in parts joined into one PDF is for the plan to measure.
-- **The analysis result** is read where the analysis service writes it, as the content
-  service reads it today. Its format is the plan's to handle. Tests use a private
-  instance, never production.
+- **One book's size:** the human book runs to thousands of pages. It is printed in parts
+  and joined into one PDF (plan, research R4).
+- **The analysis result** is read through the analysis service, which reads the files
+  it writes by its own rules; its stored format is Java's own (plan, research R6). Tests
+  use a private instance or a stub, never production.
 - **The website's part:** routing, the depth choice, the token and the error answers live
   in WebsiteAngular's specs. This spec provides the means.
 - **Comparison inputs:** a private copy of the release's graph (release 98), with

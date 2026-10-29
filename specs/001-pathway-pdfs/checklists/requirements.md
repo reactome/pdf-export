@@ -76,3 +76,7 @@
   dropped analysis options are ignored.
 - **After the sixth review (#10):** bookmarks no longer depend on a contents list
   (FR-006), and Story 6's cover scenario names the book's cover (FR-002).
+- **Amended by the plan:** FR-007 reads the analysis through its service,
+  FR-010 names the render service beside the book's step, list order and the top-level
+  pathways' order join the expected differences, and the book's size is settled as
+  parts joined (research R2, R3, R4, R6).
