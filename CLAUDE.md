@@ -34,11 +34,22 @@ Feature-sized work goes through Spec Kit before any code, and the specs live in
 
 ## The checks
 
-- **`format`**: Markdown, YAML and JSON as Prettier 3.9.10 writes them
-  (`.prettierrc`, `.prettierignore`, as BioPAX3Exporter has them). Fix with
-  `npx prettier@3.9.10 --write .`, which a Spec Kit run needs afterwards: Spec Kit
-  writes `[X]` and `*emphasis*`, which Prettier writes `[x]` and `_emphasis_`.
-- The build, tests, lint and licence check come with the code, from spec 001.
+`npm run check` runs the code's gates as CI does: types (`tsc`, strict), lint
+(typescript-eslint's strict type-checked rules), formatting, the unit tests (`node
+--test`, on Node 24's own type stripping) and the licence check.
+
+- **`format`**: every file as Prettier 3.9.10 writes it (`.prettierrc`,
+  `.prettierignore`). Fix with `npx prettier@3.9.10 --write .`, which a Spec Kit run
+  needs afterwards: Spec Kit writes `[X]` and `*emphasis*`, which Prettier writes `[x]`
+  and `_emphasis_`.
+- **The licence check**, `node ci/licences.ts`: every installed package's licence on
+  the allowlist, and every shipped font's licence file (research R11).
+- **Imports name their `.ts` file:** Node runs the TypeScript as it is, so a relative
+  import, export or dynamic import of `.js` passes the type check but fails at run time;
+  lint refuses each.
+- **Run from a checkout:** the `pdf-export` command is `src/cli.ts`, run by Node's type
+  stripping, which does not work from an installed package. Publishing would need a
+  build step.
 
 ## Proving what is written
 
