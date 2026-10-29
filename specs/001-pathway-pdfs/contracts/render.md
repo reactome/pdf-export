@@ -12,7 +12,7 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
 | `ancestor`             | `/render/{ancestorStId}.svg?highlight={id},{id},…`                                    |
 | `ehld`                 | `/render/{stId}.svg`; the render page draws the illustration when the pathway has one |
 | `reaction`             | `/render/{stId}.svg?layout=reaction`                                                  |
-| with an analysis       | the same, plus `analysis={token}`, decoded once                                       |
+| with an analysis       | the same, plus `token={token}`, decoded once (the service's parameter name)           |
 
 ## Answers pdf-export relies on
 
