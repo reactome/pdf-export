@@ -27,6 +27,20 @@ jobs:
     # type stripping.
     check:
         runs-on: ubuntu-latest
+        # The fixture graph (ci/fixture), which the graph tests read
+        services:
+            neo4j:
+                image: neo4j:4.4.48-community
+                env:
+                    NEO4J_AUTH: none
+                    NEO4J_dbms_default__database: graph.db
+                ports:
+                    - 7687:7687
+                options: >-
+                    --health-cmd "cypher-shell -d graph.db 'RETURN 1'"
+                    --health-interval 5s --health-timeout 10s --health-retries 30
+        env:
+            NEO4J_URI: bolt://localhost:7687
         steps:
             - uses: actions/checkout@v7
 
@@ -36,6 +50,11 @@ jobs:
                   cache: npm
 
             - run: npm ci
+
+            - name: Load the fixture graph
+              run: |
+                  docker cp ci/fixture/fixture.cypher ${{ job.services.neo4j.id }}:/fixture.cypher
+                  docker exec ${{ job.services.neo4j.id }} cypher-shell -d graph.db -f /fixture.cypher
 
             - name: Types
               run: npm run typecheck

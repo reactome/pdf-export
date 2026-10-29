@@ -54,7 +54,7 @@ repository root.
 
   Unit tests in `test/ci/licences.test.ts`. Show it failing on a planted GPL-3.0 package and on a planted package with no licence (SC-006), and run it in CI.
 
-- [ ] T003 [P] The fixture, `ci/fixture/`: a small release graph, `fixture.cypher`, with `DBInfo` at 98, and the release's files beside it, `files/`. Every `Person` and every free text is a placeholder (constitution VII). `README.md` says how it was made, that it holds no real names, and the case each item is there for. It holds:
+- [x] T003 [P] The fixture, `ci/fixture/`: — #23. 55 nodes and 91 relationships in release 98's labels and relationships (each with `order` and `stoichiometry`), ids from 90000000. `test/graph/fixture.test.ts` checks each case (8 tests), and fails if a person is not a placeholder. CI loads it into a Neo4j 4.4 service. Seen failing: one inference source removed, every `hasEvent` order set to its child's id, and a real-looking person added. From #22's review: the licence check takes the project's root from its own place, so it runs from any folder. a small release graph, `fixture.cypher`, with `DBInfo` at 98, and the release's files beside it, `files/`. Every `Person` and every free text is a placeholder (constitution VII). `README.md` says how it was made, that it holds no real names, and the case each item is there for. It holds:
   - **Top-level pathways:**
     - three human ones whose names sort differently ignoring case than by database id or by case (FR-002);
     - one non-human top-level pathway, which `--species` must exclude.
