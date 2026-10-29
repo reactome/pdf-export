@@ -561,7 +561,7 @@ packaging.
 **Decision.** A short check of our own, `ci/licences.ts`:
 
 - an allowlist (MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, 0BSD, OFL-1.1,
-  CC0-1.0, Zlib);
+  CC0-1.0, Zlib, and BlueOak-1.0.0, permissive like MIT, which one of the lint tools' dependencies uses);
 - SPDX expressions, such as pako's `(MIT AND Zlib)`;
 - one documented exception: the website's theme package, CC0 by its repository;
 - every offender listed, not only the first;
