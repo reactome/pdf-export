@@ -1,7 +1,9 @@
 // The render stub (spec 001 T004): contracts/render.md's service, answering the fixture's
-// events from recorded SVGs in ci/fixture/figures/. It answers 400 to a query parameter
-// the contract does not name, so a wrongly named one fails a test instead of passing
-// silently, and refuses on request with 404, 503 or a timeout.
+// events from recorded SVGs in ci/fixture/figures/, as WebsiteAngular's render service
+// answers (tools/render/service.ts): its type, a 400 for another format or a parameter
+// given twice, a JSON error body, and Retry-After on a 503. It answers 400 to a query
+// parameter the contract does not name, so a wrongly named one fails a test instead of
+// passing silently, and refuses on request with 404, 503 or a timeout.
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -24,6 +26,8 @@ export interface RenderStub {
   requests: string[];
   /** Refuse requests for a stable id, `times` times (every time without it). */
   refuse(stId: string, how: Refusal, times?: number): void;
+  /** Forget the refusals and the recorded requests, for the next test. */
+  reset(): void;
   close(): Promise<void>;
 }
 
@@ -55,16 +59,30 @@ export async function startRenderStub(): Promise<RenderStub> {
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub');
     requests.push(url.pathname + url.search);
-    const match = /^\/render\/(R-[A-Z]{3}-\d+)\.svg$/.exec(url.pathname);
+    const error = (status: number, message: string, headers: Record<string, string> = {}) =>
+      res
+        .writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers })
+        .end(JSON.stringify({ error: message }));
+    const match = /^\/render\/(R-[A-Z]{3}-\d+)\.([a-z]+)$/.exec(url.pathname);
     if (!match?.[1]) {
-      res.writeHead(404).end();
+      error(404, 'Not a render request');
       return;
     }
     const stId = match[1];
+    if (match[2] !== 'svg') {
+      error(400, `Not a format pdf-export asks for: ${String(match[2])}`);
+      return;
+    }
+    const seen = new Set<string>();
     for (const [name, value] of url.searchParams) {
+      if (seen.has(name)) {
+        error(400, `${name} given more than once`);
+        return;
+      }
+      seen.add(name);
       const valid = PARAMETERS[name];
       if (!valid?.(value)) {
-        res.writeHead(400, { 'Content-Type': 'text/plain' }).end(`Unknown parameter: ${name}`);
+        error(400, `Unknown parameter, or a bad value: ${name}`);
         return;
       }
     }
@@ -75,15 +93,16 @@ export async function startRenderStub(): Promise<RenderStub> {
         hanging.add(res);
         return;
       }
-      res.writeHead(refusal.how).end();
+      if (refusal.how === 503) error(503, 'Busy', { 'Retry-After': '5' });
+      else error(404, `No figure for ${stId}`);
       return;
     }
     const svg = figure(stId, url.searchParams);
     if (svg === undefined) {
-      res.writeHead(404).end();
+      error(404, `No figure for ${stId}`);
       return;
     }
-    res.writeHead(200, { 'Content-Type': 'image/svg+xml' }).end(svg);
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' }).end(svg);
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -95,7 +114,13 @@ export async function startRenderStub(): Promise<RenderStub> {
     refuse(stId, how, times = -1) {
       refusals.set(stId, { how, left: times });
     },
+    reset() {
+      refusals.clear();
+      requests.length = 0;
+    },
     async close() {
+      // A timed-out request's response is held open; close it with the connections, so the
+      // tests end even when a client never gave up on one.
       for (const res of hanging) res.destroy();
       server.closeAllConnections();
       await new Promise<void>((resolve) =>

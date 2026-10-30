@@ -214,16 +214,18 @@ synthetic documents, on this host under load.
   are numbered as the book's are: a first print with placeholders, its anchors' pages
   read back, and a second print. A reaction alone, or depth 0, has no contents list and
   is printed once. The second print is in SC-005's budget (R7).
-- **The legibility floor** (FR-016): a diagram's label text, 16 px in the render
-  service's SVG, never below 5 pt on the page. The figure's scale on the page gives its
+- **The legibility floor** (FR-016): a diagram's node labels, 12 px in the render
+  service's SVG (measured in its cache on 30 Oct 2026: 140–165 labels a diagram at 12 px,
+  compartments' at 80 px, a few at 16 px), never below 5 pt on the page. The smallest
+  label in the figure sets its scale, not the first. The figure's scale on the page gives its
   labels' size. A figure that would fall below the floor at the text width gets a
   landscape page of its own, at the largest size the page allows. A diagram so large
   that even that is below the floor is accepted at that size (the PDF's vector drawing
   can still be zoomed) and listed in the run report; FR-016 is amended to say so ("5 pt,
   or the largest a landscape page allows"). A figure is never split across pages.
-  - At 16 px labels, 5 pt allows a figure about 1,540 of the SVG's pixels wide in
-    portrait and about 2,330 on an A4 landscape page with 20 mm margins (inference,
-    from the page sizes). Many diagrams are wider, so the exception may be common. The
+  - At 12 px labels, 5 pt allows a figure about 1,155 of the SVG's pixels wide in
+    portrait and about 1,750 on an A4 landscape page with 20 mm margins (inference,
+    from the page sizes: 481.9 and 728.5 pt of text width, at 5/12 pt a pixel). Many diagrams are wider, so the exception may be common. The
     first tasks count the release's diagram widths (R7, to measure).
 - **pdf-lib:** the maintained MIT fork `@cantoo/pdf-lib`, if it passes the same tests;
   otherwise pdf-lib 1.17.
