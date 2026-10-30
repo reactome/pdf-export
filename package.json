@@ -12,6 +12,7 @@
     "pdf-export": "src/cli.ts"
   },
   "scripts": {
+    "build": "node src/layout/theme.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --check .",
@@ -19,15 +20,26 @@
     "check": "npm run typecheck && npm run lint && npm run format && npm test && node ci/licences.ts"
   },
   "devDependencies": {
+    "@angular/cdk": "21.2.14",
+    "@angular/material": "21.2.14",
     "@eslint/js": "10.0.1",
+    "@types/fontkit": "2.0.9",
     "@types/node": "24.19.2",
     "@types/sanitize-html": "2.16.2",
     "eslint": "10.13.0",
+    "ngx-reactome-style": "github:reactome/ngx-reactome-base#606de81b66283029fb0ccfa170ed757e95701a35",
     "prettier": "3.9.10",
+    "sass": "1.97.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"
   },
   "dependencies": {
+    "@fontsource/noto-sans": "5.3.0",
+    "@fontsource/noto-sans-math": "5.3.0",
+    "@fontsource/noto-sans-symbols-2": "5.3.0",
+    "@fontsource/roboto": "5.3.0",
+    "@fontsource/roboto-mono": "5.3.0",
+    "fontkit": "2.0.4",
     "neo4j-driver": "5.28.3",
     "sanitize-html": "2.18.1"
   }
