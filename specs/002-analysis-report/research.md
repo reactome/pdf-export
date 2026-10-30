@@ -175,7 +175,7 @@ A race is not ruled out by a clean sample, so the fix is unconditional: the rend
 page's readiness waits for the analysis overlay, for the result's default resource, and
 the render cache's key is bumped so figures cached without it are not served. It is a
 WebsiteAngular task that gates the report, done before the figures are timed (plan,
-Order of work), with a test there that fails when the page is ready before its overlay;
+Order of work, step 0), with a test there that fails when the page is ready before its overlay;
 the report's checks also look for each figure's overlay (quickstart §3). Once settled, the overview is as today's, and a pathway's figure
 differs where the report's resource is not the result's default.
 Adding `resource` is a WebsiteAngular task; until it ships, that is a listed difference
