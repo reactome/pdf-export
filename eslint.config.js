@@ -12,10 +12,7 @@ export default tseslint.config(
     },
     rules: {
       // A field left out of an object by destructuring the rest is not a mistake.
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
       // Node runs the TypeScript as it is: a relative import must name its .ts file, and
       // one naming .js passes the type check but fails at run time.
       'no-restricted-syntax': [

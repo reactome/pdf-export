@@ -51,6 +51,8 @@ export interface Reference {
   dbId: number;
   kind: PublicationKind;
   title: string;
+  /** A book's chapter, where the reference is to one. */
+  chapterTitle: string | null;
   journal: string | null;
   volume: number | null;
   pages: string | null;
@@ -100,27 +102,29 @@ export async function topLevelPathways(graph: Graph, species: string): Promise<E
   );
 }
 
-/** One event by stable id (with or without its version) or database id, or null. */
-export async function eventByIdentifier(graph: Graph, identifier: string): Promise<Child | null> {
-  const dbId = /^\d+$/.test(identifier) ? Number(identifier) : null;
-  const stId = identifier.replace(/\.\d+$/, '');
-  const [row] = await graph.read<Child & { isEvent: boolean }>(
-    `MATCH (e:DatabaseObject)
-     WHERE ($dbId IS NOT NULL AND e.dbId = $dbId) OR ($dbId IS NULL AND e.stId = $stId)
+/** What an identifier names: an event, something that is not one, or nothing. */
+export type Identified = { event: Child } | { notAnEvent: true } | null;
+
+/**
+ * One object by stable id (with or without its version) or database id: an event, or
+ * something that is not one (the service's 400), or nothing (its 404). One lookup on each
+ * index, never a disjunction, which can scan every object.
+ */
+export async function eventByIdentifier(graph: Graph, identifier: string): Promise<Identified> {
+  const byDbId = /^\d+$/.test(identifier);
+  const query = `MATCH (e:DatabaseObject {${byDbId ? 'dbId: $dbId' : 'stId: $stId'}})
      RETURN e.dbId AS dbId, e.stId AS stId, e.displayName AS name, e.schemaClass AS schemaClass,
             CASE WHEN e:Pathway THEN 'pathway' ELSE 'reaction' END AS kind,
             (e:Pathway OR e:ReactionLikeEvent) AS isEvent
-     LIMIT 1`,
-    { dbId, stId }
-  );
-  if (!row?.isEvent) return null;
-  return {
-    dbId: row.dbId,
-    stId: row.stId,
-    name: row.name,
-    kind: row.kind,
-    schemaClass: row.schemaClass,
-  };
+     LIMIT 1`;
+  const [row] = await graph.read<Child & { isEvent: boolean }>(query, {
+    dbId: byDbId ? Number(identifier) : null,
+    stId: identifier.replace(/^(R-[A-Z]{3}-\d+)\.\d+$/, '$1'),
+  });
+  if (!row) return null;
+  if (!row.isEvent) return { notAnEvent: true };
+  const { isEvent: _isEvent, ...event } = row;
+  return { event };
 }
 
 /** Each parent's children, by `order`: one query for a level of the tree. */
@@ -130,12 +134,13 @@ export async function children(
 ): Promise<Map<number, Child[]>> {
   const rows = await graph.read<Child & { parent: number }>(
     `UNWIND $parents AS parent
-     MATCH (p:Pathway {dbId: parent})-[r:hasEvent]->(c:Event)
+     MATCH (p:DatabaseObject {dbId: parent})-[r:hasEvent]->(c:Event)
+     WHERE p:Pathway
      RETURN parent, c.dbId AS dbId, c.stId AS stId, c.displayName AS name,
             c.schemaClass AS schemaClass,
             CASE WHEN c:Pathway THEN 'pathway' ELSE 'reaction' END AS kind
      ORDER BY parent, r.order`,
-    { parents }
+    { parents: unique(parents) }
   );
   return group(
     rows,
@@ -151,7 +156,8 @@ export async function eventFacts(
 ): Promise<Map<number, EventFacts>> {
   const rows = await graph.read<EventFacts>(
     `UNWIND $ids AS id
-     MATCH (e:Event {dbId: id})
+     MATCH (e:DatabaseObject {dbId: id})
+     WHERE e:Event
      RETURN e.dbId AS dbId, e.stId AS stId, e.displayName AS name, e.schemaClass AS schemaClass,
        CASE WHEN e:Pathway THEN 'pathway' ELSE 'reaction' END AS kind,
        e.speciesName AS speciesName, e.category AS category,
@@ -164,39 +170,44 @@ export async function eventFacts(
        [(e)-[r:summation]->(m) | {order: r.order, text: m.text}] AS summations,
        [(e)-[r:precedingEvent]->(b:Event) | {order: r.order, dbId: b.dbId, stId: b.stId, name: b.displayName}] AS before,
        [(f:Event)-[:precedingEvent]->(e) | {dbId: f.dbId, stId: f.stId, name: f.displayName}] AS after`,
-    { ids }
+    { ids: unique(ids) }
   );
-  const facts = new Map<number, EventFacts>();
-  for (const row of rows as unknown as RawFacts[]) {
-    facts.set(row.dbId, {
-      dbId: row.dbId,
-      stId: row.stId,
-      name: row.name,
-      kind: row.kind,
-      schemaClass: row.schemaClass,
-      speciesName: row.speciesName,
-      category: row.category ?? null,
-      hasDiagram: row.hasDiagram,
-      hasEHLD: row.hasEHLD,
-      isInferred: row.isInferred,
-      isInDisease: row.isInDisease,
-      species: byOrder(row.species).map(({ dbId, name }) => ({ dbId, name }))[0] ?? null,
-      compartments: byOrder(row.compartments).map(({ dbId, name }) => ({ dbId, name })),
-      diseases: byOrder(row.diseases).map(({ dbId, name }) => ({ dbId, name })),
-      inferredFrom: row.inferredFrom,
-      summations: byOrder(row.summations).map(({ text }) => text),
-      before: byOrder(row.before).map(({ dbId, stId, name }) => ({ dbId, stId, name })),
-      after: [...row.after].sort((a, b) => a.dbId - b.dbId),
-    });
-  }
-  return facts;
+  return new Map((rows as unknown as RawFacts[]).map((row) => [row.dbId, factsFromRow(row)]));
 }
 
-interface Ordered {
+/**
+ * An event's facts from its row: each list put in its relationship's `order`. Neo4j gives
+ * a pattern comprehension no order (it may come back in order, or not), so the sort is
+ * here, and tested here, apart from whatever order a database returns.
+ */
+export function factsFromRow(row: RawFacts): EventFacts {
+  return {
+    dbId: row.dbId,
+    stId: row.stId,
+    name: row.name,
+    kind: row.kind,
+    schemaClass: row.schemaClass,
+    speciesName: row.speciesName,
+    category: row.category ?? null,
+    hasDiagram: row.hasDiagram,
+    hasEHLD: row.hasEHLD,
+    isInferred: row.isInferred,
+    isInDisease: row.isInDisease,
+    species: byOrder(row.species).map(({ dbId, name }) => ({ dbId, name }))[0] ?? null,
+    compartments: byOrder(row.compartments).map(({ dbId, name }) => ({ dbId, name })),
+    diseases: byOrder(row.diseases).map(({ dbId, name }) => ({ dbId, name })),
+    inferredFrom: row.inferredFrom,
+    summations: byOrder(row.summations).map(({ text }) => text),
+    before: byOrder(row.before).map(({ dbId, stId, name }) => ({ dbId, stId, name })),
+    after: [...row.after].sort((a, b) => a.dbId - b.dbId),
+  };
+}
+
+export interface Ordered {
   order: number | null;
 }
 
-interface RawFacts extends Omit<
+export interface RawFacts extends Omit<
   EventFacts,
   'species' | 'compartments' | 'diseases' | 'summations' | 'before'
 > {
@@ -222,7 +233,8 @@ export async function literature(
 ): Promise<Map<number, Reference[]>> {
   const rows = await graph.read<Reference & { event: number; labels: string[] }>(
     `UNWIND $ids AS id
-     MATCH (:Event {dbId: id})-[r:literatureReference]->(p:Publication)
+     MATCH (e:DatabaseObject {dbId: id})-[r:literatureReference]->(p:Publication)
+     WHERE e:Event
      WITH id, p, r.order AS ord ORDER BY id, ord
      WITH id, collect(p)[..5] AS firsts
      UNWIND range(0, size(firsts) - 1) AS i
@@ -231,13 +243,14 @@ export async function literature(
      WITH id, i, p, a ORDER BY id, i, ra.order
      WITH id, i, p, collect(a.displayName) AS authors
      RETURN id AS event, p.dbId AS dbId, labels(p) AS labels, p.title AS title,
+            p.chapterTitle AS chapterTitle,
             p.journal AS journal, p.volume AS volume, p.pages AS pages, p.year AS year,
             p.pubMedIdentifier AS pubMedId, p.ISBN AS isbn,
             p.uniformResourceLocator AS url,
             head([(p)-[:publisher]->(f) | f.displayName]) AS publisher,
             authors[..6] AS authors, size(authors) > 6 AS moreAuthors
      ORDER BY event, i`,
-    { ids }
+    { ids: unique(ids) }
   );
   return group(
     rows,
@@ -245,6 +258,7 @@ export async function literature(
     ({ event: _event, labels, ...ref }) => ({
       ...ref,
       kind: labels.includes('Book') ? 'book' : labels.includes('URL') ? 'web page' : 'article',
+      chapterTitle: ref.chapterTitle ?? null,
       journal: ref.journal ?? null,
       volume: ref.volume ?? null,
       pages: ref.pages ?? null,
@@ -257,18 +271,22 @@ export async function literature(
   );
 }
 
-/** Each event's edits, each with its authors by `order`; the edit history's rules are the model's. */
+/**
+ * Each event's edits, each with its authors by `order`. The edit history's rules are the
+ * model's, its rows' authors by database id among them (research R2), so it re-sorts them.
+ */
 export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<number, Edit[]>> {
   const rows = await graph.read<Edit & { event: number }>(
     `UNWIND $ids AS id
-     MATCH (:Event {dbId: id})<-[k:authored|edited|reviewed|revised]-(i:InstanceEdit)
+     MATCH (e:DatabaseObject {dbId: id})<-[k:authored|edited|reviewed|revised]-(i:InstanceEdit)
+     WHERE e:Event
      OPTIONAL MATCH (a:Person)-[ra:author]->(i)
      WITH id, k, i, a ORDER BY id, i.dbId, ra.order
      WITH id, type(k) AS kind, i,
           [x IN collect(a) WHERE x IS NOT NULL | {dbId: x.dbId, name: x.displayName, surname: x.surname}] AS authors
      RETURN id AS event, i.dbId AS dbId, kind, i.dateTime AS dateTime, authors
      ORDER BY event, dbId`,
-    { ids }
+    { ids: unique(ids) }
   );
   return group(
     rows,
@@ -279,6 +297,14 @@ export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<n
       authors: edit.authors.map((a) => ({ ...a, surname: a.surname ?? null })),
     })
   );
+}
+
+/**
+ * Each id once: an event with two parents at one level is in a level's list twice, and
+ * read twice it would give every row twice (the first five references among them).
+ */
+function unique(ids: readonly number[]): number[] {
+  return [...new Set(ids)];
 }
 
 function group<R, K, V>(rows: readonly R[], key: (row: R) => K, value: (row: R) => V): Map<K, V[]> {
