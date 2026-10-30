@@ -51,6 +51,10 @@ jobs:
 
             - run: npm ci
 
+            # Chromium's headless shell, for the layout's print tests (T018)
+            - name: Chromium
+              run: npx playwright-core install --with-deps --only-shell chromium
+
             - name: Load the fixture graph
               run: |
                   docker cp ci/fixture/fixture.cypher ${{ job.services.neo4j.id }}:/fixture.cypher

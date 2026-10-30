@@ -28,6 +28,8 @@
     "@types/sanitize-html": "2.16.2",
     "eslint": "10.13.0",
     "ngx-reactome-style": "github:reactome/ngx-reactome-base#606de81b66283029fb0ccfa170ed757e95701a35",
+    "pdfjs-dist": "6.4.299",
+    "playwright-core": "1.64.1",
     "prettier": "3.9.10",
     "sass": "1.97.3",
     "typescript": "6.0.3",

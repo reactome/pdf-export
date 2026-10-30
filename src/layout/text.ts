@@ -44,6 +44,18 @@ export const DOCUMENT_HOLDS =
 export const RELEASE_LINE = 'Reactome release {release}';
 
 /**
+ * Written anew: the cover's note on a single pathway's PDF, pointing at the book, which the
+ * website's download page offers.
+ */
+export const EXCERPT = {
+  text: 'This document is an excerpt of The Reactome Book, which holds the release’s human pathways in full.',
+  page: '/download-data',
+} as const;
+
+/** Written anew: what the cover's names are. */
+export const CONTRIBUTORS = 'Authored, edited, reviewed and revised by';
+
+/**
  * The analysis section's explanations (content/documentation/userguide/analysis.mdx: its
  * Analysis Data, Identifier mapping, Results and Species Comparison sections, and
  * Analysis Gene Expression for ReactomeGSA).

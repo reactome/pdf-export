@@ -1,0 +1,234 @@
+/*
+ * The PDFs' pages (spec 001 T018, FR-015, FR-016). Every colour and type size is one of
+ * the website's theme variables (dist/theme.css, compiled from its theme package): none is
+ * written here. Parts are set apart by space, type and thin rules, never boxes or borders,
+ * and no elevation (the theme's shadows use colours outside its palette, SC-009).
+ */
+
+/* The same margins on every page, a landscape figure's page included. */
+@page {
+  size: A4;
+  margin: 20mm;
+}
+@page wide {
+  size: A4 landscape;
+}
+
+html {
+  /*
+   * Roboto, then the Noto fonts for what it lacks (FR-015). Noto Sans Symbols 2 comes before
+   * Noto Sans Math on purpose: the two share some symbols (✓), and Symbols 2 draws them as
+   * the website's text does.
+   */
+  font-family: Roboto, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math';
+  color: var(--mat-sys-on-surface);
+}
+/* The root keeps the browser's 16 px, so the theme's rem sizes are the website's. */
+body {
+  margin: 0;
+  font-size: var(--mat-sys-body-medium-size);
+  line-height: var(--mat-sys-body-medium-line-height);
+  font-weight: var(--mat-sys-body-medium-weight);
+}
+a {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+}
+.id {
+  font-family: 'Roboto Mono', 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math';
+}
+p {
+  margin: 0 0 6pt;
+}
+
+/* The book's probes: a 1 px link inside each target, removed after the join (research R4). */
+.probe {
+  display: inline-block;
+  width: 1px;
+  height: 1px;
+}
+
+/* The cover: a page of its own, with no header or number. */
+.cover {
+  page: cover;
+  break-after: page;
+  text-align: center;
+}
+.cover .logo svg {
+  width: 90mm;
+  height: auto;
+  margin: 20mm 0 12mm;
+}
+.cover .title {
+  font-size: var(--mat-sys-headline-large-size);
+  line-height: var(--mat-sys-headline-large-line-height);
+  font-weight: var(--mat-sys-headline-large-weight);
+  margin-bottom: 8pt;
+}
+.cover .release {
+  font-size: var(--mat-sys-title-large-size);
+  line-height: var(--mat-sys-title-large-line-height);
+  color: var(--mat-sys-on-surface-variant);
+}
+.cover-figure {
+  height: 90mm;
+  margin: 8mm 0;
+}
+.cover .excerpt,
+.cover .names,
+.cover .licence,
+.cover .date {
+  font-size: var(--mat-sys-body-small-size);
+  line-height: var(--mat-sys-body-small-line-height);
+}
+.institutions {
+  list-style: none;
+  padding: 0;
+  margin: 12pt 0;
+}
+
+/* The front parts: each begins a page of its own, named for its running header. */
+.front {
+  break-before: page;
+}
+.front[data-part='introduction'] {
+  page: introduction;
+}
+.front[data-part='analysis'] {
+  page: analysis;
+}
+.front[data-part='contents'] {
+  page: contents;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0 0 6pt;
+  break-after: avoid;
+}
+h1 {
+  font-size: var(--mat-sys-headline-small-size);
+  line-height: var(--mat-sys-headline-small-line-height);
+  font-weight: var(--mat-sys-headline-small-weight);
+}
+h2 {
+  font-size: var(--mat-sys-title-large-size);
+  line-height: var(--mat-sys-title-large-line-height);
+  font-weight: var(--mat-sys-title-large-weight);
+}
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--mat-sys-title-medium-size);
+  line-height: var(--mat-sys-title-medium-line-height);
+  font-weight: var(--mat-sys-title-medium-weight);
+}
+
+/* A part's title within a section: type, not a heading, so the outline holds events only. */
+.part {
+  font-size: var(--mat-sys-title-small-size);
+  line-height: var(--mat-sys-title-small-line-height);
+  font-weight: var(--mat-sys-title-small-weight);
+  color: var(--mat-sys-on-surface-variant);
+  margin: 10pt 0 4pt;
+  break-after: avoid;
+}
+
+/* Sections: a thin rule above each, and space. */
+.event {
+  margin-top: 14pt;
+  padding-top: 10pt;
+  border-top: 0.5pt solid var(--mat-sys-outline-variant);
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12pt;
+  row-gap: 2pt;
+  margin: 0 0 8pt;
+}
+.facts dt {
+  color: var(--mat-sys-on-surface-variant);
+}
+.facts dd {
+  margin: 0;
+}
+.sep {
+  color: var(--mat-sys-on-surface-variant);
+}
+.short {
+  margin: 8pt 0;
+  padding-left: calc(var(--depth, 0) * 12pt);
+}
+
+/*
+ * A figure is never split across pages. Chromium moves an SVG no taller than a page to the
+ * next page whole, and figure.ts makes none taller; break-inside keeps the wrapper with it.
+ * A wide one takes a landscape page of its own.
+ */
+.figure {
+  break-inside: avoid;
+  margin: 10pt 0;
+  text-align: center;
+}
+.figure svg {
+  display: inline-block;
+}
+.figure.landscape {
+  page: wide;
+  margin: 0;
+}
+
+.summation table,
+table.edits,
+table.found {
+  border-collapse: collapse;
+  margin: 4pt 0 8pt;
+}
+th {
+  text-align: left;
+  font-weight: var(--mat-sys-title-small-weight);
+  color: var(--mat-sys-on-surface-variant);
+}
+th,
+td {
+  padding: 2pt 8pt 2pt 0;
+  border-bottom: 0.5pt solid var(--mat-sys-outline-variant);
+  vertical-align: top;
+}
+tr {
+  break-inside: avoid;
+}
+.references {
+  margin: 0 0 8pt;
+  padding-left: 16pt;
+}
+.references li {
+  margin-bottom: 3pt;
+}
+
+/* The contents: each entry indented by its depth, its page number in a box of fixed width. */
+.contents {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.contents li {
+  display: flex;
+  padding-left: calc(var(--depth, 0) * 12pt);
+  break-inside: avoid;
+}
+.contents li a {
+  flex: 1;
+}
+.contents .page {
+  flex: none;
+  width: 4em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

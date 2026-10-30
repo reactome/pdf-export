@@ -82,3 +82,30 @@ export interface Document {
   /** A single event's PDF at depth 0, or a reaction alone, has none (the Background). */
   contents: ContentsEntry[] | null;
 }
+
+/** An analysis's properties, for its part of the PDF (data-model.md's Analysis). */
+export interface AnalysisProperties {
+  token: string;
+  /** The analysis service's type: OVERREPRESENTATION, EXPRESSION, SPECIES_COMPARISON or GSA. */
+  type: string;
+  /** The species the overlay is for: the event's. */
+  species: string;
+  projection: boolean;
+  interactors: boolean;
+  identifiersFound: number;
+  identifiersTotal: number;
+  pathwaysHit: number;
+}
+
+/** An identifier of the submitted data found in a pathway, and what it maps to. */
+export interface FoundRow {
+  identifier: string;
+  mapsTo: string[];
+  resource: string;
+}
+
+/** What an analysis found in one event: its entities, then its interactors. */
+export interface Found {
+  entities: FoundRow[];
+  interactors: FoundRow[];
+}
