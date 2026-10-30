@@ -9,11 +9,11 @@
 pdf-export makes the website's analysis report on request, in place of
 `reactome/analysis-report`, by the same code as spec 001's single-event PDF.
 
-- **The analysis:** three calls to the analysis service's public API give everything the
-  report shows, whatever its number of pathways (research R1); the analysis's sums stay
-  in the analysis service.
+- **The analysis:** four calls to the analysis service's public API, five when the report
+  filters, give everything the report shows, whatever its number of pathways (research
+  R1); the analysis's sums stay in the analysis service.
 - **The pathways' details:** spec 001's sections, read from the graph by spec 001's
-  queries, with the edit history's "created" and "modified" rows added (R2).
+  queries, with the edit history grouped as today's report groups it (R2).
 - **Figures:** the render service's SVGs, overlaid by the token, the genome-wide overview
   among them, asked for at the service's own concurrency (R3).
 - **Layout and printing:** spec 001's theme, fonts, layout and printer; the report's
@@ -53,15 +53,15 @@ the gateway's lane, two in the service by default.
 
 _GATE: checked before research and again after design._
 
-| Principle                          | How the plan meets it                                                                                                                           | Status                                  |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client. | Pass                                    |
-| II. Loose licences only            | No new dependency. The render service's FoamTree remains spec 001's tracked violation; the genome-wide overview depends on it too.              | Pass, with spec 001's tracked violation |
-| III. The graph, nothing relational | The graph and the analysis service's API.                                                                                                       | Pass                                    |
-| IV. The pathway browser's look     | Every figure is the render service's. The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3).                 | Pass, with R3's gap tracked             |
-| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                             | Pass                                    |
-| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                      | Pass                                    |
-| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                          | Pass                                    |
+| Principle                          | How the plan meets it                                                                                                                                                                                                                                       | Status                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client.                                                                                                             | Pass                                                     |
+| II. Loose licences only            | No new dependency. The render service's FoamTree remains spec 001's tracked violation, and for the genome-wide overview it has no end: the overview is FoamTree's own drawing.                                                                              | Pass, with a tracked violation that has no end condition |
+| III. The graph, nothing relational | The graph and the analysis service's public API: Principle III's "So" names the graph and the release's files; the analysis API is a third source, read because FR-202 keeps the analysis's sums in the analysis service, and it is no relational database. | Pass, by FR-202                                          |
+| IV. The pathway browser's look     | Every figure is the render service's. The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3).                                                                                                                             | Pass, with R3's gap tracked                              |
+| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                                                                                                                                         | Pass                                                     |
+| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                                                                                                                                  | Pass                                                     |
+| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                                                                                                                                      | Pass                                                     |
 
 **After design:** unchanged.
 
@@ -89,7 +89,7 @@ specs/002-analysis-report/
 
 ```text
 src/
-├── analysis/      # spec 001's client, extended: the report's three calls (R1)
+├── analysis/      # spec 001's client, extended: the report's calls (R1)
 ├── report/        # the report model (data-model.md) and its parts' layout
 └── serve.ts       # spec 001's service, with the report's route (contracts/service.md)
 test/
@@ -107,22 +107,28 @@ else (constitution I).
      from it (R5);
    - today's report on that private copy, for a sample of tokens at 25 and 50 pathways:
      its time and size (SC-203's baseline);
-   - a cold report's figures on a private render service (spec 001's T005, part c), and
-     whether the reactions' columns differ when filtered (R1's fourth call);
+   - a cold report, stage by stage, on a private stack: the analysis calls (R1's call 4
+     for a large expression dataset), the figures (spec 001's T005, part c), layout and
+     printing (twice, for the contents);
    - **then the time budget's decision with the user** (R4), before the service is
      built to one answer.
-2. **Foundations:** the analysis stub extended, made-up fixture tokens.
-3. **The model:** the report's entities from the three calls and the graph.
-4. **Layout:** the report's parts, in spec 001's theme; the genome-wide overview.
-5. **The service:** the route, its parameters, its errors in the analysis service's
-   form, its limits.
-6. **The checks:** the replay (User Story 2), the comparison by FR-208, SC-203's timing,
+2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
+   not built yet: the analysis stub (its T010), the analysis client (T020, T021) and the
+   service (T022), besides the layout and printing already merged. Its own work starts
+   once those are, or builds them first under spec 001's task numbers.
+3. **Foundations:** the analysis stub extended, made-up fixture tokens.
+4. **The model:** the report's entities from R1's calls and the graph, the identifiers
+   found gathered as today's report gathers them.
+5. **Layout:** the report's parts, in spec 001's theme; the genome-wide overview.
+6. **The service:** the route, its parameters, its errors in the analysis service's
+   form, its limits, and stopping the work when the client abandons the request (R7).
+7. **The checks:** the replay (User Story 2), the comparison by FR-208, SC-203's timing,
    SC-205's search of logs and files; each shown failing.
-7. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
+8. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
    pdf-export, and the render service's `resource`.
 
 ## Complexity Tracking
 
-| Violation                                                                    | Why Needed                                                             | Simpler Alternative Rejected Because                                                                 |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| The genome-wide overview needs the render service, which loads FoamTree (II) | Today's report shows it, and only the website draws it in the new look | As spec 001's tracked violation; it ends when WebsiteAngular's render bundle without FoamTree exists |
+| Violation                                                                    | Why Needed                                                             | Simpler Alternative Rejected Because                                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The genome-wide overview needs the render service, which loads FoamTree (II) | Today's report shows it, and only the website draws it in the new look | Unlike spec 001's figures, the overview is FoamTree's own drawing, so a render bundle without FoamTree cannot draw it: the violation lasts as long as the report shows today's overview. Dropping the overview would break FR-201's parts; the user decides if that changes |

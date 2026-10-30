@@ -4,9 +4,9 @@ Spec 001's contracts/render.md holds: SVG only, ids prefixed and labels after FR
 before inlining, a 503 retried once after its pause, and a refusal leaving the figure
 out of a PDF made on request. The report adds:
 
-| Figure                   | Request                                                     |
-| ------------------------ | ----------------------------------------------------------- |
-| the genome-wide overview | `GET /render/genome-wide.svg?species={taxId}&token={token}` |
+| Figure                   | Request                                                                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the genome-wide overview | `GET /render/genome-wide.svg?species={taxId}&token={token}`: the whole token's pathways; today's narrows them by the report's filters, a listed difference when the report filters |
 
 - **Pacing:** a report asks for its figures at the render service's concurrency (a
   setting, 2 by default), never more at once, so a burst never passes its queue of 8.

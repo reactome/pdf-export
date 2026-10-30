@@ -46,8 +46,8 @@ inside the analysis service. It draws its figures with the same Java exporters a
   the controller. On the analysis service's main branch the PDF is streamed as it is
   made, so the answer ends early, usually as a 200 (its exact form, a short PDF or a
   cut-off file, is the replay's to record). An unmerged branch buffers the PDF: a
-  failure of the PDF library (or of loading the report's bundled style, which the
-  library's own exception reports) is then answered 500 with the web framework's default
+  failure of the PDF library, or the report library's own exception (raised when its
+  bundled style fails to load), is then answered 500 with the web framework's default
   body, and any other failure 500 in the service's JSON form. Which build the deployments run
   is settled by the deployed analysis service's version or commit, which the plan
   records; the replay's private copy is built from that.

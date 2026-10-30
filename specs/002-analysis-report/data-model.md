@@ -18,8 +18,8 @@ Section (its data-model.md).
 
 ## Analysis summary
 
-From `GET /token/{token}` (R1, call 1): `type`, `sampleName`, `fileName`, `species` (of
-the analysis), `projection`, `interactors`, the resources with their filtered counts,
+From `GET /token/{token}` (R1, call 2): `type`, `gsaMethod` (which explains a
+ReactomeGSA result's type), `sampleName`, `fileName`, `species` (of the analysis), `projection`, `interactors`, the resources with their filtered counts,
 `identifiersNotFound`, and the expression columns' names. Its **name** (the cover's and
 the PDF's title) is the sample's name, else the file's, else the species compared with,
 else the type, else the token.
@@ -28,21 +28,25 @@ else the type, else the token.
 
 One of the first `number` pathways of the report's species, in the service's order.
 
-- From the analysis service (call 1): `stId`, `name`, entities found, total, ratio,
-  p-value and FDR; reactions found, total and ratio (unfiltered, research R1).
-- From call 2: its found entities (each with what it maps to, per resource, and its
-  expression values) and its found interactors.
+- From the analysis service (R1's call 2): `stId`, `name`, entities found, total,
+  ratio, p-value and FDR; reactions found, total and ratio, unfiltered (from call 3
+  when the report filters, research R1).
+- From call 4: its found entities (each with what it maps to, per resource, and its
+  expression values), split by resource, and its found interactors, split by the
+  resource they interact through.
 - From the graph (R2): spec 001's Section for it: compartments, diseases, inferred-from,
-  summations, the first five references, the edit history (with "created" and
-  "modified" rows), and its figure (its own diagram, the diagram that holds it with its
+  summations, the first five references, the edit history (today's report's rule: one
+  row per date and action, created and modified included, authorless edits kept,
+  research R2), and its figure (its own diagram, the diagram that holds it with its
   events selected, or its illustration).
 
 ## Identifier lists
 
-- **Found:** the union of call 2's found entities over every pathway after the filters,
-  each with what it maps to and, for an expression analysis, its values; interactors
-  apart.
-- **Not found:** call 3's list, sorted, without repeats. Left out of the report and its
+- **Found:** for each resource, the pathways read in call 2's order, each identifier
+  taken from the first pathway holding it, with that pathway's mappings and, for an
+  expression analysis, its values; interactors apart. Not a union (research R1). The
+  heading's count of Reactome entities is the union of the mapped accessions.
+- **Not found:** call 5's list, sorted, without repeats. Left out of the report and its
   contents when empty.
 
 ## Report
