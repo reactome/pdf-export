@@ -363,7 +363,8 @@ working files for the submitted identifiers.
   report moves. Its report endpoint is retired once the website routes to pdf-export.
 - **The website's part:** WebsiteAngular routes `/AnalysisService/report/` to pdf-export
   through its analysis gateway, in a task in its own specs, and offers the same "PDF Result"
-  button.
+  button. Its render page is also made to wait for a figure's analysis overlay before capturing
+  it, which the report waits for (FR-204), and later takes a `resource`.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
   FoamTree under a commercial licence; pdf-export ships none of it. Unlike spec 001's
   figures, the overview cannot be drawn without FoamTree, so this dependency has no end:

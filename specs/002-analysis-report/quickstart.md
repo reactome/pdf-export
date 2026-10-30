@@ -8,7 +8,8 @@ requests, and no ReactomeGSA runs.
 - The release's graph, read-only (spec 001's quickstart, step 0).
 - An analysis service built from the deployed version (research R5), on that graph,
   with its results folder; tokens made by submitting made-up identifiers.
-- A render service on the same graph, its cache empty for timed runs.
+- A render service on the same graph, built with the overlay wait (plan, step 0), its
+  cache empty for timed runs.
 
 ## 1. The baseline
 
