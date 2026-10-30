@@ -53,15 +53,15 @@ the gateway's lane, two in the service by default.
 
 _GATE: checked before research and again after design._
 
-| Principle                          | How the plan meets it                                                                                                                                                                                                                                       | Status                                                 |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client.                                                                                                             | Pass                                                   |
-| II. Loose licences only            | No new dependency. The render service's FoamTree remains spec 001's tracked violation, and for the genome-wide overview it has no end: the overview is FoamTree's own drawing.                                                                              | **Needs agreement** before tasks (Complexity Tracking) |
-| III. The graph, nothing relational | The graph and the analysis service's public API: Principle III's "So" names the graph and the release's files; the analysis API is a third source, read because FR-202 keeps the analysis's sums in the analysis service, and it is no relational database. | Pass, by FR-202                                        |
-| IV. The pathway browser's look     | Every figure is the render service's. The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3).                                                                                                                             | Pass, with R3's gap tracked                            |
-| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                                                                                                                                         | Pass                                                   |
-| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                                                                                                                                  | Pass                                                   |
-| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                                                                                                                                      | Pass                                                   |
+| Principle                          | How the plan meets it                                                                                                                                                                                                                                            | Status                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client.                                                                                                                  | Pass                                                   |
+| II. Loose licences only            | No new dependency. The render service's FoamTree remains spec 001's tracked violation, and for the genome-wide overview it has no end: the overview is FoamTree's own drawing.                                                                                   | **Needs agreement** before tasks (Complexity Tracking) |
+| III. The graph, nothing relational | The graph and the analysis service's public API: Principle III's "So" names the graph and the release's files; the analysis API is a third source, read because FR-202 keeps the analysis's sums in the analysis service, and it is no relational database.      | Pass, by FR-202                                        |
+| IV. The pathway browser's look     | Every figure is the render service's, overlaid for the result's default resource once the page waits for its overlay (step 1 checks; step 8 fixes, gating the report). The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3). | Pass, with R3's gaps tracked                           |
+| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                                                                                                                                              | Pass                                                   |
+| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                                                                                                                                       | Pass                                                   |
+| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                                                                                                                                           | Pass                                                   |
 
 **After design:** unchanged; Principle II's gate stays open until that agreement.
 
@@ -107,13 +107,16 @@ else (constitution I).
      from it (R5);
    - today's report on that private copy, for a sample of tokens at 25 and 50 pathways:
      its time and size (SC-203's baseline);
+   - whether the render service captures each kind of figure (diagram, illustration,
+     overview) with the analysis overlay, and with the result's default resource (R3),
+     first, because the figures' timings depend on it: if not, the render page is made
+     to wait for its overlay (step 8's WebsiteAngular task, which then comes first)
+     and the figures are timed with that wait;
    - a cold report, stage by stage, on a private stack: the analysis calls (R1's call 4
      for a large expression dataset), the figures (spec 001's T005, part c), layout and
      printing (twice, for the contents);
    - **then the time budget's decision with the user** (R4), before the service is
      built to one answer;
-   - whether the render service captures each kind of figure (diagram, illustration,
-     overview) with the analysis overlay, and with the result's default resource (R3);
    - **and the overview's FoamTree agreement** (Complexity Tracking), recorded in spec
      Assumptions, before tasks are written.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
@@ -129,8 +132,11 @@ else (constitution I).
 7. **The checks:** the replay (User Story 2), the comparison by FR-208, SC-203's timing,
    SC-205's search of logs and files; each shown failing.
 8. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
-   pdf-export, the render service's `resource`, and, if step 1 finds figures captured
-   before their overlay, the render page waiting for it.
+   pdf-export, and the render service's `resource`. If step 1 finds a figure captured
+   with no overlay or with another resource's than the result's default, the render
+   page waiting for its overlay, with the render cache's key bumped so figures cached
+   without it are not served; that task gates the report (FR-204) and is done before
+   step 1's timings.
 
 ## Complexity Tracking
 

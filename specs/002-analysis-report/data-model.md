@@ -2,7 +2,8 @@
 
 What the report is made of, before any layout. Each entity says where its values come
 from (research R1, R2) and its rules. A reported pathway's detail reuses spec 001's
-Section (its data-model.md).
+Section (its data-model.md), except its edit history, which follows today's report's
+rule over edits the report reads itself (research R2).
 
 ## Report request
 
@@ -35,7 +36,8 @@ One of the first `number` pathways of the report's species, in the service's ord
   expression values), split by resource, and its found interactors, split by the
   resource they interact through.
 - From the graph (R2): spec 001's Section for it: compartments, diseases, inferred-from,
-  summations, the first five references, the edit history (today's report's rule: one
+  summations, the first five references; and, apart from the Section, the edit history
+  (today's report's rule, over edits the report reads itself: one
   row per date and action in today's order, created and modified included (spec 001's
   query extended to read them), authorless edits kept, undated ones left out, research
   R2), and its figure (its own diagram, the diagram that holds it with its events

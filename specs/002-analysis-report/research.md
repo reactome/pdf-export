@@ -106,8 +106,9 @@ more (an inference).
 
 ## R2. What comes from the graph
 
-**Decision.** Each reported pathway's detail is spec 001's section, read with spec 001's
-queries (its `src/graph/queries.ts`), which already give, in the curators' order:
+**Decision.** Each reported pathway's detail is spec 001's section (its figure's choice,
+compartments, diseases, inferred-from, summations and references, built as spec 001
+builds them, with the edit history apart, below), read with spec 001's queries (its `src/graph/queries.ts`), which already give, in the curators' order:
 compartments, diseases (the generic "disease" left out), inferred-from, summations,
 the first five references with their authors, and the diagram that holds a pathway with
 no diagram of its own. Three additions:
@@ -167,12 +168,13 @@ with 400). Its page sets the resource as the pathway browser does: the result's 
 (the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`), by the
 browser's analysis service, once the page has settled. That is read from the code, not
 measured, and settling is not assured: the page's readiness check waits for what is
-drawn, not for the analysis result, and the default needs a second fetch of the result
-after the first gives its resources. So a figure may be captured with `TOTAL`'s overlay,
+drawn, not for the analysis result, and where the default is a specific resource it
+needs a second fetch of the result after the first gives its resources. So a figure may be captured with `TOTAL`'s overlay,
 or none, and then cached under its token. Step 1 measures whether each kind of figure
 (diagram, illustration, overview) is captured with an overlay, and with the default's;
-if not, the render page's readiness waiting for the analysis overlay is a WebsiteAngular
-task beside `resource`. Once settled, the overview is as today's, and a pathway's figure
+if not, the render page's readiness waiting for the analysis overlay (and the render
+cache's key bumped) is a WebsiteAngular task that gates the report, done before the
+figures are timed (plan, Order of work). Once settled, the overview is as today's, and a pathway's figure
 differs where the report's resource is not the result's default.
 Adding `resource` is a WebsiteAngular task; until it ships, that is a listed difference
 (spec, FR-204).
