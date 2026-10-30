@@ -29,7 +29,8 @@ Each PDF holds, in this order:
    - the names of the people on the authored, edited, reviewed and revised records of
      the events in it, sorted and each once;
    - a fixed statement of Reactome's institutions;
-   - Reactome's licence statement (CC BY 4.0) and the date;
+   - Reactome's licence statement (CC BY 4.0 today; the new PDFs state it as the website's
+     licence page does) and the date;
    - for a pathway at depth 1 or less, a note that it is an excerpt, pointing at the
      book.
 2. **An introduction:** about Reactome, Reactome's own references, the release, and the
@@ -193,7 +194,8 @@ own drawing of the same event by SC-008.
 Anyone can reuse this exporter, in services under any licence. Nothing it depends on,
 and nothing it puts into a PDF of its own (fonts, icons, boilerplate), is under a
 restrictive licence. Reactome's content in the PDFs stays under Reactome's own licence
-(CC BY 4.0), as the cover says.
+(as the website's licence page states it: CC0 for data, CC BY 4.0 for illustrations and
+art), as the cover says.
 
 **Why this priority**: the restrictive licences of `event-pdf`, its dependencies and its
 font are a reason it is being replaced. A replacement that brings one back fails its
@@ -489,6 +491,9 @@ of pages with today's book.
   - a section with no figure today, where the new one has a figure, or the reverse,
     each recorded;
   - the look: layout, colours and typefaces (User Story 6);
+  - the licence statement: CC0 for data and CC BY 4.0 for illustrations and art, as the
+    website's licence page has it, where `event-pdf`'s cover said CC BY 4.0 for everything
+    (decided by the user, spec 001 T016);
   - the order of lists: today's PDFs list an event's children, compartments, literature
     (and so which five references are shown), summations, diseases and the events
     before and after in the database's order; the new ones in the curators' order
