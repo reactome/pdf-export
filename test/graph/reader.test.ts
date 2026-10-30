@@ -54,7 +54,7 @@ describe('the graph reader', { skip }, () => {
 
   test('reads each id once, however often a level names it', async () => {
     const levels = await children(graph, [id(100), id(100)]);
-    assert.equal(levels.get(id(100))?.length, 2);
+    assert.equal(levels.get(id(100))?.length, 3);
     const refs = (await literature(graph, [id(211), id(211)])).get(id(211));
     assert.equal(new Set(refs?.map((r) => r.dbId)).size, 5);
     assert.equal(refs?.length, 5);
@@ -75,7 +75,7 @@ describe('the graph reader', { skip }, () => {
     );
     assert.deepEqual(
       levels.get(id(100))?.map((c) => c.name),
-      ['Shared reaction', 'Inferred reaction']
+      ['Shared reaction', 'Inferred reaction', 'beta sub with diagram']
     );
   });
 

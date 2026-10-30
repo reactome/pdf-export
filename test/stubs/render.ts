@@ -3,7 +3,8 @@
 // answers (tools/render/service.ts): its type, a 400 for another format or a parameter
 // given twice, a JSON error body, and Retry-After on a 503. It answers 400 to a query
 // parameter the contract does not name, so a wrongly named one fails a test instead of
-// passing silently, and refuses on request with 404, 503 or a timeout.
+// passing silently, and refuses on request: 404, 503, a timeout, a body that stops part way,
+// or an answer that is not SVG.
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';

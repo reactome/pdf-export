@@ -317,3 +317,61 @@ function group<R, K, V>(rows: readonly R[], key: (row: R) => K, value: (row: R) 
   }
   return grouped;
 }
+
+/** A pathway that can draw another: it has a diagram, and none lies between them. */
+export interface DiagramAncestor {
+  dbId: number;
+  stId: string;
+  /** How far it is from the nearest top-level pathway above it: 0 for one itself. */
+  depthFromTop: number;
+}
+
+export interface DiagramChoice {
+  /** The nearest pathway with a diagram on each path up, none between. */
+  ancestors: DiagramAncestor[];
+  /** The reactions beneath the pathway, not under another pathway with a diagram. */
+  reactions: string[];
+}
+
+/**
+ * For each pathway with no diagram of its own: the ancestors that could draw it, and the
+ * reactions to select there (data-model.md's Figure, research R2).
+ */
+export async function diagramChoices(
+  graph: Graph,
+  ids: readonly number[]
+): Promise<Map<number, DiagramChoice>> {
+  const rows = await graph.read<{ id: number } & DiagramChoice>(
+    `UNWIND $ids AS id
+     MATCH (p:DatabaseObject {dbId: id})
+     WHERE p:Pathway AND NOT coalesce(p.hasDiagram, false)
+     CALL {
+       WITH p
+       MATCH path = (a:Pathway)-[:hasEvent*1..]->(p)
+       WHERE a.hasDiagram AND none(n IN nodes(path)[1..-1] WHERE coalesce(n.hasDiagram, false))
+       WITH DISTINCT a
+       OPTIONAL MATCH top = (:TopLevelPathway)-[:hasEvent*0..]->(a)
+       WITH a, min(length(top)) AS depth
+       RETURN collect({dbId: a.dbId, stId: a.stId, depthFromTop: coalesce(depth, 0)}) AS ancestors
+     }
+     CALL {
+       WITH p
+       MATCH path = (p)-[:hasEvent*1..]->(r:ReactionLikeEvent)
+       WHERE none(n IN nodes(path)[1..-1] WHERE coalesce(n.hasDiagram, false))
+       RETURN collect(DISTINCT r.stId) AS reactions
+     }
+     RETURN id, ancestors, reactions`,
+    { ids: unique(ids) }
+  );
+  return new Map(
+    rows.map(({ id, ancestors, reactions }) => [
+      id,
+      {
+        ancestors: [...ancestors].sort(
+          (a, b) => a.depthFromTop - b.depthFromTop || a.dbId - b.dbId
+        ),
+        reactions: [...reactions].sort(),
+      },
+    ])
+  );
+}

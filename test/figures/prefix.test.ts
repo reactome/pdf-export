@@ -10,7 +10,7 @@ const figure = (name: string) =>
 const ids = (svg: string) => [...svg.matchAll(/\sid=["']([^"']+)["']/g)].map((m) => m[1] ?? '');
 const references = (svg: string) => [
   ...[...svg.matchAll(/url\((?:['"]|&quot;)?#([^'"&)\s]+)/g)].map((m) => m[1] ?? ''),
-  ...[...svg.matchAll(/\s(?:xlink:)?href="#([^"]+)"/g)].map((m) => m[1] ?? ''),
+  ...[...svg.matchAll(/\s(?:xlink:)?href=["']#([^"']+)["']/g)].map((m) => m[1] ?? ''),
 ];
 
 /**
@@ -59,10 +59,11 @@ test('leaves data: images and web addresses as they are', () => {
 
 test('handles the other forms of an id and a url: single quotes, and &quot; in a style', () => {
   const svg =
-    '<svg><clipPath id=\'c\'/><g style="clip-path: url(&quot;#c&quot;)"/>' +
+    "<svg><clipPath id='c'/><use href='#c'/><g style=\"clip-path: url(&quot;#c&quot;)\"/>" +
     '<g clip-path="url(#c)"/></svg>';
   const out = prefixIds(svg, 's');
   assert.match(out, /id='s-c'/);
+  assert.match(out, /href='#s-c'/);
   assert.match(out, /url\(&quot;#s-c&quot;\)/);
   assert.match(out, /url\(#s-c\)/);
   assertWhole(out);
