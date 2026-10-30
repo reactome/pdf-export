@@ -240,6 +240,9 @@ damage the output in each way FR-011 names, and see the check fail on each.
    fails and names the fault.
 3. **Given** a release file the step needs is missing, **When** the step runs, **Then**
    it fails and names the file, and writes no book.
+4. **Given** a text or a figure's label holding a character no font draws and FR-017's
+   list does not hold, **When** the step runs, **Then** it fails, naming the character
+   and the event, before the part holding it is printed, and writes no book.
 
 ---
 
@@ -286,6 +289,10 @@ of pages with today's book.
   and searches in the readers of SC-004.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
+- **A character no embedded typeface draws** (FR-017): in the book, one of a fixed list
+  is replaced by what the typefaces draw, and any other fails the step, before the part
+  holding it is printed, with no book written. In a PDF made on request it never fails: it prints as the replacement mark
+  (U+FFFD) and is logged.
 - **A release file missing:** a diagram the graph needs but the files lack, or an EHLD
   the summary names for a pathway the graph holds, but the files lack. (An entry for an
   event the graph does not hold is ignored: plan, research R7.) The step fails and names
@@ -411,6 +418,25 @@ of pages with today's book.
     sets, unless it is already at the largest a landscape page of its own allows, in
     which case it is listed in the run report;
   - a cover in the website's style (User Story 6, scenario 3).
+- **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026), in
+  the text the layout writes and in the figures' labels alike:
+  - **the book:** those on a fixed list are replaced by what the typefaces draw, without
+    changing what the text says (a ligature by its letters, a non-breaking hyphen by a
+    hyphen, a spacing dot above used as a radical's dot by a bullet, a geresh used as a
+    prime by a prime). The list is kept with the code, each entry with the release
+    text it was found in. Any character not on it fails the step, naming it and the
+    event, so the release's owners see a new one: found in the graph's texts or the
+    release's files, before anything is printed; found only in a drawn figure, before
+    the part holding it is printed. Either way no book is written;
+  - **a PDF made on request** (a single event's, or any other the website asks for on the
+    fly, whose text can include what users submit): the same list is applied, and any
+    other such character prints as the replacement mark (U+FFFD). Each such code point is
+    logged once per PDF, with the stable identifier or the token, never the text it was
+    in; the request never fails on it;
+  - in a figure, only the labels' text is changed, never its shapes; a few substituted
+    glyphs should fall well within SC-008's threshold (an inference: release 98's labels
+    hold none of the listed characters, so no comparison has tested it), so the figure is
+    compared as any other.
 
 ### Key Entities
 

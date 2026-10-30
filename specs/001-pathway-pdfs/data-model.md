@@ -63,7 +63,9 @@ the short entry alone, pointing at the full section, and not its subtree again.
   - `reaction`: a reaction's own drawing.
 - `source`: the stable identifier the render service draws, with `highlight` ids for
   `ancestor`.
-- `svg`: the drawing, every id prefixed with the section's anchor.
+- `svg`: the drawing, every id prefixed with the section's anchor, and its labels' text
+  after FR-017: the list substituted, and in a PDF made on request any other character
+  no font draws replaced by U+FFFD (in the book, such a character is a fault).
 - `scale`: its size on the page, from which its labels' size follows (12 px for node labels in the SVG; the smallest sets it).
   At least 5 pt, or a landscape page of its own; below that only for a diagram too large
   for any page, listed in the run report (research R4).
@@ -149,6 +151,8 @@ What the book's step and the service log.
 - Figures by kind, and those missing, by stable identifier.
 - Figures below the legibility floor, by stable identifier.
 - Release files missing, by name, from the preflight.
+- Characters FR-017's list replaced, by code point and count; characters off the list, by
+  code point and stable identifier (a fault in the book, U+FFFD in a PDF made on request).
 - Each stage's time, against research R7's budget.
 - Each FR-011 check, and its result.
 - No names (FR-013).

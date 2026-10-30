@@ -33,16 +33,16 @@ in TypeScript on Node (research R1).
 
 **Primary Dependencies**, each under a licence FR-009 allows:
 
-| Dependency                                                                                                   | Licence                        | Role                                                          |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
-| `neo4j-driver`                                                                                               | Apache-2.0                     | reading the graph                                             |
-| `playwright-core` with Chromium                                                                              | Apache-2.0, BSD                | layout and printing                                           |
-| `@cantoo/pdf-lib`, or pdf-lib 1.17                                                                           | MIT                            | joining parts, links, outline                                 |
-| `pdfjs-dist`                                                                                                 | Apache-2.0                     | the checks                                                    |
-| `sass`, `@angular/material`, `@angular/cdk`, and `ngx-reactome-style`, the website's theme package           | MIT, and CC0 by its repository | compiling the theme, at build time                            |
-| `@fontsource` Roboto, Roboto Mono, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2, Noto Sans Math) | OFL-1.1                        | fonts                                                         |
-| `fontkit`                                                                                                    | MIT                            | the characters each font covers, checked before printing (R5) |
-| `express`                                                                                                    | MIT                            | the website's service                                         |
+| Dependency                                                                                                   | Licence                        | Role                                                         |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------------ |
+| `neo4j-driver`                                                                                               | Apache-2.0                     | reading the graph                                            |
+| `playwright-core` with Chromium                                                                              | Apache-2.0, BSD                | layout and printing                                          |
+| `@cantoo/pdf-lib`, or pdf-lib 1.17                                                                           | MIT                            | joining parts, links, outline                                |
+| `pdfjs-dist`                                                                                                 | Apache-2.0                     | the checks                                                   |
+| `sass`, `@angular/material`, `@angular/cdk`, and `ngx-reactome-style`, the website's theme package           | MIT, and CC0 by its repository | compiling the theme, at build time                           |
+| `@fontsource` Roboto, Roboto Mono, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2, Noto Sans Math) | OFL-1.1                        | fonts                                                        |
+| `fontkit`                                                                                                    | MIT                            | the characters each font covers, checked as FR-017 says (R5) |
+| `express`                                                                                                    | MIT                            | the website's service                                        |
 
 **Storage**: none of its own. It reads:
 
