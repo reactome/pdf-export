@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Licences any dependency may have: loose, and none of the GPL family. */
 export const ALLOWED: ReadonlySet<string> = new Set([
@@ -187,7 +188,7 @@ function main(args: readonly string[]): number {
     return 2;
   }
   // The project's root, wherever the check is run from: this file is in its ci/ folder
-  const root = new URL('..', import.meta.url).pathname;
+  const root = fileURLToPath(new URL('..', import.meta.url));
   const packages = installed(root, queryFile);
   const problems = [...offenders(packages), ...fontsWithoutLicence(packages, root)];
   for (const name of unusedExceptions(packages)) {

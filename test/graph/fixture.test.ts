@@ -3,11 +3,15 @@
 // ci/fixture/README.md). Without NEO4J_URI the tests are skipped, and CI sets it, so
 // there they run.
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
 
 import neo4j, { type Driver } from 'neo4j-driver';
 
 const uri = process.env['NEO4J_URI'];
+// Skipped locally without a graph, but never in CI, where a missing graph is a failure
+if (!uri && process.env['CI'])
+  throw new Error('CI must give the fixture graph: NEO4J_URI is not set');
 const skip = uri ? false : 'no fixture graph: set NEO4J_URI (ci/fixture/README.md)';
 
 let driver: Driver | undefined;
@@ -110,15 +114,22 @@ describe('the fixture graph', { skip }, () => {
     assert.ok(
       (await count('MATCH (:ReactionLikeEvent)-[:precedingEvent]->() RETURN count(*)')) >= 2
     );
+    // one pointing outside its source's top-level pathways, so outside a PDF of any of them
+    assert.ok(
+      (await count(
+        `MATCH (a:ReactionLikeEvent)-[:precedingEvent]->(b)
+         WHERE NOT EXISTS { MATCH (t:TopLevelPathway)-[:hasEvent*]->(a) WHERE (t)-[:hasEvent*]->(b) }
+         RETURN count(*)`
+      )) >= 1
+    );
   });
 
   test('has a list whose order differs from database-id order', async () => {
     const differing = await count(
       `MATCH (p)-[r:hasEvent]->(c) WITH p, r, c ORDER BY r.order
        WITH p, collect(c.dbId) AS byOrder
-       WITH p, byOrder, [x IN byOrder | x] AS ids
-       UNWIND ids AS id WITH p, byOrder, id ORDER BY id
-       WITH p, byOrder, collect(id) AS byId WHERE byOrder <> byId RETURN count(p)`
+       WHERE any(i IN range(1, size(byOrder) - 1) WHERE byOrder[i] < byOrder[i - 1])
+       RETURN count(p)`
     );
     assert.ok(differing >= 1);
   });
@@ -162,11 +173,64 @@ describe('the fixture graph', { skip }, () => {
     assert.ok(
       (await count("MATCH (s:Summation) WHERE s.text CONTAINS '<script>' RETURN count(s)")) >= 1
     );
-    assert.equal(await count("MATCH (d:Disease {displayName: 'disease'}) RETURN count(d)"), 1);
+    // an event with two diseases, one named exactly "disease", and marked as in disease
+    assert.equal(
+      await count(
+        `MATCH (e:Event {isInDisease: true})-[:disease]->(d) WITH e, collect(d.displayName) AS names
+         WHERE size(names) >= 2 AND 'disease' IN names RETURN count(e)`
+      ),
+      1
+    );
+    assert.equal(await count('MATCH (b:Book)-[:publisher]->(:Affiliation) RETURN count(b)'), 1);
+    // edit times as the release writes them
+    assert.equal(
+      await count(
+        "MATCH (i:InstanceEdit) WHERE i.dateTime IS NOT NULL AND NOT i.dateTime =~ '\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}' RETURN count(i)"
+      ),
+      0
+    );
   });
 
-  test('has a node that is not an event', async () => {
-    assert.ok((await count('MATCH (c:Compartment) WHERE NOT c:Event RETURN count(c)')) >= 1);
+  test('has a node that is not an event, with a stable id', async () => {
+    assert.ok(
+      (await count(
+        'MATCH (c:PhysicalEntity) WHERE c.stId IS NOT NULL AND NOT c:Event RETURN count(c)'
+      )) >= 1
+    );
+  });
+
+  test("has the release's files the preflight looks for", async () => {
+    const files = new URL('../../ci/fixture/files/', import.meta.url);
+    const has = (path: string): boolean => existsSync(new URL(path, files));
+    if (!driver) throw new Error('no driver');
+    const session = driver.session({ database: process.env['NEO4J_DATABASE'] ?? 'graph.db' });
+    try {
+      const result = await session.run(
+        'MATCH (p:Pathway) RETURN p.stId AS stId, p.hasDiagram AS diagram, p.hasEHLD AS ehld'
+      );
+      for (const record of result.records) {
+        const stId = String(record.get('stId'));
+        if (record.get('diagram') === true) {
+          assert.ok(has(`diagram/${stId}.json`), `${stId}.json`);
+          assert.ok(has(`diagram/${stId}.graph.json`), `${stId}.graph.json`);
+        }
+        if (record.get('ehld') === true) assert.ok(has(`ehld/${stId}.svg`), `${stId}.svg`);
+      }
+      const named = readFileSync(new URL('ehld/svgsummary.txt', files), 'utf8')
+        .split('\n')
+        .filter((line) => line.startsWith('R-'));
+      const held = await session.run(
+        'MATCH (p:Pathway) WHERE p.stId IN $named RETURN count(p) AS n',
+        { named }
+      );
+      const n: unknown = held.records[0]?.get('n');
+      assert.ok(
+        (neo4j.isInt(n) ? n.toNumber() : Number(n)) < named.length,
+        'an entry the graph lacks'
+      );
+    } finally {
+      await session.close();
+    }
   });
 
   test('holds placeholder people only', async () => {

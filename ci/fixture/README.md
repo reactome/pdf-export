@@ -30,7 +30,7 @@ release 98's (every relationship has `order` and `stoichiometry`).
 | Edits of each kind; one with no date; one with no author; two sharing a date         | `Reaction one`                                                                              | the edit history's rules                  |
 | A summation whose HTML must be sanitised                                             | `Alpha pathway`                                                                             | sanitising                                |
 | A disease, and one named exactly "disease"                                           | `Disease reaction`                                                                          | the "disease" exclusion                   |
-| A node that is not an event                                                          | the compartments                                                                            | 400 `not-an-event`                        |
+| A node that is not an event, with a stable id                                        | `Placeholder complex`                                                                       | 400 `not-an-event`                        |
 
 ## The release's files
 
