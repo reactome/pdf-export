@@ -46,8 +46,9 @@ inside the analysis service. It draws its figures with the same Java exporters a
   the controller. On the analysis service's main branch the PDF is streamed as it is
   made, so the answer ends early, usually as a 200 (its exact form, a short PDF or a
   cut-off file, is the replay's to record). An unmerged branch buffers the PDF: a
-  failure of the PDF library is then answered 500 with the web framework's default body,
-  and any other failure 500 in the service's JSON form. Which build the deployments run
+  failure of the PDF library (or of loading the report's bundled style, which the
+  library's own exception reports) is then answered 500 with the web framework's default
+  body, and any other failure 500 in the service's JSON form. Which build the deployments run
   is settled by the deployed analysis service's version or commit, which the plan
   records; the replay's private copy is built from that.
 - **The figures' overlays:** each pathway's diagram is overlaid for the report's
@@ -154,7 +155,8 @@ use; people's scripts call it and save what it sends.
 copy (each parameter, each answer: 200, 404 for a species and for a token, 410, a
 resource the result lacks, a number out of range, a number or flag that is not one, the
 species as a name, a taxonomy id and a database id, and a failure while the PDF is made,
-on a private copy built from the deployed build) against the new service, and compare
+which no request can cause and so is planted as a fault in the private copy, built from
+the deployed build) against the new service, and compare
 the statuses, the file names and the reports.
 
 **Acceptance Scenarios**:
@@ -255,7 +257,8 @@ working files for the submitted identifiers.
   (by the analysis service's answers), a number or flag that is not one as today's (the
   replay records which), 500 when making the PDF fails, and 503 when the
   analysis service, the graph or the render service cannot answer or the service is at
-  its limit (today's answers 500 to the first and has no limit: a listed difference).
+  its limit (today's answers 500 to the first when it fails before the PDF is begun, and
+  has no limit: a listed difference).
 - **FR-204**: Figures MUST be drawn as the website's pathway browser draws them, overlaid
   with the analysis by its token: each reported pathway's figure, chosen as spec 001's
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
@@ -386,7 +389,8 @@ working files for the submitted identifiers.
     where today's links to a part that is not there;
   - the overlays for all resources together, until the render service takes a resource
     (FR-204);
-  - a 503, where today's answers 500, when a service it needs cannot answer;
+  - a 503, where today's answers 500, when a service it needs cannot answer before the
+    PDF is begun (after that, the Background's build-dependent answers);
   - the order of what a pathway was inferred from (today's in no set order), in the
     curators' order; its compartments, references (and so which five are shown),
     diseases and descriptions are in the curators' order in both, and must match;
