@@ -1,0 +1,21 @@
+{
+  "_note": "Reactome's own papers, for the introduction (spec 001 T016). Titles, journals, years and DOIs are from the website's publications page (WebsiteAngular content/community/publications.mdx). The authors are left for the release's owners to fill in, each as written on that page: the code does not write people's names.",
+  "references": [
+    {
+      "pubMedId": 41251150,
+      "title": "The Reactome Knowledgebase 2026",
+      "journal": "Nucleic Acids Res",
+      "year": 2026,
+      "doi": "10.1093/nar/gkaf1223",
+      "authors": []
+    },
+    {
+      "pubMedId": 37941124,
+      "title": "The Reactome Pathway Knowledgebase 2024",
+      "journal": "Nucleic Acids Res",
+      "year": 2024,
+      "doi": "10.1093/nar/gkad1025",
+      "authors": []
+    }
+  ]
+}
