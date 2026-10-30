@@ -28,6 +28,8 @@ interface Item {
   x: number;
   y: number;
   width: number;
+  /** Its type size, in points. */
+  size: number;
 }
 interface Printed {
   pages: { width: number; height: number; items: Item[]; links: string[] }[];
@@ -75,7 +77,13 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
           .filter((item) => 'str' in item && item.str.trim() !== '')
           .map((item) => {
             const t = item as { str: string; transform: number[]; width: number };
-            return { text: t.str, x: t.transform[4] ?? 0, y: t.transform[5] ?? 0, width: t.width };
+            return {
+              text: t.str,
+              x: t.transform[4] ?? 0,
+              y: t.transform[5] ?? 0,
+              width: t.width,
+              size: Math.hypot(t.transform[2] ?? 0, t.transform[3] ?? 0),
+            };
           });
         const links = (await p.getAnnotations())
           .filter((a: { subtype?: string }) => a.subtype === 'Link')
@@ -168,6 +176,36 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
     assert.ok(
       headers.slice(2).every((h) => h === 'beta pathway'),
       String(headers)
+    );
+  });
+
+  test("type is the theme's at the website's sizes: rem is 16 px", async () => {
+    const { pages } = await print(layoutSingle(built.pathway, options).html, true);
+    const m = PAGE.margin;
+    const sizes = (find: (item: Item, page: Printed['pages'][number]) => boolean) =>
+      new Set(
+        pages.flatMap((page) =>
+          page.items.filter((item) => find(item, page)).map((item) => item.size.toFixed(2))
+        )
+      );
+    // the running headers, body-small (0.75 rem, 12 px)
+    assert.deepEqual(
+      sizes((item, page) => item.y > page.height - m),
+      new Set(['9.00'])
+    );
+    // the introduction's heading, on its own page, headline-small (1.5 rem, 24 px); the
+    // contents list names it too, in body text, on another page
+    assert.deepEqual(
+      sizes(
+        (item, page) =>
+          page === pages[1] && item.y <= page.height - m && item.text === 'Introduction'
+      ),
+      new Set(['18.00'])
+    );
+    // body text, body-medium (0.875 rem, 14 px)
+    assert.deepEqual(
+      sizes((item) => item.text === 'Stable identifier'),
+      new Set(['10.50'])
     );
   });
 

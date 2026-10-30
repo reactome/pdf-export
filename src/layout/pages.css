@@ -21,13 +21,14 @@ html {
    * the website's text does.
    */
   font-family: Roboto, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math';
+  color: var(--mat-sys-on-surface);
+}
+/* The root keeps the browser's 16 px, so the theme's rem sizes are the website's. */
+body {
+  margin: 0;
   font-size: var(--mat-sys-body-medium-size);
   line-height: var(--mat-sys-body-medium-line-height);
   font-weight: var(--mat-sys-body-medium-weight);
-  color: var(--mat-sys-on-surface);
-}
-body {
-  margin: 0;
 }
 a {
   color: var(--mat-sys-primary);

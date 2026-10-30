@@ -88,7 +88,7 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
   });
 
   test('with an analysis, its properties after the introduction, and what it found last in a section', () => {
-    const { html } = layoutSingle(built.pathway, {
+    const { html } = layoutSingle(built.analysed, {
       ...options,
       analysis: {
         properties: {
@@ -127,6 +127,50 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
       'Q00002',
     ]);
     assert.ok(found.every((n) => n >= 0) && increasing(found), String(found));
+  });
+
+  test('an analysis the contents list was not built for, or none for one it was, is refused', () => {
+    const analysis = {
+      properties: {
+        token: 'TOKEN1',
+        type: 'EXPRESSION',
+        species: 'Homo sapiens',
+        projection: false,
+        interactors: false,
+        identifiersFound: 0,
+        identifiersTotal: 0,
+        pathwaysHit: 0,
+      },
+      found: new Map(),
+    };
+    assert.throws(() => layoutSingle(built.pathway, { ...options, analysis }), /built without one/);
+    assert.throws(() => layoutSingle(built.analysed, options), /none was given/);
+    // a reaction alone has no contents list, so nothing to disagree with
+    assert.doesNotThrow(() => layoutSingle(built.reaction, { ...options, analysis }));
+  });
+
+  test('text, attributes and the running header are escaped', () => {
+    const hostile = 'a"b\\c</style><script>x()</script>&\n';
+    const doc: Document = {
+      ...built.pathway,
+      cover: { ...built.pathway.cover, title: hostile, names: ['N<1>'] },
+      places: built.pathway.places.map((p) =>
+        p.full
+          ? { ...p, section: { ...p.section, event: { ...p.section.event, name: hostile } } }
+          : p
+      ),
+    };
+    const { html } = layoutSingle(doc, options);
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(
+      html,
+      /<title>a"b\\c&lt;\/style&gt;&lt;script&gt;x\(\)&lt;\/script&gt;&amp;\n<\/title>/
+    );
+    assert.match(html, /aria-label="a&quot;b\\c&lt;\/style&gt;/);
+    assert.match(html, /<p class="names">N&lt;1&gt;<\/p>/);
+    // in the header's CSS string: no quote, backslash, < or new line left as it was
+    const header = /@page \{ @top-center \{ content: ("(?:[^"\\]|\\.)*");/.exec(html)?.[1];
+    assert.equal(header, '"a\\22 b\\5c c\\3c /style>\\3c script>x()\\3c /script>&\\a "');
   });
 
   test("a section's parts are in the Background's order", () => {
@@ -235,7 +279,12 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
         ],
         inferredFrom: [{ dbId: 3, stId: 'SOURCE', name: 'Source', speciesName: 'Mus musculus' }],
       },
-      { links, figures: new Map(), found: null, report: { belowFloor: [], missing: [] } }
+      {
+        links,
+        figures: new Map(),
+        found: null,
+        report: { belowFloor: [], missing: [], unmeasured: [] },
+      }
     );
     assert.match(
       html,

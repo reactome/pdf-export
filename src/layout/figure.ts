@@ -60,17 +60,28 @@ export function measure(svg: string): Measured {
   return { width, height, smallestLabel: smallestLabel(svg) };
 }
 
+/** Pixels for each absolute unit a label's size may be given in. */
+const PX: Readonly<Record<string, number>> = { '': 1, px: 1, pt: 4 / 3 };
+
 /**
  * The smallest font size given to text that is drawn: a `font-size` attribute or property,
- * or the size in a `font` shorthand, in pixels (a bare number is pixels in SVG).
+ * or the size in a `font` shorthand, in pixels (a bare number is pixels in SVG). Relative
+ * sizes (em, %, rem) are not read: what they are relative to is not known here. Neither is
+ * a transform that scales a label; the render service's diagrams use neither.
  */
 function smallestLabel(svg: string): number | null {
   const sizes: number[] = [];
-  for (const [, value = ''] of svg.matchAll(/font-size(?:=["']|\s*:\s*)([\d.]+)(?:px)?/g)) {
-    sizes.push(Number(value));
+  const read = (value: string, unit: string) => {
+    const factor = PX[unit];
+    if (factor !== undefined) sizes.push(Number(value) * factor);
+  };
+  for (const [, value = '', unit = ''] of svg.matchAll(
+    /font-size(?:=["']|\s*:\s*)([\d.]+)(px|pt|em|rem|%)?/g
+  )) {
+    read(value, unit);
   }
-  for (const [, value = ''] of svg.matchAll(/\bfont\s*:[^;"']*?([\d.]+)px/g)) {
-    sizes.push(Number(value));
+  for (const [, value = '', unit = ''] of svg.matchAll(/\bfont\s*:[^;"']*?([\d.]+)(px|pt)\b/g)) {
+    read(value, unit);
   }
   const drawn = sizes.filter((size) => size > 0);
   return drawn.length > 0 ? Math.min(...drawn) : null;
@@ -82,6 +93,12 @@ export interface Placement {
   landscape: boolean;
   /** Its smallest label prints below the floor even so. */
   belowFloor: boolean;
+  /**
+   * It has no text whose size can be read: an illustration's lettering is drawn as outlines
+   * (research R3), so it is placed by its size alone and listed for the run report, its
+   * lettering measured by T008.
+   */
+  unmeasured: boolean;
 }
 
 /**
@@ -94,10 +111,12 @@ export function place({ width, height, smallestLabel }: Measured): Placement {
     Math.min(area.width / width, area.height / height, NATURAL);
   const portrait = fit(PORTRAIT);
   const legible = (scale: number) => smallestLabel === null || scale * smallestLabel >= FLOOR_PT;
-  if (legible(portrait)) return { scale: portrait, landscape: false, belowFloor: false };
+  const unmeasured = smallestLabel === null;
+  if (legible(portrait))
+    return { scale: portrait, landscape: false, belowFloor: false, unmeasured };
   const landscape = fit(LANDSCAPE);
   const scale = Math.max(portrait, landscape);
-  return { scale, landscape: landscape > portrait, belowFloor: !legible(scale) };
+  return { scale, landscape: landscape > portrait, belowFloor: !legible(scale), unmeasured };
 }
 
 /**

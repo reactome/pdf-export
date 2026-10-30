@@ -43,11 +43,39 @@ describe("a figure's size", () => {
     assert.equal(measure(svg(100, 100, [16, 7, 80])).smallestLabel, 7);
   });
 
+  test('a size in points is read as pixels; a relative size is not read', () => {
+    assert.equal(
+      measure('<svg width="9" height="9"><text font-size="6pt">a</text></svg>').smallestLabel,
+      8
+    );
+    assert.equal(
+      measure('<svg width="9" height="9"><text style="font: 9pt Roboto">a</text></svg>')
+        .smallestLabel,
+      12
+    );
+    for (const relative of ['0.6em', '100%', '1rem']) {
+      assert.equal(
+        measure(`<svg width="9" height="9"><text font-size="${relative}">a</text></svg>`)
+          .smallestLabel,
+        null,
+        relative
+      );
+    }
+  });
+
+  test('one with no label to measure, as an illustration, is placed by its size and reported', () => {
+    const placed = place(measure('<svg width="1600" height="1000"><path d="M0 0"/></svg>'));
+    assert.equal(placed.unmeasured, true);
+    assert.equal(placed.landscape, false);
+    assert.equal(place(measure(svg(300, 200))).unmeasured, false);
+  });
+
   test('a figure that fits is in the text, never larger than its own size', () => {
     assert.deepEqual(place(measure(svg(300, 200))), {
       scale: 0.75,
       landscape: false,
       belowFloor: false,
+      unmeasured: false,
     });
     const wide = place(measure(svg(1000, 200)));
     assert.equal(wide.landscape, false);

@@ -62,8 +62,18 @@ function held(doc: Document, analysis: boolean): Set<string> {
 /** A single event's PDF: cover, introduction, analysis, contents, then its sections. */
 export function layoutSingle(doc: Document, options: LayoutOptions): Laid {
   const analysis = options.analysis ?? null;
+  // the model's contents list has the analysis's entry only when it was built for one
+  // (build.ts); laid out without it, or with one it was not built for, the two disagree
+  const listed = doc.contents?.some((entry) => entry.target === FRONT.analysis) ?? false;
+  if (doc.contents && listed !== (analysis !== null)) {
+    throw new Error(
+      analysis
+        ? 'An analysis was given for a document built without one'
+        : 'The document was built for an analysis, and none was given'
+    );
+  }
   const links = new Links(false, options.site, held(doc, analysis !== null));
-  const report: Report = { belowFloor: [], missing: [] };
+  const report: Report = { belowFloor: [], missing: [], unmeasured: [] };
   const body = [
     coverHtml(doc, links, options.figures, options.date),
     introductionHtml(doc, links),
@@ -88,7 +98,7 @@ export function layoutBookFront(doc: Document, options: LayoutOptions): Laid {
   ];
   return {
     html: page(doc.cover.title, 'book', body.join('\n'), options.styles, ''),
-    report: { belowFloor: [], missing: [] },
+    report: { belowFloor: [], missing: [], unmeasured: [] },
   };
 }
 
@@ -99,7 +109,7 @@ export function layoutBookPart(
   options: LayoutOptions
 ): Laid {
   const links = new Links(true, options.site, held(doc, false));
-  const report: Report = { belowFloor: [], missing: [] };
+  const report: Report = { belowFloor: [], missing: [], unmeasured: [] };
   const body = `<div class="sections">${sections(places, links, options, report)}</div>`;
   return { html: page(doc.cover.title, 'book', body, options.styles, ''), report };
 }

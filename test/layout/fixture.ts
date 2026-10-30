@@ -25,6 +25,8 @@ export interface Built {
   book: Document;
   /** A pathway at depth 1, with a contents list. */
   pathway: Document;
+  /** The same pathway, built for an analysis. */
+  analysed: Document;
   /** A reaction alone. */
   reaction: Document;
 }
@@ -32,15 +34,16 @@ export interface Built {
 export async function buildFixture(): Promise<Built> {
   const graph = openGraph(graphSettings(process.env));
   try {
-    const single = async (stId: string, depth: 0 | 1) => {
+    const single = async (stId: string, depth: 0 | 1, analysis = false) => {
       const found = await eventByIdentifier(graph, stId);
       if (!found || !('event' in found)) throw new Error(`${stId} is not an event`);
-      return buildSingle(graph, found.event, { depth, illustrated });
+      return buildSingle(graph, found.event, { depth, illustrated, analysis });
     };
     return {
       book: await buildBook(graph, { illustrated }),
       // beta pathway, and Reaction one
       pathway: await single('R-HSA-90000100', 1),
+      analysed: await single('R-HSA-90000100', 1, true),
       reaction: await single('R-HSA-90000211', 0),
     };
   } finally {

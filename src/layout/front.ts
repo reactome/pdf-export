@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { prefixIds } from '../figures/prefix.ts';
 import type { AnalysisProperties, ContentsEntry, Document } from '../model/types.ts';
 import { coverFigureHtml, figureKey } from './figure.ts';
-import { Links, text } from './html.ts';
+import { Links, attribute, text } from './html.ts';
 import {
   ABOUT_REACTOME,
   ANALYSIS,
@@ -53,7 +53,7 @@ export function coverHtml(
   }
   if (cover.names.length > 0) {
     parts.push(
-      `<p class="part">${text(CONTRIBUTORS)}</p><p class="names">${text(cover.names.join(', '))}</p>`
+      `<p class="part">${text(CONTRIBUTORS)}</p><p class="names">${text(cover.names.join('; '))}</p>`
     );
   }
   parts.push(
@@ -148,7 +148,7 @@ export function contentsHtml(entries: readonly ContentsEntry[], links: Links): s
   const items = entries
     .map(
       (entry) =>
-        `<li style="--depth: ${String(entry.depth)}">${Links.a(links.internal(entry.target), entry.title)}<span class="page" data-target="${entry.target}">0</span></li>`
+        `<li style="--depth: ${String(entry.depth)}">${Links.a(links.internal(entry.target), entry.title)}<span class="page" data-target="${attribute(entry.target)}">0</span></li>`
     )
     .join('');
   return `<section class="front" data-part="contents">

@@ -6,12 +6,14 @@ import type { Reference } from '../graph/queries.ts';
 import type { Found, FoundRow, Place, Section } from '../model/types.ts';
 import { figureHtml, figureKey, type Placement } from './figure.ts';
 import { anchorOf } from '../model/build.ts';
-import { Links, text } from './html.ts';
+import { Links, attribute, text } from './html.ts';
 
 /** What laying out sections reports, for the run report and the service's log. */
 export interface Report {
   /** Figures printed below the legibility floor even on a landscape page, by stable id. */
   belowFloor: string[];
+  /** Figures with no label whose size can be read (illustrations), by stable id. */
+  unmeasured: string[];
   /** Sections whose figure was not given, by stable id. */
   missing: string[];
 }
@@ -39,7 +41,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
   const { event } = section;
   const h = `h${String(level(section.depth))}`;
   const parts: string[] = [
-    `<${h} id="${section.anchor}" class="name">${links.probe(section.anchor)}${Links.a(links.event(event.stId), event.name)}</${h}>`,
+    `<${h} id="${attribute(section.anchor)}" class="name">${links.probe(section.anchor)}${Links.a(links.event(event.stId), event.name)}</${h}>`,
   ];
   const facts: [string, string][] = [];
   if (section.path.length > 0) {
@@ -130,6 +132,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
 
 function noteFloor(report: Report, stId: string, placement: Placement): void {
   if (placement.belowFloor) report.belowFloor.push(stId);
+  if (placement.unmeasured) report.unmeasured.push(stId);
 }
 
 function definitions(rows: readonly [string, string][]): string {
