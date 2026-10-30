@@ -24,19 +24,33 @@ export class Printer {
   }
 
   static async start(): Promise<Printer> {
-    const browser = await chromium.launch();
-    return new Printer(browser, mkdtempSync(join(tmpdir(), 'pdf-export-')));
+    const folder = mkdtempSync(join(tmpdir(), 'pdf-export-'));
+    try {
+      return new Printer(await chromium.launch(), folder);
+    } catch (error) {
+      rmSync(folder, { recursive: true, force: true });
+      throw error;
+    }
   }
 
   /** A page of HTML, printed once from a file: tagged with an outline, or not. */
   async print(html: string, tagged: boolean): Promise<Uint8Array> {
     const file = join(this.#folder, `${String(++this.#count)}.html`);
-    writeFileSync(file, html);
     const page = await this.#browser.newPage();
     try {
+      writeFileSync(file, html);
       await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
-      // every face is font-display: block, so printing waits for each one used
-      await page.evaluate('document.fonts.ready.then(() => true)');
+      // Every face the page declares is loaded, not only those its body uses: text only in
+      // a margin box (a running header) is drawn with faces nothing else asked for, and is
+      // left out if they are not ready. A face that fails to load (a missing file, or a
+      // page whose file:// fonts cannot load) is refused, not left to a system font.
+      const failed = await page.evaluate<string[]>(
+        `Promise.allSettled([...document.fonts].map((face) => face.load())).then(() =>
+          [...document.fonts].filter((face) => face.status !== 'loaded').map((face) => face.family))`
+      );
+      if (failed.length > 0) {
+        throw new Error(`Fonts did not load: ${[...new Set(failed)].join(', ')}`);
+      }
       // a plain Uint8Array: pdf.js refuses a Buffer
       return new Uint8Array(
         await page.pdf({ preferCSSPageSize: true, printBackground: true, tagged, outline: tagged })
@@ -73,7 +87,10 @@ export class Printer {
   }
 
   async close(): Promise<void> {
-    await this.#browser.close();
-    rmSync(this.#folder, { recursive: true, force: true });
+    try {
+      await this.#browser.close();
+    } finally {
+      rmSync(this.#folder, { recursive: true, force: true });
+    }
   }
 }

@@ -9,7 +9,13 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { chromium } from 'playwright-core';
 
 import { FAMILIES } from '../../src/layout/fonts.ts';
-import { layoutSingle, pageStyles, type LayoutOptions } from '../../src/layout/document.ts';
+import {
+  layoutBookPart,
+  layoutSingle,
+  pageStyles,
+  type LayoutOptions,
+} from '../../src/layout/document.ts';
+import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { contentsTargets } from '../../src/print/contents.ts';
 import { Printer } from '../../src/print/print.ts';
@@ -37,25 +43,29 @@ async function linksOf(page: { getAnnotations(): Promise<unknown[]> }): Promise<
 const OURS = FAMILIES.map((f) => f.family.replace(/ /g, ''));
 
 /**
- * Each embedded font that is not one of ours, or that is referenced without its file: the
- * descriptor's name, its subset tag taken off.
+ * Each font the PDF uses that is not one of ours or is not embedded, by its name with the
+ * subset tag taken off: every font dictionary is looked at, not only those with a
+ * descriptor, so a standard font (Helvetica, with no descriptor) or a Type 3 font is found.
  */
 async function fontProblems(pdf: Uint8Array): Promise<string[]> {
   const doc = await PDFDocument.load(pdf);
   const problems: string[] = [];
   let fonts = 0;
+  const name = (value: { toString(): string } | undefined) =>
+    (value?.toString() ?? '').replace(/^\/([A-Z]{6}\+)?/, '');
   for (const [, object] of doc.context.enumerateIndirectObjects()) {
     if (!(object instanceof PDFDict)) continue;
-    if (object.get(PDFName.of('Type'))?.toString() !== '/FontDescriptor') continue;
+    if (object.get(PDFName.of('Type'))?.toString() !== '/Font') continue;
     fonts += 1;
-    const name = (object.get(PDFName.of('FontName'))?.toString() ?? '').replace(
-      /^\/([A-Z]{6}\+)?/,
-      ''
-    );
-    const family = name.split('-')[0] ?? '';
-    if (!OURS.includes(family)) problems.push(`not ours: ${name}`);
-    if (!['FontFile', 'FontFile2', 'FontFile3'].some((k) => object.has(PDFName.of(k)))) {
-      problems.push(`not embedded: ${name}`);
+    const base = name(object.get(PDFName.of('BaseFont')));
+    const subtype = object.get(PDFName.of('Subtype'))?.toString();
+    if (!OURS.includes(base.split('-')[0] ?? '')) problems.push(`not ours: ${base}`);
+    if (subtype === '/Type3') problems.push(`Type 3: ${base}`);
+    // a composite font's glyphs are its descendant's, a font dictionary of its own
+    if (subtype === '/Type0') continue;
+    const descriptor = object.lookupMaybe(PDFName.of('FontDescriptor'), PDFDict);
+    if (!['FontFile', 'FontFile2', 'FontFile3'].some((k) => descriptor?.has(PDFName.of(k)))) {
+      problems.push(`not embedded: ${base}`);
     }
   }
   if (fonts === 0) problems.push('no fonts');
@@ -89,6 +99,8 @@ async function printedNumbers(pdf: Uint8Array): Promise<number[]> {
 
 describe('printing', { skip: skipWithoutGraph }, () => {
   let built: Built;
+  /** Undefined only if starting it failed, so after() does not hide that error. */
+  let started: Printer | undefined;
   let printer: Printer;
   let options: LayoutOptions;
   let html: string;
@@ -96,6 +108,7 @@ describe('printing', { skip: skipWithoutGraph }, () => {
   before(async () => {
     built = await buildFixture();
     printer = await Printer.start();
+    started = printer;
     options = {
       site: 'https://site.example',
       date: new Date('2026-10-30T12:00:00Z'),
@@ -106,29 +119,89 @@ describe('printing', { skip: skipWithoutGraph }, () => {
     pdf = await printer.single(html);
   });
   after(async () => {
-    await printer.close();
+    await started?.close();
   });
 
-  test('only our fonts, each embedded; loaded with setContent, the system fonts creep in', async () => {
+  test('only our fonts, each embedded', async () => {
     assert.deepEqual(await fontProblems(pdf), []);
     assert.deepEqual(
       await fontProblems(await printer.part(layoutSingle(built.reaction, options).html)),
       []
     );
-    // the trap of research R4: from a string, file:// fonts do not load, silently
+  });
+
+  test('a face that does not load is refused; from a string, none of them load', async () => {
+    const missing = html.replace(
+      '</style>',
+      "</style><style>@font-face { font-family: 'Gone'; src: url('file:///nowhere/gone.woff2'); } body { font-family: Gone, Roboto; }</style>"
+    );
+    await assert.rejects(printer.print(missing, true), /Fonts did not load: Gone/);
+    // the trap of research R4: a page set from a string cannot load file:// fonts, whatever
+    // fonts the host has, and printing it would use the system's
     const browser = await chromium.launch();
     try {
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'load' });
-      const fromString = await page.pdf({ preferCSSPageSize: true });
-      const problems = await fontProblems(fromString);
-      assert.ok(
-        problems.some((p) => p.startsWith('not ours')),
-        problems.join('; ')
+      const failed = await page.evaluate<number>(
+        `Promise.allSettled([...document.fonts].map((face) => face.load())).then(() =>
+          [...document.fonts].filter((face) => face.status !== 'loaded').length)`
       );
+      assert.ok(failed > 0, String(failed));
     } finally {
       await browser.close();
     }
+  });
+
+  test('text only in a running header is drawn, with faces nothing else uses', async () => {
+    const page = `<!doctype html><html><head><meta charset="utf-8"><style>${options.styles.fonts}</style><style>@page { size: A4; margin: 20mm; @top-center { content: "TNF-\\3b1 \\2192 \\436"; font-family: Roboto, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math'; } } body { font-family: Roboto; }</style></head><body><p>x</p></body></html>`;
+    const printed = await printer.print(page, true);
+    const task = getDocument({ data: printed.slice() });
+    try {
+      const items = await textOf(await (await task.promise).getPage(1));
+      const header = items
+        .filter((item) => item.y > PAGE.height - PAGE.margin)
+        .map((item) => item.str)
+        .join('');
+      assert.equal(header.replace(/\s+/g, ''), 'TNF-α→ж');
+    } finally {
+      await task.destroy();
+    }
+  });
+
+  test("a part of the book is printed untagged, its links the layout's placeholders", async () => {
+    const part = layoutBookPart(built.book, built.book.places, options).html;
+    const printed = await printer.part(part);
+    const task = getDocument({ data: printed.slice() });
+    try {
+      const doc = await task.promise;
+      assert.equal(await doc.getOutline(), null);
+      const urls: string[] = [];
+      for (let i = 1; i <= doc.numPages; i++) {
+        for (const a of await (await doc.getPage(i)).getAnnotations()) {
+          const { url } = a as { url?: unknown };
+          if (typeof url === 'string') urls.push(url);
+        }
+      }
+      assert.ok(
+        urls.some((url) => url.startsWith(PLACEHOLDER)),
+        'no placeholder links'
+      );
+      assert.ok(
+        urls.some((url) => url.startsWith(PROBE)),
+        'no probes'
+      );
+      assert.deepEqual(await linksOf(await doc.getPage(1)), []);
+    } finally {
+      await task.destroy();
+    }
+  });
+
+  test('a second print whose pages moved is refused', async () => {
+    // the placeholder in a box only wide enough for one digit, at a size where a second
+    // digit wraps to a line as tall as a page: the target, on page 12, then moves
+    const filler = '<div style="break-after: page">x</div>'.repeat(11);
+    const page = `<!doctype html><html><head><meta charset="utf-8"><style>${options.styles.fonts}</style><style>@page { size: A4; margin: 20mm; } body { font-family: Roboto; }</style></head><body><a href="#t">t</a><div style="font-size: 360pt; line-height: 1; width: 0.6em; overflow-wrap: anywhere"><span class="page" data-target="t">0</span></div>${filler}<h1 id="t">Target</h1></body></html>`;
+    await assert.rejects(printer.single(page), /The contents' numbers moved the pages/);
   });
 
   test('the outline is nested as the sections are', async () => {
@@ -167,9 +240,12 @@ describe('printing', { skip: skipWithoutGraph }, () => {
           assert.ok(destination, dest);
           const target =
             (await doc.getPageIndex(destination[0] as { num: number; gen: number })) + 1;
-          const text = (await textOf(await doc.getPage(target))).map((item) => item.str);
+          // the title as a heading there, not as a contents entry, which lists every title
+          const headings = (await textOf(await doc.getPage(target)))
+            .filter((item) => item.size > 11)
+            .map((item) => item.str);
           const title = titleOf.get(dest);
-          assert.ok(title && text.includes(title), `${dest} lands on page ${String(target)}`);
+          assert.ok(title && headings.includes(title), `${dest} lands on page ${String(target)}`);
         }
       }
       assert.ok(links >= (built.pathway.contents ?? []).length, String(links));
