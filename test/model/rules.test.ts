@@ -94,6 +94,20 @@ test("a row's kinds are in event-pdf's order, whatever order the edits came in",
   );
 });
 
+test("edits tied on date and first surname keep event-pdf's order: by kind, then id", () => {
+  const day = '2026-08-01 10:00:00';
+  // the reviewed edit's id lies between the other two; event-pdf orders ties by kind
+  const rows = editRows([
+    edit(1, 'authored', day, [person(1, 'Smith')]),
+    edit(2, 'reviewed', day, [person(1, 'Smith'), person(2, 'Jones')]),
+    edit(3, 'edited', day, [person(1, 'Smith')]),
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.kinds),
+    [['authored', 'edited'], ['reviewed']]
+  );
+});
+
 test('edits on one date are sorted by surname as Java compares strings', () => {
   const day = '2026-06-01 10:00:00';
   const rows = editRows([
