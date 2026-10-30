@@ -265,10 +265,10 @@ working files for the submitted identifiers.
   diagram that holds it with its events selected, or its illustration), for the
   report's resource; and the genome-wide overview, for the result's default resource, as
   today's (spec 001 FR-008). The render service takes no resource yet; by its code, its
-  page overlays a figure for the result's default resource once it has settled, which
-  the plan measures first; a figure captured before its overlay settles is not allowed,
-  so if the page does not wait for it, making it wait is a WebsiteAngular task the
-  report waits for. Adding a resource is a WebsiteAngular task, and until it
+  page overlays a figure for the result's default resource once it has settled, but does
+  not wait for that before capturing it. A figure captured before its overlay settles
+  is not allowed, so making the page wait is a WebsiteAngular task the report waits
+  for. Adding a resource is a WebsiteAngular task, and until it
   ships a pathway's figure for a report whose resource is not the default is a listed
   difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and

@@ -11,9 +11,9 @@ out of a PDF made on request. The report adds:
 - **Pacing:** a report asks for its figures at the render service's concurrency (a
   setting, 2 by default), never more at once, so a burst never passes its queue of 8.
 - **The resource:** not taken by the render service today (a 400); its page applies the
-  result's default resource as the pathway browser does, once it has settled, which is
-  measured first (research R3); if the page captures a figure before its overlay
-  settles, making it wait is a WebsiteAngular task the report waits for. A WebsiteAngular task
+  result's default resource as the pathway browser does, once it has settled, but does
+  not wait for that before capturing (research R3); making it wait, with the render
+  cache's key bumped, is a WebsiteAngular task the report waits for. A WebsiteAngular task
   adds `resource`; once it ships, the report passes the report's resource for the
   pathways' diagrams, and the result's default resource for the overview, as today's
   report overlays it (over the pathways its filters kept).

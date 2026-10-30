@@ -32,6 +32,9 @@ requests, and no ReactomeGSA runs.
 - **The comparison by meaning** (FR-208, SC-201): the cover, the properties, the
   pathways and their statistics in order, each detail's parts, the identifiers found
   and not found. Names never printed: counts and hashes.
+- **The overlays:** each figure in a sample of reports carries the analysis overlay for
+  the result's default resource (FR-204), shown failing on a figure captured without
+  it.
 - **The time** (SC-203): cold and warm, stage by stage, against the baseline and the
   budget the user chose (research R4).
 - **The look** (SC-204): spec 001's colour and font check on a sample report.
