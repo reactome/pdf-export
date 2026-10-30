@@ -13,8 +13,8 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
 
 1. **`GET /token/{token}/resources`**: the result's resources, unfiltered. The report's
    resource is decided from it first: one the result does not hold (compared as today,
-   case and all) becomes the result's default (the second of its resources when it has
-   exactly two, otherwise the first). Sent unchecked, an unknown resource would not fail:
+   case and all) becomes the result's default
+   (the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`). Sent unchecked, an unknown resource would not fail:
    the service answers 200 with empty statistics.
 2. **`GET /token/{token}?resource={R}&importableOnly={B}&includeDisease=true`**, with no
    page and no species, so every pathway comes back. It gives:
@@ -64,13 +64,14 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
   that pathway's mappings and values; later pathways add nothing for it. (Today's report
   keys a sorted set by identifier, pathway by pathway, and the first wins.) The heading's
   "mapping to N Reactome entities" is the union of the mapped accessions.
-  - For an expression or GSVA result, today's order is call 2's only up to ties:
-    drawing the overview filters the shared result again, re-sorting it by the result's
-    default resource's comparator, before the identifiers are gathered (the diagrams'
+  - When today's overview colours pathways by expression values (an expression or GSVA
+    result, or GSA statistics with expression values shown), today's order is call 2's
+    only up to ties: drawing the overview filters the shared result again, re-sorting it
+    by the result's default resource's comparator, before the identifiers are gathered (the diagrams'
     stable sort by the report's own comparator then restores call 2's order except
     among ties, and where no diagram is drawn the list keeps the default resource's
-    order). For over-representation the overview does not re-sort, and the order is
-    call 2's. Only which pathway's values an identifier shows can differ, an edge case
+    order). Otherwise (over-representation, species comparison, GSA regulation) the
+    overview does not re-sort, and the order is call 2's. Only which pathway's values an identifier shows can differ, an edge case
     the FR-208 comparison names when it meets it.
 - **The count of identifiers found** (the properties' and the heading's) is the number
   of distinct identifiers in call 4's found entities, in every resource, not only the
@@ -113,24 +114,28 @@ no diagram of its own. Three additions:
 - **The edits read:** spec 001's `edits` query matches only `authored`, `edited`,
   `reviewed` and `revised`, and its `EditKind` has no others. The report also needs
   `created` and `modified`, so the query takes those two as well. Spec 001's `editRows`
-  filters only on a date and an author, not on kind, so spec 001's path then filters
-  explicitly to its four kinds (in `editRows`), with a test that fails without that
-  filter; its PDFs are otherwise unchanged. (The graph keeps one `modified` per object,
+  filters only on a date and an author, not on kind, and the cover's names
+  (`coverNames`) take every edit's authors. So spec 001's build filters the edits to its
+  four kinds where it reads them, before both (`src/model/build.ts`), with a test that
+  fails without that filter, on the rows and on the cover's names; spec 001's PDFs are
+  otherwise unchanged. (The graph keeps one `modified` per object,
   the latest, so there is at most one Modified row, as today.)
 - **The edit history** follows today's report's rule, not spec 001's: one row for each
   date and action (created, modified, authored, edited, reviewed, revised), sorted by
   date, each with that row's names (up to five, then "et al."), and an edit with no
-  author kept as a row with no names.
+  author kept as a row with no names. Spec 001's `editRows` merges neighbouring edits and
+  drops authorless ones, as `event-pdf` did, so the report has a rule of its own beside
+  it (`src/report/`).
   - **Within a date**, today's rows come in a fixed order, a hash map's over six fixed
     keys: Modified, Revised, Edited, Created, Authored, Reviewed. The new report keeps
     that order, so FR-208 compares the rows themselves.
-  - **A row's names** come from a hash set today, in no order a reader can rely on; the
-    new report lists them in the edits' authors' order, without repeats, and FR-208
-    compares them as a set.
+  - **A row's names** come from a hash set today, in no order a reader can rely on, and
+    today's shows the first five of it. The new report lists them in the edits' authors'
+    order, without repeats. FR-208 compares a row's names as a set when it has five or
+    fewer; with more, which five are shown is a listed difference, and only the "et al."
+    is compared.
   - **An edit with no date** makes today's report fail; the new report leaves it out,
-    a listed difference. Spec 001's `editRows` merges neighbouring edits and
-    drops authorless ones, as `event-pdf` did, so the report has a rule of its own beside
-    it (`src/report/`).
+    a listed difference.
 - **The release** and the species' names, read once per report.
 
 **Rationale.** One reading of an event for both PDFs (constitution I), and the lists'
@@ -156,13 +161,18 @@ service, and a figure is cached under its token, so a second report of the same 
 is fast; a new token is always cold.
 
 **The resource.** The render service takes no `resource` (a request with one is refused
-with 400), so a diagram is overlaid for all resources together. Adding it is a
-WebsiteAngular task (the page already has a resource filter state, unset on the render
-path); until it ships, the overlay is a listed difference (spec, FR-204).
+with 400). Its page sets the resource as the pathway browser does: the result's default
+(the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`), by the
+browser's analysis service. That is read from the code, not measured: whether the
+default is applied before the figure is captured is measured in step 1. So every figure
+is overlaid for the result's default resource. The overview is then as today's; a
+pathway's figure differs where the report's resource is not the result's default.
+Adding `resource` is a WebsiteAngular task; until it ships, that is a listed difference
+(spec, FR-204).
 
 **The overview's pathways.** Today's overview is drawn from the result after the
 report's resource and importable-only filters, overlaid for the result's default
-resource (the second of its resources when it has exactly two, otherwise `TOTAL`), so
+resource (the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`), so
 either filter narrows which pathways it shows; the render service draws the whole token,
 for the same default resource. With the website's defaults (`TOTAL`, all identifiers) the two
 are the same; otherwise it is a listed difference (spec, Expected differences).

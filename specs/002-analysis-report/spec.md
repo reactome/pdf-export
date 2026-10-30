@@ -29,8 +29,8 @@ inside the analysis service. It draws its figures with the same Java exporters a
   release deleted, 410.
 - **The number of pathways** to report: 25 by default, clamped to 1–50.
 - **The resource** to sort and filter by (`TOTAL` by default): one the result does not
-  hold is silently replaced by the result's default (the second of its resources when
-  it has exactly two, otherwise the first).
+  hold is silently replaced by the result's default (the only resource besides `TOTAL`
+  when it holds just one, otherwise `TOTAL`).
 - **Importable only:** when set, with the `TOTAL` resource, only the pathways found
   through importable identifiers are kept, and the table's statistics count importable
   identifiers only.
@@ -264,8 +264,9 @@ working files for the submitted identifiers.
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
   diagram that holds it with its events selected, or its illustration), for the
   report's resource; and the genome-wide overview, for the result's default resource, as
-  today's (spec 001 FR-008). The render service takes no resource yet: adding one is a
-  WebsiteAngular task, and until it ships the overlays are for all resources together,
+  today's (spec 001 FR-008). The render service takes no resource yet and overlays every
+  figure for the result's default resource: adding one is a WebsiteAngular task, and
+  until it ships a pathway's figure for a report whose resource is not the default is
   a listed difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
@@ -283,7 +284,7 @@ working files for the submitted identifiers.
   - the properties' values;
   - the pathways reported, in order, with their statistics;
   - each pathway's detail: its figure present, its compartments, diseases, inferred
-    from, descriptions, references, the count of its edit history's rows, its entities
+    from, descriptions, references, its edit history's rows (their names as a set), its entities
     found per resource and its interactors;
   - the identifiers found, with their values, and the interactors;
   - the identifiers not found.
@@ -389,8 +390,10 @@ working files for the submitted identifiers.
     page number counted from the cover;
   - the identifiers not found, when there are none, also left out of the contents list,
     where today's links to a part that is not there;
-  - the overlays for all resources together, until the render service takes a resource
-    (FR-204);
+  - a pathway's figure overlaid for the result's default resource where the report's
+    resource is another, until the render service takes a resource (FR-204);
+  - in an edit-history row with more than five names, which five are shown (today's
+    takes five from a hash set);
   - the genome-wide overview showing the whole result's pathways, where today's shows
     only those the report's resource and importable-only filters kept (the same with
     the website's defaults);

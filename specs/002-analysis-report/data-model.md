@@ -6,15 +6,15 @@ Section (its data-model.md).
 
 ## Report request
 
-| Field            | From                                                       | Rules                                                                                                                                            |
-| ---------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `token`          | the path                                                   | checked by the analysis service: unknown 404, gone 410                                                                                           |
-| `species`        | the path                                                   | a name (any case, `_` as a space), a taxonomy id or a database id; resolved from the graph first, unknown 404                                    |
-| `fileName`       | the path                                                   | ignored; the download is named `report.pdf`                                                                                                      |
-| `number`         | `?number`                                                  | 25 by default, clamped to 1–50; not a number: as today's (the replay records it)                                                                 |
-| `resource`       | `?resource`                                                | `TOTAL` by default; one the result lacks becomes the result's default (the second of its resources when it has exactly two, otherwise the first) |
-| `importableOnly` | `?importableOnly`                                          | false by default; acts only with `TOTAL`                                                                                                         |
-| profiles         | `?diagramProfile`, `?analysisProfile`, `?fireworksProfile` | accepted and ignored                                                                                                                             |
+| Field            | From                                                       | Rules                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`          | the path                                                   | checked by the analysis service: unknown 404, gone 410                                                                                              |
+| `species`        | the path                                                   | a name (any case, `_` as a space), a taxonomy id or a database id; resolved from the graph first, unknown 404                                       |
+| `fileName`       | the path                                                   | ignored; the download is named `report.pdf`                                                                                                         |
+| `number`         | `?number`                                                  | 25 by default, clamped to 1–50; not a number: as today's (the replay records it)                                                                    |
+| `resource`       | `?resource`                                                | `TOTAL` by default; one the result lacks becomes the result's default (the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`) |
+| `importableOnly` | `?importableOnly`                                          | false by default; acts only with `TOTAL`                                                                                                            |
+| profiles         | `?diagramProfile`, `?analysisProfile`, `?fireworksProfile` | accepted and ignored                                                                                                                                |
 
 ## Analysis summary
 
