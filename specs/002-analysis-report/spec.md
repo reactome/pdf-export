@@ -29,8 +29,8 @@ inside the analysis service. It draws its figures with the same Java exporters a
   release deleted, 410.
 - **The number of pathways** to report: 25 by default, clamped to 1–50.
 - **The resource** to sort and filter by (`TOTAL` by default): one the result does not
-  hold is silently replaced by the result's default (the second of its resources when
-  it has exactly two, otherwise the first).
+  hold is silently replaced by the result's default (the only resource besides `TOTAL`
+  when it holds just one, otherwise `TOTAL`).
 - **Importable only:** when set, with the `TOTAL` resource, only the pathways found
   through importable identifiers are kept, and the table's statistics count importable
   identifiers only.
@@ -46,8 +46,9 @@ inside the analysis service. It draws its figures with the same Java exporters a
   the controller. On the analysis service's main branch the PDF is streamed as it is
   made, so the answer ends early, usually as a 200 (its exact form, a short PDF or a
   cut-off file, is the replay's to record). An unmerged branch buffers the PDF: a
-  failure of the PDF library is then answered 500 with the web framework's default body,
-  and any other failure 500 in the service's JSON form. Which build the deployments run
+  failure of the PDF library, or the report library's own exception (raised when its
+  bundled style fails to load), is then answered 500 with the web framework's default
+  body, and any other failure 500 in the service's JSON form. Which build the deployments run
   is settled by the deployed analysis service's version or commit, which the plan
   records; the replay's private copy is built from that.
 - **The figures' overlays:** each pathway's diagram is overlaid for the report's
@@ -154,7 +155,8 @@ use; people's scripts call it and save what it sends.
 copy (each parameter, each answer: 200, 404 for a species and for a token, 410, a
 resource the result lacks, a number out of range, a number or flag that is not one, the
 species as a name, a taxonomy id and a database id, and a failure while the PDF is made,
-on a private copy built from the deployed build) against the new service, and compare
+which no request can cause and so is planted as a fault in the private copy, built from
+the deployed build) against the new service, and compare
 the statuses, the file names and the reports.
 
 **Acceptance Scenarios**:
@@ -255,15 +257,20 @@ working files for the submitted identifiers.
   (by the analysis service's answers), a number or flag that is not one as today's (the
   replay records which), 500 when making the PDF fails, and 503 when the
   analysis service, the graph or the render service cannot answer or the service is at
-  its limit (today's answers 500 to the first and has no limit: a listed difference).
+  its limit (today's answers 500 to the first when it fails before the PDF is begun, and
+  has no limit: a listed difference).
 - **FR-204**: Figures MUST be drawn as the website's pathway browser draws them, overlaid
   with the analysis by its token: each reported pathway's figure, chosen as spec 001's
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
   diagram that holds it with its events selected, or its illustration), for the
-  report's resource; and the genome-wide overview, for the result's default resource,
-  as today's (spec 001 FR-008). The render service takes no resource yet: adding one is
-  a WebsiteAngular task, and until it ships the overlays are for all resources together,
-  a listed difference.
+  report's resource; and the genome-wide overview, for the result's default resource, as
+  today's (spec 001 FR-008). The render service takes no resource yet; by its code, its
+  page overlays a figure for the result's default resource once it has settled, but does
+  not wait for that before capturing it. A figure captured before its overlay settles
+  is not allowed, so making the page wait is a WebsiteAngular task the report waits
+  for. Adding a resource is a WebsiteAngular task, and until it
+  ships a pathway's figure for a report whose resource is not the default is a listed
+  difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
   split across pages or below the legibility floor, a page number on every page but the
@@ -280,7 +287,7 @@ working files for the submitted identifiers.
   - the properties' values;
   - the pathways reported, in order, with their statistics;
   - each pathway's detail: its figure present, its compartments, diseases, inferred
-    from, descriptions, references, the count of its edit history's rows, its entities
+    from, descriptions, references, its edit history's rows (their names as a set, the "et al." alone past five names), its entities
     found per resource and its interactors;
   - the identifiers found, with their values, and the interactors;
   - the identifiers not found.
@@ -358,8 +365,10 @@ working files for the submitted identifiers.
   through its analysis gateway, in a task in its own specs, and offers the same "PDF Result"
   button.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
-  FoamTree under a commercial licence; pdf-export ships none of it (as spec 001's
-  Assumptions say of the render service).
+  FoamTree under a commercial licence; pdf-export ships none of it. Unlike spec 001's
+  figures, the overview cannot be drawn without FoamTree, so this dependency has no end:
+  it needs the user's or the release owners' agreement, recorded here, or an amendment
+  to constitution Principle II, before tasks are written (plan, Complexity Tracking).
 - **The identifiers found** are gathered across the whole result, as today's; how the
   public interface gives them at that scale, within SC-203, is the plan's to measure.
 - **ReactomeGSA results:** in scope as far as today's report covers them; anything more
@@ -384,9 +393,20 @@ working files for the submitted identifiers.
     page number counted from the cover;
   - the identifiers not found, when there are none, also left out of the contents list,
     where today's links to a part that is not there;
-  - the overlays for all resources together, until the render service takes a resource
-    (FR-204);
-  - a 503, where today's answers 500, when a service it needs cannot answer;
+  - a pathway's figure overlaid for the result's default resource where the report's
+    resource is another, until the render service takes a resource (FR-204);
+  - in an edit-history row with more than five names, which five are shown (today's
+    takes five from a hash set);
+  - the genome-wide overview showing the whole result's pathways, where today's shows
+    only those the report's resource and importable-only filters kept (the same with
+    the website's defaults);
+  - KEGG COMPOUND's and NCBI Protein's identifiers and interactors shown, in each
+    pathway's detail and in the identifiers found, where today's tables for them are
+    always empty and left out (an obvious bug: it compares their display names with the
+    mappings' resources);
+  - an edit with no date left out of the edit history, where today's report fails;
+  - a 503, where today's answers 500, when a service it needs cannot answer before the
+    PDF is begun (after that, the Background's build-dependent answers);
   - the order of what a pathway was inferred from (today's in no set order), in the
     curators' order; its compartments, references (and so which five are shown),
     diseases and descriptions are in the curators' order in both, and must match;

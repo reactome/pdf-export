@@ -1,0 +1,19 @@
+# Contract: what the report adds to spec 001's render requests
+
+Spec 001's contracts/render.md holds: SVG only, ids prefixed and labels after FR-017
+before inlining, a 503 retried once after its pause, and a refusal leaving the figure
+out of a PDF made on request. The report adds:
+
+| Figure                   | Request                                                                                                                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the genome-wide overview | `GET /render/genome-wide.svg?species={taxId}&token={token}`: the whole token's pathways; today's narrows them by the report's filters, a listed difference (spec) when the report filters |
+
+- **Pacing:** a report asks for its figures at the render service's concurrency (a
+  setting, 2 by default), never more at once, so a burst never passes its queue of 8.
+- **The resource:** not taken by the render service today (a 400); its page applies the
+  result's default resource as the pathway browser does, once it has settled, but does
+  not wait for that before capturing (research R3); making it wait, with the render
+  cache's key bumped, is a WebsiteAngular task the report waits for. A WebsiteAngular task
+  adds `resource`; once it ships, the report passes the report's resource for the
+  pathways' diagrams, and the result's default resource for the overview, as today's
+  report overlays it (over the pathways its filters kept).
