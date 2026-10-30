@@ -15,41 +15,66 @@ content as today's report, by the same implementation as spec 001."
 The website offers a "Report (PDF)" download of an analysis result, made on request by
 the analysis service at `/AnalysisService/report/{token}/{species}/{filename}.pdf`. It is
 written by `reactome/analysis-report`, a library under the AGPL-3.0 built on iText 7,
-inside the analysis service.
+inside the analysis service. It draws its figures with the same Java exporters as
+`event-pdf`, in the old pathway browser's look.
 
-- **What it is asked:** the token, the species, a file name, and optionally the number of
-  pathways to report (25 by default, at most 50), the resource to sort by, whether to
-  count importable identifiers only, and three colour profiles (diagram, analysis and
-  overview). At most two are made at once; more wait.
-- **Its answers:** the PDF; 404 for a token it does not know; 410 for a result deleted
-  by a new release.
-- **What it holds, in order:**
-  1. **A cover:** Reactome's logo, the title "Pathway Analysis Report" and the
-     analysis's name.
-  2. **A contents list,** linking each part below.
-  3. **An introduction:** about Reactome, with Reactome's own references.
-  4. **The analysis's properties:** its type, token and date, the species, whether it
-     was projected to human and included interactors, how many identifiers were
-     submitted and found, and links to see the result on the website.
-  5. **The genome-wide overview:** the species overview (Reacfoam), overlaid with the
-     analysis, with a caption.
-  6. **The most significant pathways:** a table of the reported pathways, each with its
-     entities found and total, ratio, p-value and false discovery rate, and its
-     reactions found and total.
-  7. **Each of those pathways in detail:** its name and statistics, its diagram (or
-     illustration) overlaid with the analysis, the entities it mapped, and its
-     description.
-  8. **The identifiers found:** what each submitted identifier mapped to, with its
-     values for an expression analysis, and interactors apart.
-  9. **The identifiers not found.**
+### What it is asked, and how it answers
 
-  A footer on each page names the server and the page.
+- **The species** is looked up first: one the graph does not know is answered 404, before
+  the token is read. A species the analysis has no result for gives a report with no
+  pathways.
+- **The token:** one the service does not know is answered 404; one whose result a new
+  release deleted, 410.
+- **The number of pathways** to report: 25 by default, clamped to 1–50.
+- **The resource** to sort and filter by (`TOTAL` by default): one the result does not
+  hold is silently replaced by the result's default (the second of its resources when
+  it has exactly two, otherwise the first).
+- **Importable only:** when set, only the pathways found through importable identifiers
+  are kept.
+- **Three colour profiles** (diagram, analysis and overview).
+- **The file name** in the address is ignored: the download is always named `report.pdf`.
+- **At most two** reports are made at once; more wait, without limit. A failure while
+  making the PDF is answered 500.
+- **The pathways reported** are the result's pathways for the species, with something
+  found, sorted by their entities' p-value, lowest first (the analysis service's default
+  sort), for the resource; disease pathways included.
 
-- **Its figures** are drawn by the Java exporters in the old pathway browser's look, as
-  in spec 001's Background.
+### What it holds, in order
+
+1. **A cover:** Reactome's logo, the title "Pathway Analysis Report", the analysis's
+   name, the release, the date the report was made, the link to the result in the
+   pathway browser, and how long results are kept.
+2. **A contents list,** linking each part below.
+3. **An introduction:** about Reactome, with Reactome's own references.
+4. **The analysis's properties:** its type, explained, with a link to the user guide;
+   the identifiers found of those submitted; the number of pathways hit; whether it was
+   projected to human and whether interactors were included (each said only when it
+   was); the species and resource the report is for; and the token, with how long it is
+   kept.
+5. **The genome-wide overview:** the species overview (Reacfoam), overlaid with the
+   analysis, with a caption.
+6. **The most significant pathways:** a table of the reported pathways, each with its
+   entities found and total, entities ratio, p-value and false discovery rate, and its
+   reactions found, total and ratio. The entities' columns are for the species and
+   resource; the reactions' are the pathway's own.
+7. **Each of those pathways in detail:** its name, with its stable identifier linked to
+   its page on the website; its figure (its own diagram, or the diagram that holds it
+   with its events selected, or its illustration), overlaid with the analysis; its
+   compartments, diseases and what it was inferred from; its descriptions; its first five
+   references; its edit history (created, modified, authored, edited, reviewed and
+   revised, each with up to five names and then "et al."); the entities it found, for
+   each resource; and, with interactors, the interactors it found.
+8. **The identifiers found,** across the whole result: what each submitted identifier
+   mapped to, with its values for an expression analysis, and interactors apart.
+9. **The identifiers not found,** complete, without repeats, sorted. Left out when there
+   are none (though today's contents list still links it).
+
+A footer names the server (a link, the result's own server, or Reactome's by default) and
+the page, from the third page on, numbered from 2. There are no bookmarks.
 
 The website's analysis gateway (WebsiteAngular) queues these requests before the
-analysis service.
+analysis service, one at a time by default, with a bounded queue, and answers
+"unavailable" with a time to retry beyond it.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -65,53 +90,59 @@ replaces it.
 
 **Independent Test**: on a private analysis service and a private copy of the graph, for
 analyses of each type the service offers (over-representation, expression, species
-comparison) and one with interactors, ask for the report at the default number of
-pathways and at the maximum, and compare each with today's report for the same token by
-FR-208.
+comparison) and one with interactors, all on made-up identifiers, ask for the report at
+the default number of pathways and at the maximum, and compare each with today's report
+for the same token by FR-208.
 
 **Acceptance Scenarios**:
 
 1. **Given** a known token and a species, **When** the report is asked for, **Then** it
    holds the Background's parts in order, the number of pathways asked for (25 by
-   default, at most 50), sorted as today's report sorts them.
+   default, 1–50), in the Background's order.
 2. **Given** an expression analysis, **When** its report is asked for, **Then** the
    identifiers found carry their values, as today's.
-3. **Given** an analysis with interactors, **When** its report is asked for, **Then** the
-   interactors found are listed apart from the entities, as today's.
-4. **Given** a pathway whose diagram is an illustration, **When** it is among the most
-   significant, **Then** its detail holds the illustration, overlaid as the website
-   overlays it, or recorded as a difference where the website cannot yet.
+3. **Given** an analysis with interactors, **When** its report is asked for, **Then**
+   each pathway's detail lists the interactors it found, and the identifiers found list
+   them apart, as today's.
+4. **Given** a reported pathway with no diagram of its own, **When** its detail is
+   written, **Then** its figure is the diagram that holds it, with its events selected,
+   overlaid; one whose figure is an illustration is overlaid as the website overlays it,
+   or recorded as a difference where the website cannot yet.
 5. **Given** a submitted identifier that holds a character no font draws, **When** the
    report is asked for, **Then** the report is made, the character printed as the
    replacement mark and logged (spec 001 FR-017).
+6. **Given** a result with no identifiers not found, **When** its report is asked for,
+   **Then** that part is left out of the report and of its contents list.
 
 ---
 
 ### User Story 2 - The download keeps working (Priority: P1)
 
 Links the website and other people's programs already use go on working: the same
-address and parameters give a report, and the same tokens give the same answers.
+address and parameters give a report, and the same requests get the same answers.
 
 **Why this priority**: the analysis service documents this endpoint for programmatic
-use; people's scripts call it.
+use; people's scripts call it and save what it sends.
 
-**Independent Test**: replay a recorded set of today's requests (each parameter, each
-answer: 200, 404, 410, and a token in each of the forms the service issues) against the
-new service, and compare the statuses and the reports.
+**Independent Test**: replay a recorded set of requests to today's service on a private
+copy (each parameter, each answer: 200, 404 for a species and for a token, 410, a
+resource the result lacks, a number out of range) against the new service, and compare
+the statuses, the file names and the reports.
 
 **Acceptance Scenarios**:
 
 1. **Given** today's address with any of today's parameters, **When** it is asked,
-   **Then** it answers a report; the colour profiles are accepted and ignored (the new
-   look sets the colours).
-2. **Given** an unknown token, **When** a report is asked for, **Then** the answer is
-   404, as today. **Given** a token whose result was deleted by a release, **Then** 410.
-3. **Given** a species the analysis does not cover, or a number of pathways out of range,
-   **When** a report is asked for, **Then** the answer is as today's for the same
-   request (the number is clamped to 1–50).
+   **Then** it answers a report named `report.pdf`, whatever the file name in the
+   address; the colour profiles are accepted and ignored (the new look sets the
+   colours).
+2. **Given** a species the graph does not know, **When** a report is asked for, **Then**
+   404, whatever the token; **given** an unknown token, 404; **given** a token whose
+   result a release deleted, 410.
+3. **Given** a number of pathways out of range, **Then** it is clamped to 1–50; **given**
+   a resource the result lacks, **Then** the result's default is used, as today.
 4. **Given** more requests at once than the service makes, **When** they arrive, **Then**
-   they wait in a queue of bounded length, and beyond it are answered "unavailable" with
-   a time to retry, never left hanging.
+   they wait in a bounded queue, and beyond it, or past their time budget, are answered
+   "unavailable" with a time to retry, never left hanging.
 
 ---
 
@@ -128,7 +159,7 @@ installed, and fails when a restrictive one is planted.
 **Acceptance Scenarios**:
 
 1. **Given** this feature's dependencies, **When** CI's licence check runs, **Then** it
-   passes; **Given** a planted GPL-family dependency, **Then** it fails.
+   passes; **given** a planted GPL-family dependency, **Then** it fails.
 
 ---
 
@@ -146,81 +177,105 @@ working files for the submitted identifiers.
 **Acceptance Scenarios**:
 
 1. **Given** a report made and sent, **When** the service's logs and working files are
-   searched, **Then** no submitted identifier is found; the log names the token, the
-   species, the number of pathways, the time and any character replaced.
+   searched, **Then** no submitted identifier is found; the log holds only FR-211's
+   fields.
 
 ---
 
 ### Edge Cases
 
-- **A token whose analysis found nothing** for the species: the report is made with its
-  properties and the identifiers not found, and says no pathway was found, as today's.
-- **Fewer significant pathways than asked for:** the report holds those there are.
+- **A species with no result** for the token: the report is made with its properties
+  and the identifiers not found, and the most significant pathways' table is empty, as
+  today's.
+- **Fewer pathways with something found than asked for:** the report holds those there
+  are.
 - **A figure that cannot be drawn** (the render service refuses or times out): the
   report is made without it and the absence is logged, as for spec 001's single-event
   PDF.
-- **Very many identifiers** (tens of thousands submitted, or not found): the lists are
+- **The analysis service, the graph or the render service cannot answer at all:** the
+  request is answered "unavailable" with a time to retry; no partial report is sent.
+- **Very many identifiers** (tens of thousands found, or not found): the lists are
   complete, the report is still made within SC-203, and the tables break across pages
   with their headers repeated.
 - **A species comparison:** the report shows what today's shows for it.
 - **A token from ReactomeGSA** (gene set analysis): the report shows what today's shows
-  for it, with the website's link to see it.
+  for it, its type explained with ReactomeGSA's guide.
 - **A request abandoned by the client:** the work stops, and nothing is kept.
 
 ## Requirements _(mandatory)_
 
 ### Functional Requirements
 
-- **FR-201**: The system MUST answer today's report address and parameters (User Story 2)
-  with a PDF holding the Background's parts in order; the colour profiles are accepted
-  and ignored.
+- **FR-201**: The system MUST answer today's report address and parameters with a PDF
+  holding the Background's parts in order, handling each parameter as the Background
+  says (species looked up first, the number clamped, a missing resource replaced by the
+  result's default, importable-only as a filter, the file name ignored and the download
+  named `report.pdf`); the colour profiles are accepted and ignored.
 - **FR-202**: The system MUST read the analysis only through the analysis service's
-  public interface; the analysis's sums stay in the analysis service. It reads the graph
-  only for what that interface does not give (such as a pathway's description).
-- **FR-203**: The report MUST answer 404 for an unknown token and 410 for one deleted by
-  a release, by the analysis service's answers, and say which in the body.
+  public interface, including the order of the pathways reported (its default sort, by
+  the entities' p-value, lowest first); the analysis's sums stay in the analysis
+  service. From the graph it reads only what that interface does not give: the
+  release, species' names, and each reported pathway's compartments, diseases, inferred
+  from, descriptions, references, edit history and the diagram that holds it.
+- **FR-203**: The report MUST answer, with a JSON reason as spec 001's service answers:
+  404 for a species the graph does not know (before the token is read), 404 for an
+  unknown token, 410 for one a release deleted (by the analysis service's answers),
+  503 when the analysis service, the graph or the render service cannot answer or the
+  service is at its limit, and 500 when making the PDF fails.
 - **FR-204**: Figures MUST be drawn as the website's pathway browser draws them, overlaid
   with the analysis by its token: the genome-wide overview, and each reported pathway's
-  diagram or illustration (spec 001 FR-007, FR-008).
-- **FR-205**: The report MUST take its look from spec 001: the website's light theme, its
-  typefaces, and FR-016's layout rules (no boxes, the same margins on every page, a
-  running header naming the report and a page number on every page but the cover, no
-  figure split across pages).
-- **FR-206**: The report MUST have a contents list before its parts and nested bookmarks,
-  and link each pathway's row in the most-significant table to its detail, and each
-  pathway's name to its page on the website.
+  figure, chosen as spec 001's Figure is (its own diagram, or the diagram that holds it
+  with its events selected, or its illustration) (spec 001 FR-007, FR-008).
+- **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
+  typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
+  split across pages or below the legibility floor, a page number on every page but the
+  cover, and a running header naming the report, or on its front parts that part).
+- **FR-206**: The report MUST have a contents list before its parts and bookmarks: the
+  parts, and under the pathways' details each pathway. It links each pathway's row in
+  the most-significant table to its detail, and each pathway's name to its page on the
+  website.
 - **FR-207**: Characters no embedded typeface draws MUST follow spec 001 FR-017 for PDFs
   made on request: the fixed list substituted, any other printed as the replacement mark
   and logged, the request never failing on it.
 - **FR-208**: The report MUST be compared with today's for the same token by meaning:
-  - the cover's title and analysis name;
+  - the cover's title, analysis name, release and link to the result;
   - the properties' values;
   - the pathways reported, in order, with their statistics;
-  - each pathway's detail: its figure present, its statistics, its entities mapped;
+  - each pathway's detail: its figure present, its compartments, diseases, inferred
+    from, descriptions, references, the count of its edit history's rows, its entities
+    found per resource and its interactors;
   - the identifiers found, with their values, and the interactors;
   - the identifiers not found.
     Differences are allowed only where Assumptions lists them or a recorded reason gives
-    them.
+    them. A comparison never prints people's names (spec 001 FR-012).
 - **FR-209**: The text that is not the analysis's data (introduction, captions, the
   explanations of each part) MUST be the website's current wording, or written anew;
   nothing is copied from `analysis-report`.
 - **FR-210**: The service MUST make at most a set number of reports at once (two by
   default, as today), queue a bounded number more, and answer "unavailable" with a time
-  to retry beyond that. A report that takes longer than its time budget is abandoned and
-  answered "unavailable".
+  to retry beyond that; a report that takes longer than its time budget is abandoned
+  and answered "unavailable". On the website's path the analysis gateway's queue comes
+  first; the service's own limit protects it from callers that do not pass the gateway,
+  and its budget fits within the gateway's wait.
 - **FR-211**: The service MUST log, for each report, the token, the species, the number
-  of pathways, its time, its size and any character replaced, and no submitted
-  identifier. It keeps no file of a report after sending it.
+  of pathways, its time, its size and any character FR-207 replaced, and no submitted
+  identifier and nothing about the client. It keeps no file of a report after sending
+  it.
 - **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009/FR-010).
+- **FR-213**: Fixtures and samples MUST use made-up identifiers and placeholder names
+  for the authors and curators a report names (constitution Principle VII; spec 001
+  FR-013).
 
 ### Key Entities
 
-- **Report request:** the token, species, number of pathways (1–50), resource, and
-  importable-only choice; the profiles, ignored.
-- **Analysis summary:** from the analysis service: its type, date, species, projection,
-  interactors, and the counts of identifiers submitted and found.
-- **Reported pathway:** a pathway's stable identifier, name, statistics, its entities
-  mapped, and its figure; its description from the graph.
+- **Report request:** the species, token, number of pathways (1–50), resource,
+  importable-only choice and file name; the profiles, ignored.
+- **Analysis summary:** from the analysis service: its type, species, projection,
+  interactors, the counts of identifiers submitted and found, the pathways hit, and its
+  server.
+- **Reported pathway:** a pathway's stable identifier, name and statistics from the
+  analysis service, its entities and interactors found; from the graph, the parts of its
+  detail and its figure's source.
 - **Identifier lists:** found (with what each maps to and, for expression, its values;
   interactors apart) and not found.
 - **Report:** the PDF, its parts in the Background's order, and its log line.
@@ -232,11 +287,12 @@ working files for the submitted identifiers.
 - **SC-201**: For a sample of tokens covering each analysis type, with and without
   interactors, at 25 and 50 pathways, the new report agrees with today's by FR-208, with
   only listed or recorded differences.
-- **SC-202**: Every request in the replayed set of User Story 2 gets the same status as
-  today's.
+- **SC-202**: Every request in the replayed set of User Story 2 gets the same status and
+  file name as today's, but where Assumptions lists a difference.
 - **SC-203**: A report of 25 pathways is made in no more time than today's for the same
   token on the same private services, and one of 50 within a budget the plan sets from
-  that measurement; the time is measured warm, with the render service's cache empty.
+  that measurement and the gateway's wait; the time is measured with the render
+  service's cache empty.
 - **SC-204**: Every colour and typeface in the report's own text and layout is one spec
   001 SC-009 allows, as its check shows.
 - **SC-205**: No submitted identifier is found in the service's logs or working files
@@ -251,9 +307,11 @@ working files for the submitted identifiers.
   user's choice, 30 Oct 2026); improvements are recorded for a later spec, not made
   here.
 - **One implementation:** the report is made by pdf-export, beside spec 001's
-  single-event PDF, reusing its theme, fonts, layout, printing and figures. The
+  single-event PDF, reusing its theme, fonts, layout, printing and figures; a reported
+  pathway's detail is close to spec 001's section, and shares its parts. The
   constitution's Principle I is amended with this spec (version 1.1.0) to cover the
   website's PDFs generally, the analysis report among them.
+- **Spec 001's FR-017** (characters no font draws) is merged before this spec.
 - **The analysis service stays:** its analysis stays in Java and is not ported; only the
   report moves. Its report endpoint is retired once the website routes to pdf-export.
 - **The website's part:** WebsiteAngular routes `/AnalysisService/report/` to pdf-export
@@ -262,16 +320,23 @@ working files for the submitted identifiers.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
   FoamTree under a commercial licence; pdf-export ships none of it (as spec 001's
   Assumptions say of the render service).
+- **The identifiers found** are gathered across the whole result, as today's; how the
+  public interface gives them at that scale, within SC-203, is the plan's to measure.
 - **ReactomeGSA results:** in scope as far as today's report covers them; anything more
   (several samples, its own statistics) is a later spec.
 - **Measured privately:** against a private analysis service on a private copy of the
-  graph; no production requests, and no real ReactomeGSA runs.
+  graph, with made-up identifiers; no production requests, and no real ReactomeGSA runs.
 - **Expected differences from today's report** (FR-208):
   - the look: layout, colours, typefaces and figures (spec 001's User Stories 3 and 6);
-  - the bookmarks (FR-206), whether or not today's report has them;
+  - bookmarks, which today's has none of;
   - the colour profiles, ignored;
   - rewritten text (FR-209);
-  - the footer's server name, replaced by the running header and page number;
-  - the wording of the 404 and 410 answers' bodies (their statuses are as today's);
+  - the footer's server link and its numbering, replaced by the running header and a
+    page number counted from the cover;
+  - the identifiers not found, when there are none, also left out of the contents list,
+    where today's links to a part that is not there;
+  - the error answers' bodies, now JSON reasons (their statuses are as today's);
+  - a request beyond the queue or past its time budget answered "unavailable", where
+    today's waits without limit;
   - today's service also sends each report's timing, with the client's address and
     browser, to a separate reporting service; the new one logs only what FR-211 lists.

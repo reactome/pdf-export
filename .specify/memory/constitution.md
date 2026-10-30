@@ -18,8 +18,9 @@ Reactome publishes PDFs in three ways:
   inside the analysis service.
 
 The first two come from `event-pdf` today, which is why one fix reaches both; the
-third comes from another library with its own look, its own copy of the figures'
-drawing and the same restrictive licence, so a fix to one never reached it.
+third comes from another library, under the same restrictive licence, with its own look
+and its own layout of the same kinds of part, so a fix to a page of one never reached
+the other.
 
 **So:** this repository is the one implementation of all of them, and of any PDF the
 website makes later. They share one look, one way of drawing figures and one way of
@@ -81,8 +82,9 @@ reference taken from Reactome's servers, and they are kept out of the repository
 
 ### VII. People's names stay out of the repository
 
-This repository is public. A pathway's PDF carries the names of the authors of its
-literature and of the curators in its edit history. A fixture, a test log or a
+This repository is public. A pathway's PDF, and an analysis report's pathway details,
+carry the names of the authors of its literature and of the curators in its edit
+history. A fixture, a test log or a
 sample PDF copied from real output would publish them.
 
 **So:** fixtures and samples replace those values with placeholders, and
