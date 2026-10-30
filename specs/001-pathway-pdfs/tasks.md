@@ -310,13 +310,15 @@ passes.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir>` (contracts/cli.md).
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
-  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts`, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 labels in the release's 2,780 diagram files, which the figures draw (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), over the texts and the labels in the release's diagram files (`--files`), before any figure is drawn.
+  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts` (with T017's detector), applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json`), which the diagrams' figures draw (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (the book's events' physical entities and compartments, from the graph) and the labels of the diagram files the figures need, read in `src/preflight/labels.ts`; and after drawing, over each SVG's label text, in `src/figures/text.ts`, which also makes the substitutions there after T014's id prefixing.
   - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
   - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
-  - a character off the list in a diagram file's label is a fault;
+  - a character off the list in a diagram file's label is a fault naming that diagram's pathway, and one in a physical entity's name a fault naming the event;
+  - one in a drawn figure's label alone (the stub's SVG) is a fault after drawing, before printing;
+  - a label in a diagram file the book does not need (another species') is not read;
   - a substitution in an inlined figure leaves its elements, ids and attributes as they were;
   - the fixture summary's entry for an absent event is not a fault.
 
@@ -354,7 +356,7 @@ passes.
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
   - exit 2 on bad arguments, and on a service unreachable at the start;
-  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters.
+  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters (T024 adds one to the fixture graph's summations and one to a stub figure's label).
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.

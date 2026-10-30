@@ -63,7 +63,8 @@ the short entry alone, pointing at the full section, and not its subtree again.
   - `reaction`: a reaction's own drawing.
 - `source`: the stable identifier the render service draws, with `highlight` ids for
   `ancestor`.
-- `svg`: the drawing, every id prefixed with the section's anchor.
+- `svg`: the drawing, every id prefixed with the section's anchor, and its labels' text
+  after FR-017's substitutions.
 - `scale`: its size on the page, from which its labels' size follows (12 px for node labels in the SVG; the smallest sets it).
   At least 5 pt, or a landscape page of its own; below that only for a diagram too large
   for any page, listed in the run report (research R4).

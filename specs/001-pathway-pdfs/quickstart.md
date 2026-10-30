@@ -102,6 +102,7 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 - A planted fault fails the step.
 - **Story 5, scenario 3:** a release file removed from the folder fails the preflight,
   naming the file, before anything is printed, and no book is written.
-- **Story 5, scenario 4:** a character off FR-017's list, planted in a text and then in a
-  diagram file's label, fails the preflight, naming it, and no book is written.
+- **Story 5, scenario 4:** a character off FR-017's list, planted in a text, in a diagram
+  file's label, in a physical entity's name, and then in a drawn figure's label alone,
+  fails the step before printing, naming it, and no book is written.
 - The image's fonts are only FR-015's (its build lists them).

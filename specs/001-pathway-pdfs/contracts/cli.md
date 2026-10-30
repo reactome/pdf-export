@@ -26,9 +26,15 @@ Writes the release's book (Story 1).
   hold), and a file missing is a fault
   `missing-file <name>`, the step ending with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault
-  `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4): in the
-  graph's texts the layout writes, and in the labels the figures draw, read from the
-  release's diagram files (`--files`), so the check comes before any figure is drawn.
+  `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4), checked
+  twice:
+  - **before any figure is drawn,** in the graph's texts the layout writes, in the names
+    the figures label (the physical entities and compartments of the book's events, from
+    the graph), and in the labels of the diagram files the figures need (`--files`); a
+    fault names the event, or for a diagram file the pathway whose diagram it is;
+  - **after each figure is drawn and before printing,** in the text of its SVG's labels,
+    a fault naming the figure's event: the backstop for anything the first check's
+    sources did not hold.
 - **Exit 0:** the book is written, and `check-book` passed on it. The file is written
   beside its name and moved into place, so a failed run never leaves a partial book.
 - **Exit 1:** a fault from the preflight or FR-011, or a figure that could not be drawn.
