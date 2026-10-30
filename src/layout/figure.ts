@@ -39,6 +39,8 @@ export interface Measured {
   height: number;
   /** Its smallest label, in the SVG's pixels, or none if it has no text. */
   smallestLabel: number | null;
+  /** Labels whose size could not be read: relative, or in a unit not known. */
+  unreadLabels: number;
 }
 
 /** An SVG's size, from its viewBox or else its width and height, and its smallest label. */
@@ -57,34 +59,55 @@ export function measure(svg: string): Measured {
     box?.length === 4 ? [box[2] ?? NaN, box[3] ?? NaN] : [attr('width'), attr('height')];
   if (!(width > 0 && height > 0))
     throw new Error('A figure with no size: no viewBox, width or height');
-  return { width, height, smallestLabel: smallestLabel(svg) };
+  const { sizes, unread } = labelSizes(svg);
+  return {
+    width,
+    height,
+    smallestLabel: sizes.length > 0 ? Math.min(...sizes) : null,
+    unreadLabels: unread,
+  };
 }
 
-/** Pixels for each absolute unit a label's size may be given in. */
-const PX: Readonly<Record<string, number>> = { '': 1, px: 1, pt: 4 / 3 };
+/** Pixels for each absolute unit a label's size may be given in (CSS's 96 px to the inch). */
+const PX: Readonly<Record<string, number>> = {
+  '': 1,
+  px: 1,
+  pt: 96 / 72,
+  pc: 16,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+};
+
+/** A number as CSS writes one, exponent and all. */
+const NUMBER = String.raw`(\d*\.?\d+(?:e[+-]?\d+)?)`;
 
 /**
- * The smallest font size given to text that is drawn: a `font-size` attribute or property,
- * or the size in a `font` shorthand, in pixels (a bare number is pixels in SVG). Relative
- * sizes (em, %, rem) are not read: what they are relative to is not known here. Neither is
- * a transform that scales a label; the render service's diagrams use neither.
+ * The font sizes given to text: each `font-size` attribute or property, and the size in each
+ * `font` shorthand (the first number with a unit: a bare number there is a weight), in
+ * pixels, a bare number being pixels in SVG. A size in a relative unit (em, %, rem, ex …)
+ * or one not known is not read, and is counted: what it is relative to is not known here.
+ * Neither is a transform that scales a label; the render service's diagrams use neither.
  */
-function smallestLabel(svg: string): number | null {
+function labelSizes(svg: string): { sizes: number[]; unread: number } {
   const sizes: number[] = [];
+  let unread = 0;
   const read = (value: string, unit: string) => {
-    const factor = PX[unit];
-    if (factor !== undefined) sizes.push(Number(value) * factor);
+    const factor = PX[unit.toLowerCase()];
+    const size = Number(value) * (factor ?? NaN);
+    if (size > 0) sizes.push(size);
+    else unread += 1;
   };
   for (const [, value = '', unit = ''] of svg.matchAll(
-    /font-size(?:=["']|\s*:\s*)([\d.]+)(px|pt|em|rem|%)?/g
+    new RegExp(String.raw`font-size(?:=["']|\s*:\s*)${NUMBER}([a-z%]*)`, 'gi')
   )) {
     read(value, unit);
   }
-  for (const [, value = '', unit = ''] of svg.matchAll(/\bfont\s*:[^;"']*?([\d.]+)(px|pt)\b/g)) {
-    read(value, unit);
+  for (const [, shorthand = ''] of svg.matchAll(/\bfont\s*:\s*([^;"']*)/gi)) {
+    const size = new RegExp(String.raw`(?<![\w.])${NUMBER}([a-z%]+)`, 'i').exec(shorthand);
+    if (size) read(size[1] ?? '', size[2] ?? '');
   }
-  const drawn = sizes.filter((size) => size > 0);
-  return drawn.length > 0 ? Math.min(...drawn) : null;
+  return { sizes, unread };
 }
 
 export interface Placement {
@@ -106,12 +129,13 @@ export interface Placement {
  * its own size; in the portrait text when its labels are legible there, otherwise on a
  * landscape page if that prints it larger.
  */
-export function place({ width, height, smallestLabel }: Measured): Placement {
+export function place({ width, height, smallestLabel, unreadLabels }: Measured): Placement {
   const fit = (area: { width: number; height: number }) =>
     Math.min(area.width / width, area.height / height, NATURAL);
   const portrait = fit(PORTRAIT);
   const legible = (scale: number) => smallestLabel === null || scale * smallestLabel >= FLOOR_PT;
-  const unmeasured = smallestLabel === null;
+  // a label whose size could not be read may be the smallest: it is not taken as legible
+  const unmeasured = smallestLabel === null || unreadLabels > 0;
   if (legible(portrait))
     return { scale: portrait, landscape: false, belowFloor: false, unmeasured };
   const landscape = fit(LANDSCAPE);

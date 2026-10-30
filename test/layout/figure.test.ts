@@ -28,11 +28,17 @@ function svg(width: number, height: number, labels: number[] = [12]): string {
 
 describe("a figure's size", () => {
   test('is read from the viewBox, or else the width and height', () => {
-    assert.deepEqual(measure(svg(300, 200)), { width: 300, height: 200, smallestLabel: 12 });
+    assert.deepEqual(measure(svg(300, 200)), {
+      width: 300,
+      height: 200,
+      smallestLabel: 12,
+      unreadLabels: 0,
+    });
     assert.deepEqual(measure('<svg width="40px" height="30"><text>x</text></svg>'), {
       width: 40,
       height: 30,
       smallestLabel: null,
+      unreadLabels: 0,
     });
     assert.throws(() => measure('<svg><text>x</text></svg>'), /no size/);
   });
@@ -43,24 +49,47 @@ describe("a figure's size", () => {
     assert.equal(measure(svg(100, 100, [16, 7, 80])).smallestLabel, 7);
   });
 
-  test('a size in points is read as pixels; a relative size is not read', () => {
-    assert.equal(
-      measure('<svg width="9" height="9"><text font-size="6pt">a</text></svg>').smallestLabel,
-      8
-    );
-    assert.equal(
-      measure('<svg width="9" height="9"><text style="font: 9pt Roboto">a</text></svg>')
-        .smallestLabel,
-      12
-    );
-    for (const relative of ['0.6em', '100%', '1rem']) {
-      assert.equal(
-        measure(`<svg width="9" height="9"><text font-size="${relative}">a</text></svg>`)
-          .smallestLabel,
-        null,
-        relative
-      );
+  test('a size in any absolute unit is read as pixels; a relative one is counted unread', () => {
+    const label = (size: string) =>
+      measure(`<svg width="9" height="9"><text font-size="${size}">a</text></svg>`);
+    const read: [string, number][] = [
+      ['12', 12],
+      ['12.5px', 12.5],
+      ['1e1px', 10],
+      ['6pt', 8],
+      ['12PT', 16],
+      ['1pc', 16],
+      ['0.5in', 48],
+      ['2.54cm', 96],
+      ['25.4mm', 96],
+    ];
+    for (const [size, px] of read) {
+      const measured = label(size);
+      assert.ok(Math.abs((measured.smallestLabel ?? NaN) - px) < 1e-9, size);
+      assert.equal(measured.unreadLabels, 0, size);
     }
+    for (const size of ['0.6em', '100%', '1rem', '1ex', '2vw', '3foo']) {
+      assert.deepEqual([label(size).smallestLabel, label(size).unreadLabels], [null, 1], size);
+    }
+    // in the shorthand, the size is the first number with a unit: a bare number is a weight,
+    // and a line height after it is not a size
+    const shorthand = (font: string) =>
+      measure(`<svg width="9" height="9"><text style="font: ${font}">a</text></svg>`);
+    assert.equal(shorthand('normal 600 9pt/1.2em Roboto').smallestLabel, 12);
+    assert.equal(shorthand('600 12px/14px Roboto').unreadLabels, 0);
+    assert.deepEqual(
+      [shorthand('600 1.5em Roboto').smallestLabel, shorthand('600 1.5em Roboto').unreadLabels],
+      [null, 1]
+    );
+  });
+
+  test('a label whose size cannot be read is not taken as legible', () => {
+    const mixed = place(
+      measure(
+        '<svg width="300" height="200"><text font-size="12">a</text><text font-size="0.5em">b</text></svg>'
+      )
+    );
+    assert.equal(mixed.unmeasured, true);
   });
 
   test('one with no label to measure, as an illustration, is placed by its size and reported', () => {

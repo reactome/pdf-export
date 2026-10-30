@@ -153,12 +153,23 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     const hostile = 'a"b\\c</style><script>x()</script>&\n';
     const doc: Document = {
       ...built.pathway,
-      cover: { ...built.pathway.cover, title: hostile, names: ['N<1>'] },
+      cover: { ...built.pathway.cover, title: hostile, names: ['N<1>, A.', 'Two, B.'] },
       places: built.pathway.places.map((p) =>
         p.full
-          ? { ...p, section: { ...p.section, event: { ...p.section.event, name: hostile } } }
+          ? {
+              ...p,
+              section: {
+                ...p.section,
+                anchor: `${p.section.anchor}"x`,
+                event: { ...p.section.event, name: hostile },
+              },
+            }
           : p
       ),
+      contents: (built.pathway.contents ?? []).map((entry) => ({
+        ...entry,
+        target: `${entry.target}"x`,
+      })),
     };
     const { html } = layoutSingle(doc, options);
     assert.doesNotMatch(html, /<script>/);
@@ -167,10 +178,33 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
       /<title>a"b\\c&lt;\/style&gt;&lt;script&gt;x\(\)&lt;\/script&gt;&amp;\n<\/title>/
     );
     assert.match(html, /aria-label="a&quot;b\\c&lt;\/style&gt;/);
-    assert.match(html, /<p class="names">N&lt;1&gt;<\/p>/);
+    // each name holds a comma, so names are set apart by semicolons
+    assert.match(html, /<p class="names">N&lt;1&gt;, A\.; Two, B\.<\/p>/);
+    // anchors and targets as attributes
+    assert.match(html, / id="s-R-HSA-90000100&quot;x" class="name">/);
+    assert.match(html, / data-target="introduction&quot;x">/);
+    assert.doesNotMatch(html, /"x"/);
     // in the header's CSS string: no quote, backslash, < or new line left as it was
     const header = /@page \{ @top-center \{ content: ("(?:[^"\\]|\\.)*");/.exec(html)?.[1];
     assert.equal(header, '"a\\22 b\\5c c\\3c /style>\\3c script>x()\\3c /script>&\\a "');
+  });
+
+  test('figures with no readable label, and those below the floor, are in the report', () => {
+    const figures = new Map(options.figures);
+    const root = fullSection(built.pathway, 'R-HSA-90000100');
+    const child = fullSection(built.pathway, 'R-HSA-90000220');
+    assert.ok(root.figure && child.figure);
+    figures.set(figureKey(root.figure), '<svg width="1600" height="1000"><path d="M0 0"/></svg>');
+    figures.set(
+      figureKey(child.figure),
+      '<svg width="4000" height="600"><text font-size="12">a</text></svg>'
+    );
+    const { report } = layoutSingle(built.pathway, { ...options, figures });
+    assert.deepEqual(report, {
+      missing: [],
+      unmeasured: ['R-HSA-90000100'],
+      belowFloor: ['R-HSA-90000220'],
+    });
   });
 
   test("a section's parts are in the Background's order", () => {
