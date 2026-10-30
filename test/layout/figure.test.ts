@@ -103,6 +103,20 @@ describe("a figure's size", () => {
     }
     // a style element is read, and a size in it that is not a font's is not
     assert.deepEqual(read('<style>.a{font: bold 12px R} .b{stroke-width: 2px}</style>'), [12, 0]);
+    assert.deepEqual(
+      read('<svg:style type="text/css" media="all">.a{font-size: 3px !important}</svg:style>'),
+      [3, 0]
+    );
+    // a > in an attribute's value does not end its tag, so the size after it is read
+    assert.deepEqual(
+      read('<text font-size="12">a</text><text data-id="a>b" style="font: 600 3px R">b</text>'),
+      [3, 0]
+    );
+    // comments and character data are not read
+    assert.deepEqual(
+      read('<!-- font-size: 1px --><![CDATA[ font: 1px R ]]><text font-size="12">a</text>'),
+      [12, 0]
+    );
     // the text drawn, a data attribute and a custom property are not sizes
     assert.deepEqual(
       read('<text data-font-size="1" style="--my-font: 2px" font-size="14">font: 1px</text>'),
@@ -115,11 +129,23 @@ describe("a figure's size", () => {
     );
   });
 
-  test('a long run of digits is read in linear time', () => {
-    const start = performance.now();
-    measure(`<svg width="9" height="9"><text style="font: ${'1'.repeat(1_000)}!">a</text></svg>`);
-    measure(`<svg width="9" height="9"><text font-size="${'1'.repeat(1_000)}!">a</text></svg>`);
-    assert.ok(performance.now() - start < 250, String(performance.now() - start));
+  test('inputs that make a pattern backtrack are read quickly', () => {
+    // each took seconds or more with an earlier reader: digits with no unit (30,000: 1.9 s),
+    // a tail of > after the last < (50,000: 7 s), unclosed style elements and quotes
+    const svg = (body: string) => `<svg width="9" height="9">${body}</svg>`;
+    const inputs = [
+      svg(`<text style="font: ${'1'.repeat(30_000)}!">a</text>`),
+      svg(`<text font-size="${'1'.repeat(30_000)}!">a</text>`),
+      svg(`<text font-size="12">a</text>${'>'.repeat(50_000)}`),
+      svg('<style>'.repeat(20_000)),
+      svg(`<text font-size="12" data-x="${'a'.repeat(50_000)}`),
+    ];
+    for (const input of inputs) {
+      const start = performance.now();
+      measure(input);
+      const took = performance.now() - start;
+      assert.ok(took < 250, `${input.slice(26, 60)}…: ${String(took)} ms`);
+    }
   });
 
   test('a label whose size cannot be read is not taken as legible', () => {

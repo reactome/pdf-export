@@ -92,7 +92,8 @@ const ANGLE = /^(deg|rad|grad|turn)$/i;
  * is a weight, and what follows a `/` a line height), in pixels, a bare number being pixels
  * in SVG. Every size that is not one of these, relative (em, %, rem, smaller …), a keyword
  * (x-small, inherit …), a function (calc, var) or a unit not known, is counted unread: what
- * it is relative to is not known here. Text content is not read, but a style element is.
+ * it is relative to is not known here. Text content, comments and character data are not
+ * read, but a style element is (markupOf).
  * A transform that scales a label is not known either; the render service's diagrams use
  * none.
  */
@@ -101,7 +102,7 @@ function labelSizes(svg: string): { sizes: number[]; unread: number } {
   let unread = 0;
   /** A size's value, whole; anything that is not a finite, positive size is unread. */
   const read = (value: string) => {
-    const match = SIZE.exec(value.trim());
+    const match = SIZE.exec(value.replace(/!\s*important\s*$/i, '').trim());
     const unit = match?.[2] ?? '';
     const factor = PX[unit.toLowerCase()];
     const size =
@@ -111,11 +112,7 @@ function labelSizes(svg: string): { sizes: number[]; unread: number } {
     if (Number.isFinite(size) && size > 0) sizes.push(size);
     else unread += 1;
   };
-  // the markup and style elements, not the text drawn
-  const markup = svg.replace(
-    /(<style\b[^>]*>[\s\S]*?<\/style>)|>[^<]*(?=<)/gi,
-    (_whole, style: string | undefined) => style ?? '>'
-  );
+  const markup = markupOf(svg);
   for (const [, value = ''] of markup.matchAll(
     /(?<![\w-])font-size(?:=["']|\s*:\s*)([^"';}<>]*)/gi
   )) {
@@ -132,6 +129,53 @@ function labelSizes(svg: string): { sizes: number[]; unread: number } {
     read(size ?? '');
   }
   return { sizes, unread };
+}
+
+const STYLE = /^<(?:[\w-]+:)?style\b/i;
+const STYLE_END = /<\/(?:[\w-]+:)?style\s*>/gi;
+
+/**
+ * An SVG's markup and its style elements' rules, without the text it draws, comments or
+ * character data, in one pass: a tag ends at the first `>` outside a quoted value, so a `>`
+ * in an attribute's value does not end it early.
+ */
+function markupOf(svg: string): string {
+  const kept: string[] = [];
+  let at = 0;
+  while (at < svg.length) {
+    const open = svg.indexOf('<', at);
+    if (open < 0) break;
+    const skip = svg.startsWith('<!--', open)
+      ? '-->'
+      : svg.startsWith('<![CDATA[', open)
+        ? ']]>'
+        : null;
+    if (skip) {
+      const end = svg.indexOf(skip, open);
+      at = end < 0 ? svg.length : end + skip.length;
+      continue;
+    }
+    let close = open + 1;
+    let quote = '';
+    for (; close < svg.length; close++) {
+      const c = svg[close];
+      if (quote) {
+        if (c === quote) quote = '';
+      } else if (c === '"' || c === "'") quote = c;
+      else if (c === '>') break;
+    }
+    const tag = svg.slice(open, close + 1);
+    kept.push(tag);
+    at = close + 1;
+    if (STYLE.test(tag) && !tag.endsWith('/>')) {
+      // its rules, to its end tag, or to the end of an unclosed one
+      STYLE_END.lastIndex = at;
+      const end = STYLE_END.exec(svg)?.index ?? svg.length;
+      kept.push(svg.slice(at, end));
+      at = end;
+    }
+  }
+  return kept.join('');
 }
 
 export interface Placement {
