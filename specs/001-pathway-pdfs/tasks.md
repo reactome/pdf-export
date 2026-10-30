@@ -54,7 +54,7 @@ repository root.
 
   Unit tests in `test/ci/licences.test.ts`. Show it failing on a planted GPL-3.0 package and on a planted package with no licence (SC-006), and run it in CI.
 
-- [ ] T003 [P] The fixture, `ci/fixture/`: a small release graph, `fixture.cypher`, with `DBInfo` at 98, and the release's files beside it, `files/`. Every `Person` and every free text is a placeholder (constitution VII). `README.md` says how it was made, that it holds no real names, and the case each item is there for. It holds:
+- [x] T003 [P] The fixture, `ci/fixture/`: a small release graph, `fixture.cypher`, with `DBInfo` at 98, and the release's files beside it, `files/`. Every `Person` and every free text is a placeholder (constitution VII). `README.md` says how it was made, that it holds no real names, and the case each item is there for. It holds:
   - **Top-level pathways:**
     - three human ones whose names sort differently ignoring case than by database id or by case (FR-002);
     - one non-human top-level pathway, which `--species` must exclude.
@@ -80,6 +80,8 @@ repository root.
     - `ehld/svgsummary.txt`, with one entry for an event the graph does not hold.
 
   A Neo4j 4.4 service loads the graph in CI. A test in `test/graph/fixture.test.ts` checks that it loads and holds each case above, by count.
+
+  — #24, replacing #23 after its review. 56 nodes and 92 relationships in release 98's labels and relationships (each with `order` and `stoichiometry`), ids from 90000000. `test/graph/fixture.test.ts` checks each case (9 tests), and fails if a person is not a placeholder. CI loads it into a Neo4j 4.4 service. Seen failing: one inference source removed, every `hasEvent` order set to its child's id, and a real-looking person added. From #22's review: the licence check takes the project's root from its own place, so it runs from any folder. From #23's review: a reaction pointing outside its top-level pathways, the "disease" exclusion on one event, the publisher and the release files are tested, and the graph suite fails rather than skips in CI without a graph; `isInDisease` and edit times as release 98 has them; a non-event with a stable id (a complex).
 
 - [ ] T004 The render stub, `test/stubs/render.ts`, after T003. It is a small HTTP server on loopback, started by the tests, that answers contracts/render.md's requests for the fixture's events from recorded SVGs in `ci/fixture/figures/`.
   - **The SVGs** are hand-made in the website's SVG form: text in Roboto, `clip-N` ids, small PNG node shapes. Two of them have colliding ids. They are not rendered from Reactome's data, so they carry no names.

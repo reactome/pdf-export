@@ -38,7 +38,7 @@ deployment pins; built here against graph-core 2.0.9, which its pom names).
     (uniformResourceLocator), `Book` (chapterTitle, `-[:publisher]->` an affiliation);
   - `(Person)-[:author {order}]->(Publication | InstanceEdit)`;
   - `(InstanceEdit {dateTime})-[:authored | edited | reviewed | revised]->(event)`;
-  - `(:DBInfo {version})`, and `:TopLevelPathway {speciesName}`.
+  - `(:DBInfo {releaseNumber})` (graph-core 2.0.9's `version` reads null on release 98), and `:TopLevelPathway {speciesName}`.
 - **Order today is mostly the database's, not the curators'.** graph-core 2.0.9 loads
   each list below the PDF's root with no `ORDER BY` on the relationship's `order`:
   children (so the sections' order), compartments, literature (so _which_ five are

@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Licences any dependency may have: loose, and none of the GPL family. */
 export const ALLOWED: ReadonlySet<string> = new Set([
@@ -158,10 +159,14 @@ export function fontsWithoutLicence(packages: readonly Installed[], root: string
 }
 
 /** The installed packages, from `npm query '*'` or a saved answer; the root is left out. */
-export function installed(queryFile?: string): Installed[] {
+export function installed(root: string, queryFile?: string): Installed[] {
   const text = queryFile
     ? readFileSync(queryFile, 'utf8')
-    : execFileSync('npm', ['query', '*'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    : execFileSync('npm', ['query', '*'], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+      });
   const all = JSON.parse(text) as Installed[];
   return all.filter((pkg) => pkg.location !== '');
 }
@@ -182,8 +187,10 @@ function main(args: readonly string[]): number {
     process.stderr.write('--query needs the file of a saved `npm query` answer\n');
     return 2;
   }
-  const packages = installed(queryFile);
-  const problems = [...offenders(packages), ...fontsWithoutLicence(packages, process.cwd())];
+  // The project's root, wherever the check is run from: this file is in its ci/ folder
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const packages = installed(root, queryFile);
+  const problems = [...offenders(packages), ...fontsWithoutLicence(packages, root)];
   for (const name of unusedExceptions(packages)) {
     process.stdout.write(`note: the exception for ${name} matches nothing installed\n`);
   }
