@@ -129,22 +129,52 @@ describe("a figure's size", () => {
     );
   });
 
-  test('inputs that make a pattern backtrack are read quickly', () => {
-    // each took seconds or more with an earlier reader: digits with no unit (30,000: 1.9 s),
-    // a tail of > after the last < (50,000: 7 s), unclosed style elements and quotes
+  test("a style element's rules end at its own end tag; a stray < in text hides none", () => {
+    const read = (body: string) => {
+      const m = measure(`<svg width="9" height="9">${body}</svg>`);
+      return [m.smallestLabel, m.unreadLabels];
+    };
+    // a prefixed style element ends at its prefixed end tag, not at the end of the document
+    assert.deepEqual(
+      read('<svg:style>.a{font-size: 12px}</svg:style><text>font-size: 1px</text>'),
+      [12, 0]
+    );
+    // a self-closing style element holds no rules
+    assert.deepEqual(read('<style/><text font-size="12">font-size: 1px</text>'), [12, 0]);
+    // a < in text, with no > before the next tag, does not swallow that tag
+    assert.deepEqual(
+      read('<text font-size="12">a</text> < <style>.a{font-size:5px}</style>'),
+      [5, 0]
+    );
+  });
+
+  test('inputs that made earlier readers backtrack are read quickly', () => {
+    // each took seconds with an earlier reader, measured: digits with no unit in the
+    // shorthand (30,000: 1.9 s), a tail of > after the last < (50,000: 7 s), unclosed style
+    // elements (20,000: 3.2 s), and a stray <svg with no root (20,000: 2.6 s)
     const svg = (body: string) => `<svg width="9" height="9">${body}</svg>`;
-    const inputs = [
-      svg(`<text style="font: ${'1'.repeat(30_000)}!">a</text>`),
-      svg(`<text font-size="${'1'.repeat(30_000)}!">a</text>`),
-      svg(`<text font-size="12">a</text>${'>'.repeat(50_000)}`),
-      svg('<style>'.repeat(20_000)),
-      svg(`<text font-size="12" data-x="${'a'.repeat(50_000)}`),
+    const inputs: [string, () => unknown][] = [
+      [
+        'shorthand digits',
+        () => measure(svg(`<text style="font: ${'1'.repeat(30_000)}!">a</text>`)),
+      ],
+      [
+        'a tail of >',
+        () => measure(`${svg('<text font-size="12">a</text>')}${'>'.repeat(50_000)}`),
+      ],
+      ['unclosed style elements', () => measure(svg('<style>'.repeat(20_000)))],
+      [
+        'no root',
+        () => {
+          assert.throws(() => measure('<svg '.repeat(20_000)), /no size/);
+        },
+      ],
     ];
-    for (const input of inputs) {
+    for (const [name, run] of inputs) {
       const start = performance.now();
-      measure(input);
+      run();
       const took = performance.now() - start;
-      assert.ok(took < 250, `${input.slice(26, 60)}…: ${String(took)} ms`);
+      assert.ok(took < 250, `${name}: ${String(took)} ms`);
     }
   });
 

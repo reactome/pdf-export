@@ -45,7 +45,10 @@ export interface Measured {
 
 /** An SVG's size, from its viewBox or else its width and height, and its smallest label. */
 export function measure(svg: string): Measured {
-  const root = /<svg\b[^>]*>/.exec(svg)?.[0] ?? '';
+  // its root's start tag, found without a pattern that could backtrack on a stray `<svg`
+  const start = svg.search(/<svg\b/);
+  const end = start < 0 ? -1 : svg.indexOf('>', start);
+  const root = end < 0 ? '' : svg.slice(start, end + 1);
   const box = /\sviewBox=(["'])([^"']*)\1/
     .exec(root)?.[2]
     ?.trim()
@@ -156,6 +159,7 @@ function markupOf(svg: string): string {
       continue;
     }
     let close = open + 1;
+    let stray = false;
     let quote = '';
     for (; close < svg.length; close++) {
       const c = svg[close];
@@ -163,6 +167,15 @@ function markupOf(svg: string): string {
         if (c === quote) quote = '';
       } else if (c === '"' || c === "'") quote = c;
       else if (c === '>') break;
+      else if (c === '<') {
+        // a < outside quotes begins a tag: the one before it was a stray < in text
+        stray = true;
+        break;
+      }
+    }
+    if (stray) {
+      at = close;
+      continue;
     }
     const tag = svg.slice(open, close + 1);
     kept.push(tag);
