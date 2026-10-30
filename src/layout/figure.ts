@@ -39,11 +39,16 @@ export interface Measured {
   height: number;
   /** Its smallest label, in the SVG's pixels, or none if it has no text. */
   smallestLabel: number | null;
+  /** Labels whose size could not be read: relative, or in a unit not known. */
+  unreadLabels: number;
 }
 
 /** An SVG's size, from its viewBox or else its width and height, and its smallest label. */
 export function measure(svg: string): Measured {
-  const root = /<svg\b[^>]*>/.exec(svg)?.[0] ?? '';
+  // its root's start tag, found without a pattern that could backtrack on a stray `<svg`
+  const start = svg.search(/<svg\b/);
+  const end = start < 0 ? -1 : svg.indexOf('>', start);
+  const root = end < 0 ? '' : svg.slice(start, end + 1);
   const box = /\sviewBox=(["'])([^"']*)\1/
     .exec(root)?.[2]
     ?.trim()
@@ -57,34 +62,138 @@ export function measure(svg: string): Measured {
     box?.length === 4 ? [box[2] ?? NaN, box[3] ?? NaN] : [attr('width'), attr('height')];
   if (!(width > 0 && height > 0))
     throw new Error('A figure with no size: no viewBox, width or height');
-  return { width, height, smallestLabel: smallestLabel(svg) };
+  const { sizes, unread } = labelSizes(svg);
+  return {
+    width,
+    height,
+    smallestLabel: sizes.length > 0 ? Math.min(...sizes) : null,
+    unreadLabels: unread,
+  };
 }
 
-/** Pixels for each absolute unit a label's size may be given in. */
-const PX: Readonly<Record<string, number>> = { '': 1, px: 1, pt: 4 / 3 };
+/** Pixels for each absolute unit a label's size may be given in (CSS's 96 px to the inch). */
+const PX: Readonly<Record<string, number>> = {
+  '': 1,
+  px: 1,
+  pt: 96 / 72,
+  pc: 16,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  q: 96 / 101.6,
+};
+
+/** A size as CSS writes one, the whole value: a number, exponent and all, and its unit. */
+const SIZE = /^(\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?([a-z%]*)$/i;
+
+/** Units of angle, which a `font` shorthand's oblique angle is given in, not its size. */
+const ANGLE = /^(deg|rad|grad|turn)$/i;
 
 /**
- * The smallest font size given to text that is drawn: a `font-size` attribute or property,
- * or the size in a `font` shorthand, in pixels (a bare number is pixels in SVG). Relative
- * sizes (em, %, rem) are not read: what they are relative to is not known here. Neither is
- * a transform that scales a label; the render service's diagrams use neither.
+ * The font sizes given to text: each `font-size` attribute or property, and the size in each
+ * `font` shorthand (its first number with a unit that is not an angle: a bare number there
+ * is a weight, and what follows a `/` a line height), in pixels, a bare number being pixels
+ * in SVG. Every size that is not one of these, relative (em, %, rem, smaller …), a keyword
+ * (x-small, inherit …), a function (calc, var) or a unit not known, is counted unread: what
+ * it is relative to is not known here. Text content, comments and character data are not
+ * read, but a style element is (markupOf).
+ * A transform that scales a label is not known either; the render service's diagrams use
+ * none.
  */
-function smallestLabel(svg: string): number | null {
+function labelSizes(svg: string): { sizes: number[]; unread: number } {
   const sizes: number[] = [];
-  const read = (value: string, unit: string) => {
-    const factor = PX[unit];
-    if (factor !== undefined) sizes.push(Number(value) * factor);
+  let unread = 0;
+  /** A size's value, whole; anything that is not a finite, positive size is unread. */
+  const read = (value: string) => {
+    const match = SIZE.exec(value.replace(/!\s*important\s*$/i, '').trim());
+    const unit = match?.[2] ?? '';
+    const factor = PX[unit.toLowerCase()];
+    const size =
+      match && factor !== undefined
+        ? Number(match[0].slice(0, match[0].length - unit.length)) * factor
+        : NaN;
+    if (Number.isFinite(size) && size > 0) sizes.push(size);
+    else unread += 1;
   };
-  for (const [, value = '', unit = ''] of svg.matchAll(
-    /font-size(?:=["']|\s*:\s*)([\d.]+)(px|pt|em|rem|%)?/g
+  const markup = markupOf(svg);
+  for (const [, value = ''] of markup.matchAll(
+    /(?<![\w-])font-size(?:=["']|\s*:\s*)([^"';}<>]*)/gi
   )) {
-    read(value, unit);
+    read(value);
   }
-  for (const [, value = '', unit = ''] of svg.matchAll(/\bfont\s*:[^;"']*?([\d.]+)(px|pt)\b/g)) {
-    read(value, unit);
+  for (const [, shorthand = ''] of markup.matchAll(/(?<![\w-])font\s*:\s*([^"';}<>]*)/gi)) {
+    const size = shorthand
+      .split('/')[0]
+      ?.split(/\s+/)
+      .find((token) => {
+        const unit = SIZE.exec(token)?.[2];
+        return unit !== undefined && unit !== '' && !ANGLE.test(unit);
+      });
+    read(size ?? '');
   }
-  const drawn = sizes.filter((size) => size > 0);
-  return drawn.length > 0 ? Math.min(...drawn) : null;
+  return { sizes, unread };
+}
+
+const STYLE = /^<(?:[\w-]+:)?style\b/i;
+const STYLE_END = /<\/(?:[\w-]+:)?style\s*>/gi;
+
+/**
+ * An SVG's markup and its style elements' rules, without the text it draws, comments or
+ * character data, in one pass: a tag ends at the first `>` outside a quoted value, so a `>`
+ * in an attribute's value does not end it early. A `<` met outside quotes before that `>`
+ * begins the next tag; what came before it is kept as markup, as a malformed tag's may
+ * hold a size.
+ */
+function markupOf(svg: string): string {
+  const kept: string[] = [];
+  let at = 0;
+  while (at < svg.length) {
+    const open = svg.indexOf('<', at);
+    if (open < 0) break;
+    const skip = svg.startsWith('<!--', open)
+      ? '-->'
+      : svg.startsWith('<![CDATA[', open)
+        ? ']]>'
+        : null;
+    if (skip) {
+      const end = svg.indexOf(skip, open);
+      at = end < 0 ? svg.length : end + skip.length;
+      continue;
+    }
+    let close = open + 1;
+    let stray = false;
+    let quote = '';
+    for (; close < svg.length; close++) {
+      const c = svg[close];
+      if (quote) {
+        if (c === quote) quote = '';
+      } else if (c === '"' || c === "'") quote = c;
+      else if (c === '>') break;
+      else if (c === '<') {
+        // a < outside quotes begins a tag: the one before it was a stray < in text
+        stray = true;
+        break;
+      }
+    }
+    if (stray) {
+      // kept as markup, so a malformed tag's size is still read: more markup can only read
+      // a label smaller, or unread, never more legible
+      kept.push(svg.slice(open, close));
+      at = close;
+      continue;
+    }
+    const tag = svg.slice(open, close + 1);
+    kept.push(tag);
+    at = close + 1;
+    if (STYLE.test(tag) && !tag.endsWith('/>')) {
+      // its rules, to its end tag, or to the end of an unclosed one
+      STYLE_END.lastIndex = at;
+      const end = STYLE_END.exec(svg)?.index ?? svg.length;
+      kept.push(svg.slice(at, end));
+      at = end;
+    }
+  }
+  return kept.join('');
 }
 
 export interface Placement {
@@ -106,12 +215,13 @@ export interface Placement {
  * its own size; in the portrait text when its labels are legible there, otherwise on a
  * landscape page if that prints it larger.
  */
-export function place({ width, height, smallestLabel }: Measured): Placement {
+export function place({ width, height, smallestLabel, unreadLabels }: Measured): Placement {
   const fit = (area: { width: number; height: number }) =>
     Math.min(area.width / width, area.height / height, NATURAL);
   const portrait = fit(PORTRAIT);
   const legible = (scale: number) => smallestLabel === null || scale * smallestLabel >= FLOOR_PT;
-  const unmeasured = smallestLabel === null;
+  // a label whose size could not be read may be the smallest: it is not taken as legible
+  const unmeasured = smallestLabel === null || unreadLabels > 0;
   if (legible(portrait))
     return { scale: portrait, landscape: false, belowFloor: false, unmeasured };
   const landscape = fit(LANDSCAPE);
