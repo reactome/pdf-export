@@ -286,7 +286,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
     - 503 `unavailable` when a service cannot answer or the limit is reached.
   - **Health:** the version, the graph's release, and whether the render and analysis services answer.
   - **Content:** bookmarks in every PDF (FR-006). A figure that cannot be drawn leaves its section without it, logged.
-  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD, in the texts and in the figures' labels alike: the labels go through T024's `src/figures/labels.ts` in its on-request mode, which replaces and logs instead of raising the book's fault. Each code point is logged once per PDF, the texts' and the labels' sharing one log, with the stable identifier or token, never the text; never a failed request. T022 creates `src/layout/characters.ts` and `src/figures/labels.ts` with the list and the on-request mode; T024 adds the book's fault mode and the preflight. Tested with:
+  - **Characters (FR-017):** FR-017's substitutions, then any character no font covers printed as U+FFFD, in the texts and in the figures' labels alike: the labels go through `src/figures/labels.ts` in its on-request mode, which replaces and logs instead of raising the book's fault. Each code point is logged once per PDF, the texts' and the labels' sharing one log, with the stable identifier or token, never the text; never a failed request. T022 creates `src/layout/characters.ts` and `src/figures/labels.ts` with the list and the on-request mode; T024 adds the book's fault mode and the preflight. Tested with:
     - a planted character in a text: U+FFFD in the PDF's text, one log line with the code point and the stable identifier;
     - one in a stub figure's label (a stub setting): the answer 200, the figure present, its label holding U+FFFD, one log line naming the code point and the stable identifier (seen failing with labels not passed through `labels.ts`, and with the book's mode, whose fault would drop the figure);
     - the same code point in a text and in a stub label: one log line, not two (seen failing with a log per source);
@@ -314,15 +314,16 @@ passes.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir>` (contracts/cli.md).
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
-  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts` (with T017's detector), applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json` only, not `.graph.json`; the 220 illustrated pathways' files among them, a superset of what is drawn) (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (every physical entity a reaction's figure draws, inputs, outputs, catalysts and regulators, and their compartments, from the graph) and the labels of the diagram files the figures draw, read in `src/preflight/labels.ts`; and after drawing, before each part is printed, over each SVG's label text, in `src/figures/labels.ts`, which also makes the substitutions there after T014's id prefixing. Only the substitutions made in what is printed are counted for the run report, not the preflight's own.
+  - **Characters (FR-017):** first FR-017's substitutions, in T022's `src/layout/characters.ts` (with T017's detector), which T024 extends with the book's fault mode, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json` only, not `.graph.json`; the 220 illustrated pathways' files among them, a superset of what is drawn) (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (every physical entity a reaction's figure draws, inputs, outputs, catalysts and regulators, and their compartments, from the graph) and the labels of the diagram files the Figure rules choose to draw, read in `src/preflight/labels.ts`; and after drawing, before each part is printed, over each SVG's label text, in T022's `src/figures/labels.ts`, extended here with the book's fault mode, which also makes the substitutions there after T014's id prefixing. Only the substitutions made in what is printed are counted for the run report, not the preflight's own.
   - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
   - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
   - a character off the list in a diagram file's label is a fault naming that diagram's pathway; one in a physical entity's name a fault naming the first event whose figure holds it; and one in a compartment held only by a participant, named in no event's section, likewise (so only the figures' names can find it);
+  - T024 adds to the fixture graph a compartment held only by a participant's physical entity, for the compartment test above;
   - one in an illustrated pathway's diagram file (`R-HSA-90000300.json`, Gamma pathway) is no fault, as the Figure rules draw its EHLD;
-  - one in a drawn figure's label alone is a fault after drawing, before its part is printed (the stub serves such a label only when a test sets it at construction, so the fixture's own run stays clean); with T025's threshold lowered, placed in a later part, it fails the step after earlier parts are printed, and no book, temporary file or part file is left;
+  - one in a drawn figure's label alone is a fault after drawing, before its part is printed (the stub serves such a label only when a test sets it at construction, so the fixture's own run stays clean);
   - a label in a diagram file the book does not draw is not read: a character off the list planted in `R-MMU-90000900.json` is no fault in the human book;
   - a substitution in an inlined figure leaves its elements, ids and attributes as they were;
   - the fixture summary's entry for an absent event is not a fault.
@@ -345,11 +346,11 @@ passes.
   Tests: every link and bookmark lands on its target heading, seen failing with links copied as pdf-lib leaves them.
 
 - [ ] T027 [US1] Page numbers and running headers, `src/print/stamp.ts`, stamped after the join with pdf-lib.
-  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (`src/layout/characters.ts`): a chapter's name is stamped, not laid out, so it would otherwise bypass the list.
+  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (T022's `src/layout/characters.ts`): a chapter's name is stamped, not laid out, so it would otherwise bypass the list. The stamped headers' substitutions are not counted in the run report: the chapter's name is counted where its section prints it.
   - Each page's header is its chapter's name, or its front part's name.
   - No number on the cover (FR-016).
 
-  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering.
+  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering; a chapter name holding U+2011 is stamped with U+002D, seen failing with the name stamped as it is.
 
 - [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in the joined book and reprint only the front part. The reprinted front part is swapped in before T026's links and T027's stamping run, so its links are rewritten and its pages stamped like the rest. Tests: every entry's number is its target's page, across parts; the contents' links land; the front pages carry their headers and numbers.
 - [ ] T029 [US1] `book` end to end, `src/cli.ts` (contracts/cli.md).
@@ -361,7 +362,8 @@ passes.
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
   - exit 2 on bad arguments, and on a service unreachable at the start;
-  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters (T024 adds one to the fixture graph's summations and one to a stub figure's label): exactly 1 for each, so a count of the preflight's substitutions too, or of the front part's two prints (T028), fails it.
+  - the run report lists the characters replaced, by code point and count, for the fixture data T024 plants: one listed character in a summation and one in an event's name (which the contents list repeats), and one in a stub figure's label. The counts are of occurrences in the finished book: the summation's 1, the name's 2 (its heading and its contents entry), the label's 1. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it;
+  - with T025's threshold lowered and the stub's label set to a character off the list in a figure of a later part: exit 1 after earlier parts are printed, and no book, temporary file or part file left.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.
@@ -498,7 +500,7 @@ passes.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
-- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031.
+- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031. T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**
@@ -514,7 +516,7 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- US2 and US1 once Phase 2 is done.
+- US2 and US1 once Phase 2 is done, but for T024 and T027, which wait for T022.
 
 ## Implementation strategy
 

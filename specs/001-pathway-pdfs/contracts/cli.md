@@ -20,7 +20,8 @@ Writes the release's book (Story 1).
 | `--parallel` |                                | parts printed at once; default 4                                                                     |
 | `--report`   |                                | where the run report (data-model.md) is written, as JSON                                             |
 
-- **The preflight,** before anything is printed: from the graph and the EHLD summary it
+- **The preflight,** before anything is printed (and the character check's second half,
+  after drawing, below): from the graph and the EHLD summary it
   lists the release's files the figures need (the events from the graph; which are
   illustrations from the summary, ignoring an entry for an event the graph does not
   hold), and a file missing is a fault
