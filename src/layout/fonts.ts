@@ -72,22 +72,66 @@ export function unicodeRange(points: Iterable<number>): string {
   return ranges.join(', ');
 }
 
+/** The order files of one family and weight are given their characters: Latin first. */
+const SUBSET_ORDER = ['latin', 'latin-ext', 'greek', 'greek-ext', 'cyrillic', 'cyrillic-ext'];
+const subsetRank = (subset: string): number => {
+  const at = SUBSET_ORDER.indexOf(subset);
+  return at === -1 ? SUBSET_ORDER.length : at;
+};
+
+export interface FontFace extends FontFile {
+  /** The code points this face, and no other of its family and weight, draws. */
+  points: number[];
+}
+
+let faces: FontFace[] | undefined;
+
 /**
- * The pages' @font-face rules, one for each file, its unicode-range the file's own
- * character map. Chromium chooses a face by its declared range, and @fontsource's ranges
- * are not always what a file draws (it declares Noto Sans Math's whole font as Latin), so
- * the ranges here come from the same maps the coverage check reads, and the two agree.
+ * Each font file with the characters it is to draw. A file's character map is wider than
+ * its subset's name (Roboto's math and symbols files hold A–Z too), and Chromium tries
+ * overlapping faces last-declared first, so plain text would come from whichever file was
+ * listed last. So within a family and weight each code point is given to one file only:
+ * Latin first, then Latin Extended, Greek, Cyrillic, then the rest by name.
+ */
+export function fontFaces(): readonly FontFace[] {
+  if (faces) return faces;
+  const ordered = [...fontFiles()].sort(
+    (a, b) =>
+      a.family.localeCompare(b.family, 'en') ||
+      a.weight - b.weight ||
+      subsetRank(a.subset) - subsetRank(b.subset) ||
+      (a.subset < b.subset ? -1 : a.subset > b.subset ? 1 : 0)
+  );
+  const given = new Map<string, Set<number>>();
+  faces = ordered.map((file) => {
+    const key = `${file.family}/${String(file.weight)}`;
+    const taken = given.get(key) ?? new Set<number>();
+    given.set(key, taken);
+    const points = drawnBy(file.path).filter((p) => !taken.has(p));
+    for (const p of points) taken.add(p);
+    return { ...file, points };
+  });
+  return faces;
+}
+
+/**
+ * The pages' @font-face rules, one for each file that draws anything, its unicode-range
+ * the characters given to it (fontFaces). Chromium chooses a face by its declared range,
+ * and @fontsource's ranges are not always what a file draws (it declares Noto Sans Math's
+ * whole font as Latin), so the ranges here come from the same character maps the coverage
+ * check reads, and the two agree.
  */
 export function fontFaceCss(): string {
-  return fontFiles()
+  return fontFaces()
+    .filter((face) => face.points.length > 0)
     .map(
-      (file) => `@font-face {
-  font-family: '${file.family}';
+      (face) => `@font-face {
+  font-family: '${face.family}';
   font-style: normal;
-  font-weight: ${String(file.weight)};
+  font-weight: ${String(face.weight)};
   font-display: block;
-  src: url('${pathToFileURL(file.path).href}') format('woff2');
-  unicode-range: ${unicodeRange(drawnBy(file.path))};
+  src: url('${pathToFileURL(face.path).href}') format('woff2');
+  unicode-range: ${unicodeRange(face.points)};
 }`
     )
     .join('\n');

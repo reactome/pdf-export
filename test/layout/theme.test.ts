@@ -9,6 +9,7 @@ import {
   FAMILIES,
   codePointName,
   fontFaceCss,
+  fontFaces,
   fontFiles,
   uncoveredCharacters,
   unicodeRange,
@@ -98,7 +99,7 @@ test('unicodeRange writes runs and single points as CSS does', () => {
 test("each face declares the range its own file draws, so Chromium's choice and the check agree", () => {
   const css = fontFaceCss();
   const faces = [...css.matchAll(/font-family: '([^']+)';[\s\S]*?unicode-range: ([^;]+);/g)];
-  assert.equal(faces.length, fontFiles().length);
+  assert.ok(faces.length > 0 && faces.length <= fontFiles().length);
   const declares = (point: number) =>
     faces
       .filter(([, , range]) =>
@@ -116,4 +117,17 @@ test("each face declares the range its own file draws, so Chromium's choice and 
   assert.ok(declares(0x030c).includes('Noto Sans Math'), 'U+030C');
   // and a face never claims what its file cannot draw
   assert.equal(declares(0x4e2d).length, 0, 'U+4E2D');
+});
+
+test('within a family and weight, each character is given to one file, Latin first', () => {
+  const owners = new Map<string, string>();
+  for (const face of fontFaces()) {
+    for (const point of face.points) {
+      const key = `${face.family}/${String(face.weight)}/${String(point)}`;
+      assert.ok(!owners.has(key), `${key}: ${owners.get(key) ?? ''} and ${face.subset}`);
+      owners.set(key, face.subset);
+    }
+  }
+  assert.equal(owners.get(`Roboto/400/${String(0x41)}`), 'latin');
+  assert.equal(owners.get(`Roboto/400/${String(0x3b1)}`), 'greek');
 });
