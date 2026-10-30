@@ -362,7 +362,7 @@ passes.
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
   - exit 2 on bad arguments, and on a service unreachable at the start;
-  - the run report lists the characters replaced, by code point and count, for the fixture data T024 plants: one listed character in a summation and one in an event's name (which the contents list repeats), and one in a stub figure's label. The counts are of occurrences in the finished book: the summation's 1, the name's 2 (its heading and its contents entry), the label's 1. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it;
+  - the run report lists the characters replaced, by code point and count. The test plants them itself, in a copy of the fixture: one listed character in a summation, one in the name of Reaction eight (`R-HSA-90000132`, at one place, with no events before or after it and no children, so its name prints only in its heading and its contents entry), and, by a stub setting made for this test, one in the label of Reaction eight's own reaction figure (drawn once; a pathway's diagram can be drawn again for its subpathways). The counts are of occurrences in the finished book: the summation's 1, the name's 2, the label's 1. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it; and a chapter's name holding a listed character adds nothing for its stamped headers (T027), seen failing with the stamps counted;
   - with T025's threshold lowered and the stub's label set to a character off the list in a figure of a later part: exit 1 after earlier parts are printed, and no book, temporary file or part file left.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
@@ -516,7 +516,7 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- US2 and US1 once Phase 2 is done, but for T024 and T027, which wait for T022.
+- T025 beside US2 once Phase 2 is done; the rest of US1 waits for T022 through T024.
 
 ## Implementation strategy
 
