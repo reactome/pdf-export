@@ -66,7 +66,11 @@ export function measure(svg: string): Measured {
   return {
     width,
     height,
-    smallestLabel: sizes.length > 0 ? Math.min(...sizes) : null,
+    // a loop, not Math.min(...sizes), which overflows the stack on a very large figure
+    smallestLabel: sizes.reduce<number | null>(
+      (min, size) => (min === null || size < min ? size : min),
+      null
+    ),
     unreadLabels: unread,
   };
 }
@@ -115,11 +119,15 @@ function labelSizes(svg: string): { sizes: number[]; unread: number } {
     if (Number.isFinite(size) && size > 0) sizes.push(size);
     else unread += 1;
   };
-  const markup = markupOf(svg);
-  for (const [, value = ''] of markup.matchAll(
-    /(?<![\w-])font-size(?:=["']|\s*:\s*)([^"';}<>]*)/gi
+  const { markup, stray } = markupOf(svg);
+  // a malformed tag may hide a size, or show one where the text drawn has a <: either way
+  // the figure's labels are not known for certain
+  unread += stray;
+  for (const [, quoted, bare, property] of markup.matchAll(
+    /(?<![\w-])font-size(?:\s*=\s*["']([^"';}<>]*)|\s*=\s*([^\s"';}<>]*)|\s*:\s*([^"';}<>]*))/gi
   )) {
-    read(value);
+    // quoted, unquoted (an HTML parser takes it when the figure is inlined), or a property
+    read(quoted ?? bare ?? property ?? '');
   }
   for (const [, shorthand = ''] of markup.matchAll(/(?<![\w-])font\s*:\s*([^"';}<>]*)/gi)) {
     const size = shorthand
@@ -142,10 +150,11 @@ const STYLE_END = /<\/(?:[\w-]+:)?style\s*>/gi;
  * character data, in one pass: a tag ends at the first `>` outside a quoted value, so a `>`
  * in an attribute's value does not end it early. A `<` met outside quotes before that `>`
  * begins the next tag; what came before it is kept as markup, as a malformed tag's may
- * hold a size.
+ * hold a size, and counted, so the caller does not take the figure's labels as known.
  */
-function markupOf(svg: string): string {
+function markupOf(svg: string): { markup: string; stray: number } {
   const kept: string[] = [];
+  let strays = 0;
   let at = 0;
   while (at < svg.length) {
     const open = svg.indexOf('<', at);
@@ -170,15 +179,16 @@ function markupOf(svg: string): string {
       } else if (c === '"' || c === "'") quote = c;
       else if (c === '>') break;
       else if (c === '<') {
-        // a < outside quotes begins a tag: the one before it was a stray < in text
+        // a < outside quotes begins a tag: the one before it was a stray < in text, or a
+        // tag missing its >
         stray = true;
         break;
       }
     }
     if (stray) {
-      // kept as markup, so a malformed tag's size is still read: more markup can only read
-      // a label smaller, or unread, never more legible
+      // kept as markup, so a malformed tag's size is still read
       kept.push(svg.slice(open, close));
+      strays += 1;
       at = close;
       continue;
     }
@@ -193,7 +203,7 @@ function markupOf(svg: string): string {
       at = end;
     }
   }
-  return kept.join('');
+  return { markup: kept.join(''), stray: strays };
 }
 
 export interface Placement {

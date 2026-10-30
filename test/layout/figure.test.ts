@@ -144,13 +144,20 @@ describe("a figure's size", () => {
     // a tag with no > of its own, or an unquoted < in its value, still gives its size
     assert.deepEqual(
       read('<text font-size="12">a</text><text font-size="1"<tspan>b</tspan></text>'),
-      [1, 0]
+      [1, 1]
     );
-    assert.deepEqual(read('<text style="font-size:1px" data-x=a<b>c</text>'), [1, 0]);
+    assert.deepEqual(read('<text style="font-size:1px" data-x=a<b>c</text>'), [1, 1]);
+    // and each stray < counts as unread, so a size it shows where there was none does not
+    // make the figure's labels known
+    assert.equal(
+      place(measure('<svg width="9" height="9"><text>a < b font-size: 40px</text></svg>'))
+        .unmeasured,
+      true
+    );
     // a < in text, with no > before the next tag, does not swallow that tag
     assert.deepEqual(
       read('<text font-size="12">a</text> < <style>.a{font-size:5px}</style>'),
-      [5, 0]
+      [5, 1]
     );
   });
 
@@ -183,6 +190,18 @@ describe("a figure's size", () => {
       const took = performance.now() - start;
       assert.ok(took < 250, `${name}: ${String(took)} ms`);
     }
+  });
+
+  test('an unquoted size, or one with spaces around =, is read', () => {
+    const read = (body: string) => measure(`<svg width="9" height="9">${body}</svg>`).smallestLabel;
+    assert.equal(read('<text font-size="12">a</text><text font-size=1>b</text>'), 1);
+    assert.equal(read('<text font-size="12">a</text><text font-size = "3">b</text>'), 3);
+    assert.equal(read('<text font-size="12">a</text><text font-size=2pt />'), 8 / 3);
+  });
+
+  test('a figure with very many labels is measured', () => {
+    const many = `<svg width="9" height="9">${'<text font-size="1">a</text>'.repeat(300_000)}</svg>`;
+    assert.equal(measure(many).smallestLabel, 1);
   });
 
   test('a label whose size cannot be read is not taken as legible', () => {
