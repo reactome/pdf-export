@@ -516,7 +516,7 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- T025 beside US2 once Phase 2 is done; T024 once T022 is done, beside T023; the rest of US1 after T024 and T025.
+- Once Phase 2 is done and T005 gives a go (or T006 a route): T025 beside US2; T024 once T022 is done, beside T023; the rest of US1 after T024 and T025.
 
 ## Implementation strategy
 
