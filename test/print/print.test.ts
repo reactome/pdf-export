@@ -18,7 +18,7 @@ import {
 import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { contentsTargets } from '../../src/print/contents.ts';
-import { Printer } from '../../src/print/print.ts';
+import { Printer, movedPages } from '../../src/print/print.ts';
 import { buildFixture, fixtureFigures, skipWithoutGraph, type Built } from '../layout/fixture.ts';
 
 /** A page's text, each piece with where it starts. */
@@ -204,6 +204,23 @@ describe('printing', { skip: skipWithoutGraph }, () => {
     await assert.rejects(printer.single(page), /The contents' numbers moved the pages/);
   });
 
+  test('either a new page count or a moved target is a moved print', () => {
+    const at = (pageCount: number, ...pages: [string, number][]) => ({
+      pageCount,
+      pages: new Map(pages),
+    });
+    const first = at(5, ['a', 2], ['b', 4]);
+    assert.equal(movedPages(first, at(5, ['a', 2], ['b', 4]), ['a', 'b']), null);
+    assert.equal(
+      movedPages(first, at(6, ['a', 2], ['b', 4]), ['a', 'b']),
+      '5 pages, then 6; moved: none'
+    );
+    assert.equal(
+      movedPages(first, at(5, ['a', 2], ['b', 5]), ['a', 'b']),
+      '5 pages, then 5; moved: b'
+    );
+  });
+
   test('the outline is nested as the sections are', async () => {
     const task = getDocument({ data: pdf.slice() });
     try {
@@ -240,6 +257,8 @@ describe('printing', { skip: skipWithoutGraph }, () => {
           assert.ok(destination, dest);
           const target =
             (await doc.getPageIndex(destination[0] as { num: number; gen: number })) + 1;
+          // never the cover, whose title and figure's labels are as large as headings
+          assert.ok(target > 1, `${dest} lands on the cover`);
           // the title as a heading there, not as a contents entry, which lists every title
           const headings = (await textOf(await doc.getPage(target)))
             .filter((item) => item.size > 11)

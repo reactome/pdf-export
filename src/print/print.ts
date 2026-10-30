@@ -11,7 +11,21 @@ import { pathToFileURL } from 'node:url';
 
 import { chromium, type Browser } from 'playwright-core';
 
-import { contentsTargets, fillContents, landed } from './contents.ts';
+import { contentsTargets, fillContents, landed, type Landed } from './contents.ts';
+
+/**
+ * How a second print's pages differ from the first's, or null: another page count, or a
+ * target on another page. Either means the numbers printed are not the pages.
+ */
+export function movedPages(
+  first: Landed,
+  second: Landed,
+  targets: readonly string[]
+): string | null {
+  const moved = targets.filter((t) => second.pages.get(t) !== first.pages.get(t));
+  if (second.pageCount === first.pageCount && moved.length === 0) return null;
+  return `${String(first.pageCount)} pages, then ${String(second.pageCount)}; moved: ${moved.join(', ') || 'none'}`;
+}
 
 export class Printer {
   readonly #browser: Browser;
@@ -71,13 +85,8 @@ export class Printer {
     if (targets.length === 0) return first;
     const { pages, pageCount } = await landed(first, targets);
     const second = await this.print(fillContents(html, pages), true);
-    const check = await landed(second, targets);
-    const moved = targets.filter((t) => check.pages.get(t) !== pages.get(t));
-    if (check.pageCount !== pageCount || moved.length > 0) {
-      throw new Error(
-        `The contents' numbers moved the pages: ${String(pageCount)} pages, then ${String(check.pageCount)}; moved: ${moved.join(', ')}`
-      );
-    }
+    const problem = movedPages({ pages, pageCount }, await landed(second, targets), targets);
+    if (problem) throw new Error(`The contents' numbers moved the pages: ${problem}`);
     return second;
   }
 
