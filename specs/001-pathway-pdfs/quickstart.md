@@ -104,5 +104,6 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
   naming the file, before anything is printed, and no book is written.
 - **Story 5, scenario 4:** a character off FR-017's list, planted in a text, in a diagram
   file's label, in a physical entity's name, and then in a drawn figure's label alone,
-  fails the step before printing, naming it, and no book is written.
+  fails the step, naming it, before the part holding it is printed, and no book is
+  written.
 - The image's fonts are only FR-015's (its build lists them).

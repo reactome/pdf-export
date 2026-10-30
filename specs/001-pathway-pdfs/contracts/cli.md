@@ -29,12 +29,17 @@ Writes the release's book (Story 1).
   `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4), checked
   twice:
   - **before any figure is drawn,** in the graph's texts the layout writes, in the names
-    the figures label (the physical entities and compartments of the book's events, from
-    the graph), and in the labels of the diagram files the figures need (`--files`); a
-    fault names the event, or for a diagram file the pathway whose diagram it is;
-  - **after each figure is drawn and before printing,** in the text of its SVG's labels,
-    a fault naming the figure's event: the backstop for anything the first check's
-    sources did not hold.
+    the figures label (every physical entity a reaction's figure draws: its inputs,
+    outputs, catalysts and regulators; and their compartments, from the graph), and in
+    the labels of the diagram files the figures draw (`--files`: a pathway's own or
+    ancestor's diagram, not an illustrated pathway's, whose figure is its EHLD); a fault
+    names the first event in document order whose figure holds it, or for a diagram file
+    the pathway whose diagram it is;
+  - **after each figure is drawn, before its part is printed,** in the text of its SVG's
+    labels, a fault naming the figure's event: the backstop for anything the first
+    check's sources did not hold. The book is printed in parts (research R4), so a fault
+    here can come after earlier parts are printed; the step still ends with exit 1 and
+    no book written, the file being moved into place only at the end.
 - **Exit 0:** the book is written, and `check-book` passed on it. The file is written
   beside its name and moved into place, so a failed run never leaves a partial book.
 - **Exit 1:** a fault from the preflight or FR-011, or a figure that could not be drawn.

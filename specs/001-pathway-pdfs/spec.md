@@ -241,8 +241,8 @@ damage the output in each way FR-011 names, and see the check fail on each.
 3. **Given** a release file the step needs is missing, **When** the step runs, **Then**
    it fails and names the file, and writes no book.
 4. **Given** a text or a figure's label holding a character no font draws and FR-017's
-   list does not hold, **When** the step runs, **Then** it fails before printing, naming
-   the character and the event, and writes no book.
+   list does not hold, **When** the step runs, **Then** it fails, naming the character
+   and the event, before the part holding it is printed, and writes no book.
 
 ---
 
@@ -432,7 +432,8 @@ of pages with today's book.
     logged once per PDF, with the stable identifier or the token, never the text it was
     in; the request never fails on it;
   - in a figure, only the labels' text is changed, never its shapes; a few substituted
-    glyphs are far within SC-008's threshold, so the figure is compared as any other.
+    glyphs should fall well within SC-008's threshold (an inference, which T034's
+    comparison shows), so the figure is compared as any other.
 
 ### Key Entities
 
