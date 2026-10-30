@@ -41,8 +41,7 @@ inside the analysis service. It draws its figures with the same Java exporters a
 - **Its errors** are JSON in the analysis service's form (`code`, `reason`, `messages`),
   as are the analysis gateway's own refusals before it, and any other failure's 500;
   only a failure of the PDF library itself is answered 500 with the web framework's
-  default body. A figure whose exporter fails is left out, and the report still answered
-  200.
+  default body. A figure whose exporter fails is left out, and the report still answered 200.
 - **The figures' overlays:** each pathway's diagram is overlaid for the report's
   resource; the genome-wide overview shows the pathways the report's filter kept,
   coloured for the result's default resource (as above). Neither is ever for importable
