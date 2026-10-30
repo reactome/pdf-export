@@ -204,23 +204,6 @@ describe('printing', { skip: skipWithoutGraph }, () => {
     await assert.rejects(printer.single(page), /The contents' numbers moved the pages/);
   });
 
-  test('either a new page count or a moved target is a moved print', () => {
-    const at = (pageCount: number, ...pages: [string, number][]) => ({
-      pageCount,
-      pages: new Map(pages),
-    });
-    const first = at(5, ['a', 2], ['b', 4]);
-    assert.equal(movedPages(first, at(5, ['a', 2], ['b', 4]), ['a', 'b']), null);
-    assert.equal(
-      movedPages(first, at(6, ['a', 2], ['b', 4]), ['a', 'b']),
-      '5 pages, then 6; moved: none'
-    );
-    assert.equal(
-      movedPages(first, at(5, ['a', 2], ['b', 5]), ['a', 'b']),
-      '5 pages, then 5; moved: b'
-    );
-  });
-
   test('the outline is nested as the sections are', async () => {
     const task = getDocument({ data: pdf.slice() });
     try {
@@ -317,4 +300,22 @@ describe('printing', { skip: skipWithoutGraph }, () => {
       await task.destroy();
     }
   });
+});
+
+// a pure comparison, so it runs with or without the fixture graph
+test('either a new page count or a moved target is a moved print', () => {
+  const at = (pageCount: number, ...pages: [string, number][]) => ({
+    pageCount,
+    pages: new Map(pages),
+  });
+  const first = at(5, ['a', 2], ['b', 4]);
+  assert.equal(movedPages(first, at(5, ['a', 2], ['b', 4]), ['a', 'b']), null);
+  assert.equal(
+    movedPages(first, at(6, ['a', 2], ['b', 4]), ['a', 'b']),
+    '5 pages, then 6; moved: none'
+  );
+  assert.equal(
+    movedPages(first, at(5, ['a', 2], ['b', 5]), ['a', 'b']),
+    '5 pages, then 5; moved: b'
+  );
 });

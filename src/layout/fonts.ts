@@ -1,7 +1,8 @@
 // The PDFs' typefaces (spec 001 T017, FR-015, research R5): the website's Roboto, Roboto
 // Mono for identifiers, and the Noto Sans family only for characters those lack, all
 // OFL-1.1 from @fontsource. The image carries no other font, so nothing falls back
-// silently; a character none of these covers is a fault before anything is printed.
+// silently. A character none of these covers is handled by spec 001 FR-017: a fixed list
+// is substituted, then any other is a fault in the book and U+FFFD in a PDF made on request.
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

@@ -278,7 +278,14 @@ synthetic documents, on this host under load.
   - with no fallback, a character none of the fonts covers would be drawn as an empty
     box, still silently. So before printing, each text's characters are checked against
     the fonts' character maps (`fontkit`, MIT), and one no font covers is a fault,
-    named by its code point and its section's stable identifier;
+    named by its code point and its section's stable identifier. Amended by FR-017
+    (30 Oct 2026): a fixed list is substituted first, and a PDF made on request prints
+    any other as U+FFFD, logged, instead of failing. The figures' labels are checked
+    too: before drawing, from the names the graph gives them and the labels of the
+    diagram files the Figure rules choose to draw (a diagram's figure reads its file,
+    research R3; a reaction's figure is laid out by the content service from the graph's
+    names); and after drawing, in each SVG's text, before the part holding it is printed
+    (the book is printed in parts, R4);
   - the check of FR-011 and SC-009 lists every font in the PDF.
 
 **Alternatives considered.**

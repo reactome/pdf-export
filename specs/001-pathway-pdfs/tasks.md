@@ -107,11 +107,12 @@ for WebsiteAngular to ship it (T042).
   - cold, with an empty `RENDER_CACHE` directory, or a fresh `RENDER_CACHE_KEY`, for each run;
   - a sample of at least 2,000 figures in the book's mix: 85% reactions, 6% own diagrams, 1% illustrations, 8% selections.
 
-  Measure two things:
+  Measure three things:
   - **(a) The render service as it is,** at `RENDER_CONCURRENCY` 1, 2, 4 and 8, with `RENDER_QUEUE` raised to match so the run measures renders, not 503s. The service deliberately opens a fresh page per render, because a reused page leaks state such as a stale analysis token.
   - **(b) Page reuse,** through a harness on WebsiteAngular's `render-core` in `ci/measure/`: 1, 2, 4 and 8 reused pages, each reset between figures, with any leak checked by comparing a figure drawn after another with the same figure drawn fresh.
+  - **(c) One figure on request,** for the PDFs made on the fly (a single event's, and the analysis report of spec 002, proposed in #51, which draws a genome-wide overview and up to 50 overlaid diagrams per request): the time for one figure with an analysis token, cold, at the service's settings for the website, and how it grows with requests at once.
 
-  Record figures per second, CPU and memory, and the extrapolation to 19,313 figures, in research R7. The script's output carries no names.
+  Record figures per second, CPU and memory, and the extrapolation to 19,313 figures, in research R7, and (c)'s times beside SC-005's budget. The script's output carries no names.
   - **Go** if (a) fits 19,313 figures in 44 minutes. A go on (b) alone is conditional: page reuse must ship in WebsiteAngular's render service first (T042), and Phase 4 then waits for it.
   - **No-go** otherwise: record the numbers, raise research R7's routes with the user, and take T006.
 
@@ -230,7 +231,7 @@ for WebsiteAngular to ship it (T042).
   - **From #40's review (#45, replacing #41 to #44 after their reviews):** a label's size is read only as a whole value: a number (with an exponent, as `1e1px`) and an absolute unit in any case (px, pt, pc, in, cm, mm, Q). Every other size is counted unread and makes the figure unmeasured, not legible: relative units (em, %, rem, ex …), keywords (x-small, smaller, inherit), functions (calc, var), zero and an overflowing number. In a `font` shorthand the size is its first number with a unit that is not an angle, before any `/`, so a weight, an oblique angle or a line height is not read as one. Style elements are read; the text drawn, data attributes and custom properties (`--my-font`) are not. The markup is read in one pass that ends a tag at the first `>` outside a quoted value, so a `>` in an attribute's value does not hide the size after it, and a stray `<` in text does not swallow the tag after it, while what came before it is kept as markup, so a malformed tag (no `>` of its own, or an unquoted `<` in a value) still gives its size; comments and character data are left out; a style element's rules end at its own end tag, prefixed or not, and a self-closing one has none; a size marked `!important` is read (in an attribute too, where a browser would ignore it: that errs small). The root's start tag is found without a pattern. Numbers are matched anchored. Inputs that made earlier readers backtrack are each read in under 250 ms, seen failing with the earlier reader each names: digits in the shorthand (2.0 s), a tail of `>` (7.0 s, with the unclosed style elements in the same run) and a stray `<svg` with no root (2.7 s); unclosed style elements alone took 1.4–3.2 s with #42's reader, as #43's and #44's reviews measured, a 5 MB diagram in about 110 ms. The report's lists, the escaped ids and the cover's semicolons are tested. Each change was seen failing with its mutant.
   - **From #45's review (#46):** a stray `<` (in text, or a tag missing its `>`) is now counted unread, so a size read after it, where there was none, does not make the figure's labels known: such a figure is reported as unmeasured. An unquoted `font-size=1`, which an HTML parser takes when the figure is inlined, is read, as is one with spaces around `=`; before, neither was seen. The smallest label is found with a loop: `Math.min` over every size overflowed the stack on a figure of 300,000 labels. Each seen failing with its mutant.
   - **`break-inside: avoid` is not what keeps a figure whole.** Chromium moves an SVG no taller than a page to the next page whole with or without it; removing it fails no test. What keeps a figure whole is that none is sized taller than the page, which the split test catches.
-  - **For T024's preflight, measured on release 98** (every summation and event name): three characters no font draws, U+2011 (non-breaking hyphen, on 197 lines), U+FB01 (the ﬁ ligature, 5) and U+02D9 (dot above, 1); ‰ and ℃ do not occur. As T024 stands, each fails the book. Whether to map them to what the fonts draw (a hyphen, "fi") or add a font that has them is T024's decision, with the user.
+  - **For T024's preflight, measured on release 98** (every summation and event name): three characters no font draws, U+2011 (non-breaking hyphen, on 197 lines), U+FB01 (the ﬁ ligature, 5) and U+02D9 (dot above, 1); ‰ and ℃ do not occur. As T024 stood, each failed the book; the user chose to map them (FR-017, #53), and T024 now lists the substitutions.
 
 - [x] T019 Printing, `src/print/print.ts` and `src/print/contents.ts`.
   - One Chromium (`playwright-core`). Pages are loaded with `goto` on a file, not `setContent` (research R4), on A4 `@page`.
@@ -243,9 +244,9 @@ for WebsiteAngular to ship it (T042).
   - internal links landing on their pages;
   - every contents number its target's page, seen failing with the placeholders left in.
 
-  — #48, replacing #47 after its review. `Printer` (`src/print/print.ts`) starts one Chromium (`playwright-core` 1.64.1, now a runtime dependency, as is `pdfjs-dist` 6.4.299), writes each page to a file in a folder of its own and loads it with `goto`, loads every face the page declares and refuses one that does not load, and prints on the page's A4 `@page`. `single` prints tagged with Chromium's outline; with a contents list it reads where each target landed from the first print and prints again with the numbers in their boxes, and refuses a second print whose pages differ from the first's. `part` prints untagged. `src/print/contents.ts` finds each target's page from the named destination Chromium writes for every anchor a link points at (every contents entry links to its target), read with pdf.js, and fills the placeholders. The font check uses `@cantoo/pdf-lib` 2.11.1 (MIT; the plan names this fork, research R4 measured pdf-lib 1.17), a dev dependency for now: every font dictionary in the PDF names one of FR-015's families, none is Type 3, and each carries its file. Its dependencies' ranges are open (`culori >=4`, `tslib >=2`, `node-html-better-parser >=1.5.9`); the lock pins them, and they are to be checked when it becomes a runtime dependency (T026). Ten tests: the fixture's pathway at depth 1, its reaction alone and a part of its book, two pages made for the purpose (a header whose characters nothing else uses, and one whose pages move), and the comparison of two prints. Each of these mutants made one fail: `setContent` in place of `goto` (every test, through the refusal of fonts that do not load; without the refusal, system fonts appear, as research R4 found), no second pass, each page counted one too low, and a single PDF printed untagged (no outline). The contents numbers are checked against each heading's page found in the text, not against what `contents.ts` read.
+  — #48, replacing #47 after its review. `Printer` (`src/print/print.ts`) starts one Chromium (`playwright-core` 1.64.1, now a runtime dependency, as is `pdfjs-dist` 6.4.299), writes each page to a file in a folder of its own and loads it with `goto`, loads every face the page declares and refuses one that does not load, and prints on the page's A4 `@page`. `single` prints tagged with Chromium's outline; with a contents list it reads where each target landed from the first print and prints again with the numbers in their boxes, and refuses a second print whose pages differ from the first's. `part` prints untagged. `src/print/contents.ts` finds each target's page from the named destination Chromium writes for every anchor a link points at (every contents entry links to its target), read with pdf.js, and fills the placeholders. The font check uses `@cantoo/pdf-lib` 2.11.1 (MIT; the plan names this fork, research R4 measured pdf-lib 1.17), a dev dependency for now: every font dictionary in the PDF names one of FR-015's families, none is Type 3, and each carries its file. Its dependencies' ranges are open (`culori >=4`, `tslib >=2`, `node-html-better-parser >=1.5.9`); the lock pins them, and they are to be checked when it becomes a runtime dependency (T026). Ten tests (the tenth, the comparison, from #49): the fixture's pathway at depth 1, its reaction alone and a part of its book, two pages made for the purpose (a header whose characters nothing else uses, and one whose pages move), and the comparison of two prints. Each of these mutants made one fail: `setContent` in place of `goto` (every printing test, through the shared setup's refusal of fonts that do not load; without the refusal, system fonts appear, as research R4 found), no second pass, each page counted one too low, and a single PDF printed untagged (no outline). The contents numbers are checked against each heading's page found in the text, not against what `contents.ts` read.
   - **From #47's review:** the link test passed with every link landing on the contents page, which lists every title; a link must now land on a page where its target's title is a heading. Waiting for `document.fonts.ready` left out text only in a running header (its faces were never asked for, and the header was not printed at all); every declared face is now loaded first, and a face that fails to load is refused, which also catches research R4's `setContent` trap whatever fonts the host has (a name check passed on a host with Roboto installed). A part is checked to print untagged with its placeholders and probes, and the refusal of a second print whose pages moved is shown with a page made to move. A failure to start or close no longer leaks the browser or the folder. New mutants, each caught: only `fonts.ready` awaited (the header test), font failures not refused, a part printed tagged, and moved pages not refused.
-  - **From #48's review (#49):** each half of the moved-pages check (another page count, a target on another page) is shown alone, on the comparison itself; a link landing on the cover fails the link test (the cover's title and figure labels are as large as headings). Loading every face costs about 130 ms a print (57 faces decoded each time): T025 and T026 are to account for it at the book's scale, or load the faces once a browser context.
+  - **From #48's review (#49):** each half of the moved-pages check (another page count, a target on another page) is shown alone, on the comparison itself; a link landing on the cover fails the link test (the cover's title and figure labels are as large as headings). Loading every face costs 130–160 ms a print (57 faces decoded each time): T025 and T026 are to account for it at the book's scale, or load the faces once a browser context.
 
 **Checkpoint:** the measurements are recorded, and the model, layout and printing work on
 the fixture.
@@ -285,6 +286,11 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
     - 503 `unavailable` when a service cannot answer or the limit is reached.
   - **Health:** the version, the graph's release, and whether the render and analysis services answer.
   - **Content:** bookmarks in every PDF (FR-006). A figure that cannot be drawn leaves its section without it, logged.
+  - **Characters (FR-017):** FR-017's substitutions, then any character no font covers printed as U+FFFD, in the texts and in the figures' labels alike: the labels go through `src/figures/labels.ts` in its on-request mode, which replaces and logs instead of raising the book's fault. Each code point is logged once per PDF, the texts' and the labels' sharing one log, with the stable identifier or token, never the text; never a failed request. T022 creates `src/layout/characters.ts` and `src/figures/labels.ts` with the list and the on-request mode; T024 adds the book's fault mode and the preflight. Tested with:
+    - a planted character in a text: U+FFFD in the PDF's text, one log line with the code point and the stable identifier;
+    - one in a stub figure's label (a stub setting): the answer 200, the figure present, its label holding U+FFFD, one log line naming the code point and the stable identifier (seen failing with labels not passed through `labels.ts`, and with the book's mode, whose fault would drop the figure);
+    - the same code point in a text and in a stub label: one log line, not two (seen failing with a log per source);
+    - the same character a thousand times in one text: one log line; distinct characters give a line each.
 
   Tests in `test/serve.test.ts` against the stubs:
   - each status, seen failing;
@@ -308,11 +314,18 @@ passes.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir>` (contracts/cli.md).
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
-  - **Characters:** each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector).
-  - Either fault means exit 1, with no book written (Story 5, scenario 3).
+  - **Characters (FR-017):** first FR-017's substitutions, in T022's `src/layout/characters.ts` (with T017's detector), which T024 extends with the book's fault mode, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json` only, not `.graph.json`; the 220 illustrated pathways' files among them, a superset of what is drawn) (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (every physical entity a reaction's figure draws, inputs, outputs, catalysts and regulators, and their compartments, from the graph) and the labels of the diagram files the Figure rules choose to draw, read in `src/preflight/labels.ts`; and after drawing, before each part is printed, over each SVG's label text, in T022's `src/figures/labels.ts`, extended here with the book's fault mode, which also makes the substitutions there after T014's id prefixing. Only the substitutions made in what is printed are counted for the run report, not the preflight's own.
+  - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
+  - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
+  - a character off the list in a diagram file's label is a fault naming that diagram's pathway; one in a physical entity's name a fault naming the first event whose figure holds it; and one in a compartment held only by a participant, named in no event's section, likewise (so only the figures' names can find it);
+  - T024 adds to the fixture graph a compartment held only by a participant's physical entity, for the compartment test above;
+  - one in an illustrated pathway's diagram file (`R-HSA-90000300.json`, Gamma pathway) is no fault, as the Figure rules draw its EHLD;
+  - one in a drawn figure's label alone is a fault after drawing, before its part is printed (the stub serves such a label only when a test sets it at construction, so the fixture's own run stays clean);
+  - a label in a diagram file the book does not draw is not read: a character off the list planted in `R-MMU-90000900.json` is no fault in the human book;
+  - a substitution in an inlined figure leaves its elements, ids and attributes as they were;
   - the fixture summary's entry for an absent event is not a fault.
 
 - [ ] T025 [US1] Parts, `src/print/parts.ts`.
@@ -333,22 +346,24 @@ passes.
   Tests: every link and bookmark lands on its target heading, seen failing with links copied as pdf-lib leaves them.
 
 - [ ] T027 [US1] Page numbers and running headers, `src/print/stamp.ts`, stamped after the join with pdf-lib.
-  - Text in embedded Roboto, in the theme's colour.
+  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (T022's `src/layout/characters.ts`): a chapter's name is stamped, not laid out, so it would otherwise bypass the list. The stamped headers' substitutions are not counted in the run report: the chapter's name is counted where its section prints it.
   - Each page's header is its chapter's name, or its front part's name.
   - No number on the cover (FR-016).
 
-  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering.
+  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering; a chapter name holding U+2011 is stamped with U+002D, seen failing with the name stamped as it is.
 
 - [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in the joined book and reprint only the front part. The reprinted front part is swapped in before T026's links and T027's stamping run, so its links are rewritten and its pages stamped like the rest. Tests: every entry's number is its target's page, across parts; the contents' links land; the front pages carry their headers and numbers.
 - [ ] T029 [US1] `book` end to end, `src/cli.ts` (contracts/cli.md).
   - **Flags and their environment variables** (contracts/cli.md): `--graph` (`NEO4J_URI`), `--database` (`NEO4J_DATABASE`), `--render` (`RENDER_SERVICE`), `--site` (`REACTOME_SITE`), `--files`, `--species`, `--out`, `--parallel` and `--report`. Credentials come from `NEO4J_USER` and `NEO4J_PASSWORD`, never the command line.
   - **Writing:** the file is written beside its name and moved into place.
-  - **The run report:** the release; each stage's time; pages and size; figures by kind; the figures below the legibility floor; missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
+  - **The run report:** the release; the characters FR-017's list replaced, by code point and count; each stage's time; pages and size; figures by kind; the figures below the legibility floor; missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
 
   Tests:
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
-  - exit 2 on bad arguments, and on a service unreachable at the start.
+  - exit 2 on bad arguments, and on a service unreachable at the start;
+  - the run report lists the characters replaced, by code point and count. The test plants them itself, in a copy of the fixture: one listed character in a summation, one in the name of Reaction eight (`R-HSA-90000132`, at one place, with no events before or after it and no children, so its name prints only in its heading and its contents entry), and, by a stub setting made for this test, one in the label of Reaction eight's own reaction figure (drawn once; a pathway's diagram can be drawn again for its subpathways). The counts are of occurrences in the finished book: the summation's 1, the name's 2, the label's 1. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it; and a chapter's name holding a listed character adds nothing for its stamped headers (T027), seen failing with the stamps counted;
+  - with T025's threshold lowered and the stub's label set to a character off the list in a figure of a later part: exit 1 after earlier parts are printed, and no book, temporary file or part file left.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.
@@ -485,7 +500,7 @@ passes.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
-- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031.
+- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031. T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**
@@ -501,7 +516,7 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- US2 and US1 once Phase 2 is done.
+- T025 beside US2 once Phase 2 is done; the rest of US1 waits for T022 through T024.
 
 ## Implementation strategy
 
