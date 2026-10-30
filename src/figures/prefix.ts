@@ -19,8 +19,8 @@ export function prefixIds(svg: string, prefix: string): string {
         (_m, quote: string | undefined, id: string) => `url(${quote ?? ''}#${p}${id}${quote ?? ''})`
       )
       .replace(
-        /(\s(?:xlink:)?href=")#([^"]+)"/g,
-        (_m, attr: string, id: string) => `${attr}#${p}${id}"`
+        /(\s(?:xlink:)?href=)(["'])#([^"']+)\2/g,
+        (_m, attr: string, quote: string, id: string) => `${attr}${quote}#${p}${id}${quote}`
       )
   );
 }
