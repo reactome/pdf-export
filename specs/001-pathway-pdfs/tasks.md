@@ -286,7 +286,11 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
     - 503 `unavailable` when a service cannot answer or the limit is reached.
   - **Health:** the version, the graph's release, and whether the render and analysis services answer.
   - **Content:** bookmarks in every PDF (FR-006). A figure that cannot be drawn leaves its section without it, logged.
-  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD, in the texts and in the figures' labels alike: the labels go through T024's `src/figures/labels.ts` in its on-request mode, which replaces and logs instead of raising the book's fault. Each code point is logged once per PDF, the texts' and the labels' sharing one log, with the stable identifier or token, never the text; never a failed request. Tested with a planted character in a text, one in a stub figure's label (a stub setting, the answer still 200), and the same character a thousand times in one text (one log line); distinct characters give a line each.
+  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD, in the texts and in the figures' labels alike: the labels go through T024's `src/figures/labels.ts` in its on-request mode, which replaces and logs instead of raising the book's fault. Each code point is logged once per PDF, the texts' and the labels' sharing one log, with the stable identifier or token, never the text; never a failed request. T022 creates `src/layout/characters.ts` and `src/figures/labels.ts` with the list and the on-request mode; T024 adds the book's fault mode and the preflight. Tested with:
+    - a planted character in a text: U+FFFD in the PDF's text, one log line with the code point and the stable identifier;
+    - one in a stub figure's label (a stub setting): the answer 200, the figure present, its label holding U+FFFD, one log line naming the code point and the stable identifier (seen failing with labels not passed through `labels.ts`, and with the book's mode, whose fault would drop the figure);
+    - the same code point in a text and in a stub label: one log line, not two (seen failing with a log per source);
+    - the same character a thousand times in one text: one log line; distinct characters give a line each.
 
   Tests in `test/serve.test.ts` against the stubs:
   - each status, seen failing;
@@ -316,8 +320,9 @@ passes.
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
   - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
-  - a character off the list in a diagram file's label is a fault naming that diagram's pathway, one in a physical entity's name a fault naming the first event whose figure holds it, and one in a compartment's name likewise;
-  - one in a drawn figure's label alone is a fault after drawing, before its part is printed (the stub serves such a label only when a test sets it at construction, so the fixture's own run stays clean);
+  - a character off the list in a diagram file's label is a fault naming that diagram's pathway; one in a physical entity's name a fault naming the first event whose figure holds it; and one in a compartment held only by a participant, named in no event's section, likewise (so only the figures' names can find it);
+  - one in an illustrated pathway's diagram file (`R-HSA-90000300.json`, Gamma pathway) is no fault, as the Figure rules draw its EHLD;
+  - one in a drawn figure's label alone is a fault after drawing, before its part is printed (the stub serves such a label only when a test sets it at construction, so the fixture's own run stays clean); with T025's threshold lowered, placed in a later part, it fails the step after earlier parts are printed, and no book, temporary file or part file is left;
   - a label in a diagram file the book does not draw is not read: a character off the list planted in `R-MMU-90000900.json` is no fault in the human book;
   - a substitution in an inlined figure leaves its elements, ids and attributes as they were;
   - the fixture summary's entry for an absent event is not a fault.
@@ -340,7 +345,7 @@ passes.
   Tests: every link and bookmark lands on its target heading, seen failing with links copied as pdf-lib leaves them.
 
 - [ ] T027 [US1] Page numbers and running headers, `src/print/stamp.ts`, stamped after the join with pdf-lib.
-  - Text in embedded Roboto, in the theme's colour.
+  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (`src/layout/characters.ts`): a chapter's name is stamped, not laid out, so it would otherwise bypass the list.
   - Each page's header is its chapter's name, or its front part's name.
   - No number on the cover (FR-016).
 
@@ -356,7 +361,7 @@ passes.
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
   - exit 2 on bad arguments, and on a service unreachable at the start;
-  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters (T024 adds one to the fixture graph's summations and one to a stub figure's label).
+  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters (T024 adds one to the fixture graph's summations and one to a stub figure's label): exactly 1 for each, so a count of the preflight's substitutions too, or of the front part's two prints (T028), fails it.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.

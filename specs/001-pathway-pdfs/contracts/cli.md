@@ -31,10 +31,12 @@ Writes the release's book (Story 1).
   - **before any figure is drawn,** in the graph's texts the layout writes, in the names
     the figures label (every physical entity a reaction's figure draws: its inputs,
     outputs, catalysts and regulators; and their compartments, from the graph), and in
-    the labels of the diagram files the figures draw (`--files`: a pathway's own or
-    ancestor's diagram, not an illustrated pathway's, whose figure is its EHLD); a fault
-    names the first event in document order whose figure holds it, or for a diagram file
-    the pathway whose diagram it is;
+    the labels of the diagram files the Figure rules choose to draw (`--files`; today an
+    illustrated pathway's file is not among them, its figure being its EHLD, data-model
+    Figure); a fault in a text names the event whose section holds it, one in a
+    figure's names the first event in document order whose figure holds it, and one in
+    a diagram file the pathway whose diagram it is. A character in several places is one
+    fault per place;
   - **after each figure is drawn, before its part is printed,** in the text of its SVG's
     labels, a fault naming the figure's event: the backstop for anything the first
     check's sources did not hold. The book is printed in parts (research R4), so a fault

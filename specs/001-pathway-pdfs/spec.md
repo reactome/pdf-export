@@ -290,8 +290,8 @@ of pages with today's book.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
 - **A character no embedded typeface draws** (FR-017): in the book, one of a fixed list
-  is replaced by what the typefaces draw, and any other fails the step before anything is
-  printed. In a PDF made on request it never fails: it prints as the replacement mark
+  is replaced by what the typefaces draw, and any other fails the step, before the part
+  holding it is printed, with no book written. In a PDF made on request it never fails: it prints as the replacement mark
   (U+FFFD) and is logged.
 - **A release file missing:** a diagram the graph needs but the files lack, or an EHLD
   the summary names for a pathway the graph holds, but the files lack. (An entry for an
@@ -424,16 +424,19 @@ of pages with today's book.
     changing what the text says (a ligature by its letters, a non-breaking hyphen by a
     hyphen, a spacing dot above used as a radical's dot by a bullet, a geresh used as a
     prime by a prime). The list is kept with the code, each entry with the release
-    text it was found in. Any character not on it fails the step before anything is
-    printed, naming it and the event, so the release's owners see a new one;
+    text it was found in. Any character not on it fails the step, naming it and the
+    event, so the release's owners see a new one: found in the graph's texts or the
+    release's files, before anything is printed; found only in a drawn figure, before
+    the part holding it is printed. Either way no book is written;
   - **a PDF made on request** (a single event's, or any other the website asks for on the
     fly, whose text can include what users submit): the same list is applied, and any
     other such character prints as the replacement mark (U+FFFD). Each such code point is
     logged once per PDF, with the stable identifier or the token, never the text it was
     in; the request never fails on it;
   - in a figure, only the labels' text is changed, never its shapes; a few substituted
-    glyphs should fall well within SC-008's threshold (an inference, which T034's
-    comparison shows), so the figure is compared as any other.
+    glyphs should fall well within SC-008's threshold (an inference: release 98's labels
+    hold none of the listed characters, so no comparison has tested it), so the figure is
+    compared as any other.
 
 ### Key Entities
 
