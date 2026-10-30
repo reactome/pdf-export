@@ -150,7 +150,7 @@ for WebsiteAngular to ship it (T042).
   Record time and peak memory per stage against research R7's 13 + 6 minutes. The script lives in `ci/measure/`. If the join does not fit in memory, take T012.
 
 - [ ] T012 Only if T011's join does not fit in memory: join in groups (research R4). Join the parts a few at a time into intermediate files, then join those, keeping the links' and the outline's targets. Record the memory and time against the budget.
-- [ ] T013 The graph reader, `src/graph/`:
+- [x] T013 The graph reader, `src/graph/`: — #26. `connection.ts` reads the settings (`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) and opens read sessions, integers as numbers. `queries.ts` has the release (`DBInfo.releaseNumber`), a species' top-level pathways, an event by stable id, versioned stable id or database id (anything but a pathway or reaction is none), a level's children, each event's facts and short lists, the first five references with six authors and whether there are more, and edits with their authors. Pattern comprehensions come back in no set order, so each list is sorted by its relationship's `order` after reading. `test/graph/reader.test.ts`, 8 tests on the fixture; each of five mutants made one fail: literature without `ORDER BY`, children without it, inference read the wrong way, compartments left unsorted, and (as T003 showed) every order equal to the ids.
   - the Neo4j driver (`neo4j-driver`), with the database name and the `NEO4J_*` settings;
   - the batched queries of research R2: the tree by level; each part across a level's events; literature, the first five by `order`, with six authors and whether there are more; edits with their authors; the release; the top-level pathways;
   - rows mapped to plain objects;
