@@ -165,7 +165,7 @@ for WebsiteAngular to ship it (T042).
   - **The fixture** gains lists whose creation order is neither their order nor its reverse (three summations, three events before and three after), the eight-author reference among the first five, authors created in reverse of their order, and a book chapter: 58 nodes and 98 relationships.
   - **Tests:** `test/graph/reader.test.ts` (9, on the fixture) and `test/graph/facts.test.ts` (2, no graph). Each of these mutants made one fail: literature or children read without `ORDER BY`; inference read the wrong way; more-authors always true; no cap of six; a reference's or an edit's authors unsorted; each of the six lists left unsorted; ids not made unique; a non-event read as nothing.
 
-- [ ] T014 [P] The figures client, `src/figures/` (contracts/render.md).
+- [x] T014 [P] The figures client, `src/figures/` (contracts/render.md).
   - It asks the render service for each kind: `/render/{stId}.svg`, `?highlight=a,b`, `?layout=reaction`, and `?token=` decoded once.
   - It retries a 503 once, and treats a refusal as a missing figure.
   - It prefixes every `id`, `url(#…)` and `href="#…"` with the section's anchor.
@@ -173,6 +173,8 @@ for WebsiteAngular to ship it (T042).
   Tests in `test/figures/` against T004's stub:
   - the exact request URL for each kind, including the token, seen failing with a wrongly named parameter (the stub's 400);
   - two colliding figures inlined together keep unique ids, seen failing without the prefixing.
+
+  — #30, replacing #29 after its review. `client.ts` builds each request's URL. The token is given as the analysis service issued it, and `URLSearchParams` encodes it once. A 503 is tried once more after a fixed pause (the service asks for 5 s); a second 503, any other refusal, a timeout (the body's read included), an answer cut short or one that is not SVG is a missing figure, with its reason (a connection's error code included). `prefix.ts` prefixes every `id` (double- or single-quoted), `url(#…)` (bare, quoted, or with `&quot;` as a style attribute writes it) and local `href`/`xlink:href`, leaving `data:` images and web addresses alone; the test fails on a `url(` of a form it does not know. Ten tests (and the stub's `stall-body` and `not-svg` refusals). Each of these mutants made one fail: the body's read unguarded (a timeout there threw), the type unchecked, the connection's code left out, `&quot;` or single-quoted ids not handled, `analysis=` for `token=`, the token encoded twice, `select=` for `highlight=`, no retry, a retry of every refusal, and ids, `url(#…)` or `href="#…"` left unprefixed. Alpha's and beta's diagrams, and Gamma's illustration inlined twice, keep every id unique with every reference on the page. From #28's review: tests for a versioned stable id of a non-event, and for `edits` given an id twice. Taking `unique()` out of `edits` fails no test: the query groups rows by event before collecting, so a doubled id cannot double them.
 
 - [ ] T015 The model, `src/model/` (data-model.md):
   - the entities: `Event`, `Section` (full or short, with its anchor and path), `Figure`, `Cover`, `Contents`, `Book`, `SingleEventPdf` and `Release`;

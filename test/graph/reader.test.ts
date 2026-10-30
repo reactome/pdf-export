@@ -48,6 +48,7 @@ describe('the graph reader', { skip }, () => {
     assert.equal((await event('R-HSA-90000200.1'))?.kind, 'pathway');
     assert.equal((await event(String(id(211))))?.stId, 'R-HSA-90000211');
     assert.deepEqual(await eventByIdentifier(graph, 'R-HSA-90000400'), { notAnEvent: true });
+    assert.deepEqual(await eventByIdentifier(graph, 'R-HSA-90000400.1'), { notAnEvent: true });
     assert.equal(await eventByIdentifier(graph, 'R-HSA-1'), null);
   });
 
@@ -57,6 +58,8 @@ describe('the graph reader', { skip }, () => {
     const refs = (await literature(graph, [id(211), id(211)])).get(id(211));
     assert.equal(new Set(refs?.map((r) => r.dbId)).size, 5);
     assert.equal(refs?.length, 5);
+    const once = (await edits(graph, [id(211)])).get(id(211))?.length;
+    assert.equal((await edits(graph, [id(211), id(211)])).get(id(211))?.length, once);
   });
 
   test("reads a level's children in the curators' order", async () => {
