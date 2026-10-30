@@ -286,6 +286,10 @@ of pages with today's book.
   and searches in the readers of SC-004.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
+- **A character no embedded typeface draws** (FR-017): in the book, one of a fixed list
+  is replaced by what the typefaces draw, and any other fails the step before anything is
+  printed. In a PDF made on request it never fails: it prints as the replacement mark
+  (U+FFFD) and is logged.
 - **A release file missing:** a diagram the graph needs but the files lack, or an EHLD
   the summary names for a pathway the graph holds, but the files lack. (An entry for an
   event the graph does not hold is ignored: plan, research R7.) The step fails and names
@@ -401,6 +405,16 @@ of pages with today's book.
   identifiers, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2 and Noto Sans
   Math) only for characters they lack. Each typeface is embedded
   and under a licence FR-009 allows.
+- **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026):
+  - **the book:** those on a fixed list are replaced by what the typefaces draw, without
+    changing what the text says (a ligature by its letters, a non-breaking hyphen by a
+    hyphen, a spacing dot above used as a radical dot by a bullet). The list is kept with
+    the code, and each entry was found in a release's text. Any character not on it fails
+    the step, naming it and the event, so the release's owners see a new one;
+  - **a PDF made on request** (a single event's, or any other the website asks for on the
+    fly, whose text can include what users submit): the same list is applied, and any
+    other such character prints as the replacement mark (U+FFFD) and is logged with the
+    event or token, never failing the request.
 - **FR-016**: The PDFs' layout MUST have:
   - parts set apart by space, type and at most thin rules, with no boxes or borders;
   - the same margins on every page;

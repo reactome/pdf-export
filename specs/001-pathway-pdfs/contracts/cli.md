@@ -25,8 +25,8 @@ Writes the release's book (Story 1).
   illustrations from the summary, ignoring an entry for an event the graph does not
   hold), and a file missing is a fault
   `missing-file <name>`, the step ending with exit 1 and no book written (Story 5,
-  scenario 3). A character no font covers is a fault `uncovered-character <code point>
-<stId>` (research R5).
+  scenario 3). A character no font covers, after FR-017's substitutions, is a fault
+  `uncovered-character <code point> <stId>` (research R5).
 - **Exit 0:** the book is written, and `check-book` passed on it. The file is written
   beside its name and moved into place, so a failed run never leaves a partial book.
 - **Exit 1:** a fault from the preflight or FR-011, or a figure that could not be drawn.
