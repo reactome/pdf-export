@@ -231,7 +231,7 @@ for WebsiteAngular to ship it (T042).
   - **From #40's review (#45, replacing #41 to #44 after their reviews):** a label's size is read only as a whole value: a number (with an exponent, as `1e1px`) and an absolute unit in any case (px, pt, pc, in, cm, mm, Q). Every other size is counted unread and makes the figure unmeasured, not legible: relative units (em, %, rem, ex …), keywords (x-small, smaller, inherit), functions (calc, var), zero and an overflowing number. In a `font` shorthand the size is its first number with a unit that is not an angle, before any `/`, so a weight, an oblique angle or a line height is not read as one. Style elements are read; the text drawn, data attributes and custom properties (`--my-font`) are not. The markup is read in one pass that ends a tag at the first `>` outside a quoted value, so a `>` in an attribute's value does not hide the size after it, and a stray `<` in text does not swallow the tag after it, while what came before it is kept as markup, so a malformed tag (no `>` of its own, or an unquoted `<` in a value) still gives its size; comments and character data are left out; a style element's rules end at its own end tag, prefixed or not, and a self-closing one has none; a size marked `!important` is read (in an attribute too, where a browser would ignore it: that errs small). The root's start tag is found without a pattern. Numbers are matched anchored. Inputs that made earlier readers backtrack are each read in under 250 ms, seen failing with the earlier reader each names: digits in the shorthand (2.0 s), a tail of `>` (7.0 s, with the unclosed style elements in the same run) and a stray `<svg` with no root (2.7 s); unclosed style elements alone took 1.4–3.2 s with #42's reader, as #43's and #44's reviews measured, a 5 MB diagram in about 110 ms. The report's lists, the escaped ids and the cover's semicolons are tested. Each change was seen failing with its mutant.
   - **From #45's review (#46):** a stray `<` (in text, or a tag missing its `>`) is now counted unread, so a size read after it, where there was none, does not make the figure's labels known: such a figure is reported as unmeasured. An unquoted `font-size=1`, which an HTML parser takes when the figure is inlined, is read, as is one with spaces around `=`; before, neither was seen. The smallest label is found with a loop: `Math.min` over every size overflowed the stack on a figure of 300,000 labels. Each seen failing with its mutant.
   - **`break-inside: avoid` is not what keeps a figure whole.** Chromium moves an SVG no taller than a page to the next page whole with or without it; removing it fails no test. What keeps a figure whole is that none is sized taller than the page, which the split test catches.
-  - **For T024's preflight, measured on release 98** (every summation and event name): three characters no font draws, U+2011 (non-breaking hyphen, on 197 lines), U+FB01 (the ﬁ ligature, 5) and U+02D9 (dot above, 1); ‰ and ℃ do not occur. As T024 stands, each fails the book. Whether to map them to what the fonts draw (a hyphen, "fi") or add a font that has them is T024's decision, with the user.
+  - **For T024's preflight, measured on release 98** (every summation and event name): three characters no font draws, U+2011 (non-breaking hyphen, on 197 lines), U+FB01 (the ﬁ ligature, 5) and U+02D9 (dot above, 1); ‰ and ℃ do not occur. As T024 stood, each failed the book; the user chose to map them (FR-017, #53), and T024 now lists the substitutions.
 
 - [x] T019 Printing, `src/print/print.ts` and `src/print/contents.ts`.
   - One Chromium (`playwright-core`). Pages are loaded with `goto` on a file, not `setContent` (research R4), on A4 `@page`.
@@ -286,7 +286,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
     - 503 `unavailable` when a service cannot answer or the limit is reached.
   - **Health:** the version, the graph's release, and whether the render and analysis services answer.
   - **Content:** bookmarks in every PDF (FR-006). A figure that cannot be drawn leaves its section without it, logged.
-  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD; each code point logged once per PDF with the stable identifier or token, never the text; never a failed request. Tested with a planted character, and with a thousand of them in one text (one log line).
+  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD; each code point logged once per PDF with the stable identifier or token, never the text; never a failed request. Tested with a planted character, and with the same character a thousand times in one text (one log line); distinct characters give a line each.
 
   Tests in `test/serve.test.ts` against the stubs:
   - each status, seen failing;
@@ -310,13 +310,14 @@ passes.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir>` (contracts/cli.md).
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
-  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts`, applied to every text the layout writes and to the text of every inlined figure: U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities, which the figures' labels draw (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), over the texts and the figures' labels.
-  - Either fault means exit 1, with no book written (Story 5, scenario 3).
+  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts`, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 labels in the release's 2,780 diagram files, which the figures draw (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), over the texts and the labels in the release's diagram files (`--files`), before any figure is drawn.
+  - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
   - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
-  - a character off the list in a figure's label is a fault;
+  - a character off the list in a diagram file's label is a fault;
+  - a substitution in an inlined figure leaves its elements, ids and attributes as they were;
   - the fixture summary's entry for an absent event is not a fault.
 
 - [ ] T025 [US1] Parts, `src/print/parts.ts`.
@@ -352,7 +353,8 @@ passes.
   Tests:
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
   - exit 1 on a figure that cannot be drawn (the stub's 404 or timeout), with no partial book left;
-  - exit 2 on bad arguments, and on a service unreachable at the start.
+  - exit 2 on bad arguments, and on a service unreachable at the start;
+  - the run report lists the characters replaced, by code point and count, for a fixture text holding one of FR-017's characters.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.

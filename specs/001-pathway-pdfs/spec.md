@@ -431,7 +431,8 @@ of pages with today's book.
     other such character prints as the replacement mark (U+FFFD). Each such code point is
     logged once per PDF, with the stable identifier or the token, never the text it was
     in; the request never fails on it;
-  - a figure's label changed by the list is a recorded difference for SC-008.
+  - in a figure, only the labels' text is changed, never its drawing; one substituted
+    character is far within SC-008's threshold, so the figure is compared as any other.
 
 ### Key Entities
 

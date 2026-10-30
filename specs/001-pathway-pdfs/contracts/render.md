@@ -16,8 +16,10 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
 
 ## Answers pdf-export relies on
 
-- **200** with `image/svg+xml`. pdf-export prefixes every `id`, `url(#…)` and
-  `href="#…"` in it with the section's anchor before inlining it.
+- **200** with `image/svg+xml`. Before inlining it, pdf-export prefixes every `id`,
+  `url(#…)` and `href="#…"` in it with the section's anchor, and applies FR-017 to the
+  text of its labels: their text content only, never an element, an id or an
+  attribute.
 - **A refusal** (any 4xx, a 5xx, or a timeout): the figure is missing. Retried once
   after a pause for a 503. Then:
   - the book fails on it (FR-011);
