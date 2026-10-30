@@ -1,0 +1,7 @@
+// The PDFs' colours (spec 001 FR-015, research R5): the website's own theme package, the
+// version the website's lockfile pins, compiled here; no colour value is written in this
+// repository. Its light theme is laid on :root; the dark one goes to a selector no page
+// has, and src/layout/theme.ts keeps only the light theme's --mat-sys-* variables.
+@use 'ngx-reactome-style';
+
+@include ngx-reactome-style.theme($root: ':root', $dark: '.not-in-a-pdf', $vars: ':root');
