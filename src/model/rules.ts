@@ -45,7 +45,10 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
     .sort(
       (a, b) =>
         byCodeUnits(a.date, b.date) ||
-        byCodeUnits(a.authors[0]?.surname ?? '', b.authors[0]?.surname ?? '')
+        byCodeUnits(a.authors[0]?.surname ?? '', b.authors[0]?.surname ?? '') ||
+        // ties as event-pdf leaves them: it lists edits kind by kind, then sorts stably
+        KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) ||
+        a.dbId - b.dbId
     );
   const sameAuthors = (a: Edit, b: Edit): boolean => {
     const ids = new Set(a.authors.map((p) => p.dbId));
