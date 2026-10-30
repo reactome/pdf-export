@@ -232,7 +232,7 @@ for WebsiteAngular to ship it (T042).
   - **`break-inside: avoid` is not what keeps a figure whole.** Chromium moves an SVG no taller than a page to the next page whole with or without it; removing it fails no test. What keeps a figure whole is that none is sized taller than the page, which the split test catches.
   - **For T024's preflight, measured on release 98** (every summation and event name): three characters no font draws, U+2011 (non-breaking hyphen, on 197 lines), U+FB01 (the ﬁ ligature, 5) and U+02D9 (dot above, 1); ‰ and ℃ do not occur. As T024 stands, each fails the book. Whether to map them to what the fonts draw (a hyphen, "fi") or add a font that has them is T024's decision, with the user.
 
-- [ ] T019 Printing, `src/print/print.ts` and `src/print/contents.ts`.
+- [x] T019 Printing, `src/print/print.ts` and `src/print/contents.ts`.
   - One Chromium (`playwright-core`). Pages are loaded with `goto` on a file, not `setContent` (research R4), on A4 `@page`.
   - **A single-event PDF** is printed tagged, with Chromium's outline. With a contents list, the second pass reads where each section landed, with pdf.js, and prints again with the numbers in the same width (research R4).
   - **A part** is printed untagged, with placeholder links.
@@ -242,6 +242,8 @@ for WebsiteAngular to ship it (T042).
   - the outline nested;
   - internal links landing on their pages;
   - every contents number its target's page, seen failing with the placeholders left in.
+
+  — #47. `Printer` (`src/print/print.ts`) starts one Chromium (`playwright-core` 1.64.1, now a runtime dependency, as is `pdfjs-dist` 6.4.299), writes each page to a file in a folder of its own and loads it with `goto`, waits for its fonts, and prints on the page's A4 `@page`. `single` prints tagged with Chromium's outline; with a contents list it reads where each target landed from the first print and prints again with the numbers in their boxes, and refuses a second print whose pages differ from the first's. `part` prints untagged. `src/print/contents.ts` finds each target's page from the named destination Chromium writes for every anchor a link points at (every contents entry links to its target), read with pdf.js, and fills the placeholders. The font check uses `@cantoo/pdf-lib` 2.11.1 (MIT, research R4's choice), a dev dependency for now: every font descriptor in the PDF names one of FR-015's families and carries its file. Five tests, on the fixture's pathway at depth 1 and its reaction alone. Each of these mutants made one fail: `setContent` in place of `goto` (system fonts appear, as research R4 found), no second pass, each page counted one too low, and a single PDF printed untagged (no outline). The contents numbers are checked against each heading's page found in the text, not against what `contents.ts` read. Not shown failing: printing without waiting for `document.fonts.ready` (the local fonts load before the print in every run here, so the wait is a guard), and the refusal of a second print that moved pages (the boxes of fixed width keep the pages; no fixture moves them).
 
 **Checkpoint:** the measurements are recorded, and the model, layout and printing work on
 the fixture.
