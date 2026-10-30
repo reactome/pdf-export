@@ -77,35 +77,59 @@ const PX: Readonly<Record<string, number>> = {
   in: 96,
   cm: 96 / 2.54,
   mm: 96 / 25.4,
+  q: 96 / 101.6,
 };
 
-/** A number as CSS writes one, exponent and all. */
-const NUMBER = String.raw`(\d*\.?\d+(?:e[+-]?\d+)?)`;
+/** A size as CSS writes one, the whole value: a number, exponent and all, and its unit. */
+const SIZE = /^(\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?([a-z%]*)$/i;
+
+/** Units of angle, which a `font` shorthand's oblique angle is given in, not its size. */
+const ANGLE = /^(deg|rad|grad|turn)$/i;
 
 /**
  * The font sizes given to text: each `font-size` attribute or property, and the size in each
- * `font` shorthand (the first number with a unit: a bare number there is a weight), in
- * pixels, a bare number being pixels in SVG. A size in a relative unit (em, %, rem, ex …)
- * or one not known is not read, and is counted: what it is relative to is not known here.
- * Neither is a transform that scales a label; the render service's diagrams use neither.
+ * `font` shorthand (its first number with a unit that is not an angle: a bare number there
+ * is a weight, and what follows a `/` a line height), in pixels, a bare number being pixels
+ * in SVG. Every size that is not one of these, relative (em, %, rem, smaller …), a keyword
+ * (x-small, inherit …), a function (calc, var) or a unit not known, is counted unread: what
+ * it is relative to is not known here. Text content is not read, but a style element is.
+ * A transform that scales a label is not known either; the render service's diagrams use
+ * none.
  */
 function labelSizes(svg: string): { sizes: number[]; unread: number } {
   const sizes: number[] = [];
   let unread = 0;
-  const read = (value: string, unit: string) => {
+  /** A size's value, whole; anything that is not a finite, positive size is unread. */
+  const read = (value: string) => {
+    const match = SIZE.exec(value.trim());
+    const unit = match?.[2] ?? '';
     const factor = PX[unit.toLowerCase()];
-    const size = Number(value) * (factor ?? NaN);
-    if (size > 0) sizes.push(size);
+    const size =
+      match && factor !== undefined
+        ? Number(match[0].slice(0, match[0].length - unit.length)) * factor
+        : NaN;
+    if (Number.isFinite(size) && size > 0) sizes.push(size);
     else unread += 1;
   };
-  for (const [, value = '', unit = ''] of svg.matchAll(
-    new RegExp(String.raw`font-size(?:=["']|\s*:\s*)${NUMBER}([a-z%]*)`, 'gi')
+  // the markup and style elements, not the text drawn
+  const markup = svg.replace(
+    /(<style\b[^>]*>[\s\S]*?<\/style>)|>[^<]*(?=<)/gi,
+    (_whole, style: string | undefined) => style ?? '>'
+  );
+  for (const [, value = ''] of markup.matchAll(
+    /(?<![\w-])font-size(?:=["']|\s*:\s*)([^"';}<>]*)/gi
   )) {
-    read(value, unit);
+    read(value);
   }
-  for (const [, shorthand = ''] of svg.matchAll(/\bfont\s*:\s*([^;"']*)/gi)) {
-    const size = new RegExp(String.raw`(?<![\w.])${NUMBER}([a-z%]+)`, 'i').exec(shorthand);
-    if (size) read(size[1] ?? '', size[2] ?? '');
+  for (const [, shorthand = ''] of markup.matchAll(/(?<![\w-])font\s*:\s*([^"';}<>]*)/gi)) {
+    const size = shorthand
+      .split('/')[0]
+      ?.split(/\s+/)
+      .find((token) => {
+        const unit = SIZE.exec(token)?.[2];
+        return unit !== undefined && unit !== '' && !ANGLE.test(unit);
+      });
+    read(size ?? '');
   }
   return { sizes, unread };
 }

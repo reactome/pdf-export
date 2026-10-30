@@ -83,6 +83,45 @@ describe("a figure's size", () => {
     );
   });
 
+  test('keywords, functions, zero and overflow are unread; only the markup and style elements are read', () => {
+    const read = (body: string) => {
+      const m = measure(`<svg width="9" height="9">${body}</svg>`);
+      return [m.smallestLabel, m.unreadLabels];
+    };
+    for (const body of [
+      '<text font-size="x-small">a</text>',
+      '<text style="font-size: smaller">a</text>',
+      '<text style="font-size: inherit">a</text>',
+      '<text style="font-size: calc(12px)">a</text>',
+      '<text style="font-size: var(--s)">a</text>',
+      '<text style="font: small-caption">a</text>',
+      '<text style="font: bold small Roboto">a</text>',
+      '<text font-size="0">a</text>',
+      '<text font-size="1e400px">a</text>',
+    ]) {
+      assert.deepEqual(read(body), [null, 1], body);
+    }
+    // a style element is read, and a size in it that is not a font's is not
+    assert.deepEqual(read('<style>.a{font: bold 12px R} .b{stroke-width: 2px}</style>'), [12, 0]);
+    // the text drawn, a data attribute and a custom property are not sizes
+    assert.deepEqual(
+      read('<text data-font-size="1" style="--my-font: 2px" font-size="14">font: 1px</text>'),
+      [14, 0]
+    );
+    // an oblique angle is not the size; Q is a unit; the property's name in any case
+    assert.deepEqual(read('<text style="FONT: oblique 10deg 9PT R">a</text>'), [12, 0]);
+    assert.ok(
+      Math.abs((read('<text font-size="40Q">a</text>')[0] ?? 0) - (96 * 40) / 101.6) < 1e-9
+    );
+  });
+
+  test('a long run of digits is read in linear time', () => {
+    const start = performance.now();
+    measure(`<svg width="9" height="9"><text style="font: ${'1'.repeat(1_000)}!">a</text></svg>`);
+    measure(`<svg width="9" height="9"><text font-size="${'1'.repeat(1_000)}!">a</text></svg>`);
+    assert.ok(performance.now() - start < 250, String(performance.now() - start));
+  });
+
   test('a label whose size cannot be read is not taken as legible', () => {
     const mixed = place(
       measure(
