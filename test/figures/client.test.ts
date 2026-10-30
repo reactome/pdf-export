@@ -70,4 +70,24 @@ describe('the figures client', () => {
     assert.match(late.missing, /no answer/);
     assert.equal(stub.requests.length, 3);
   });
+
+  test('an answer that stops part way, or is not SVG, is a missing figure, not a failure', async () => {
+    stub.refuse(ALPHA, 'stall-body');
+    const cut = await ask({ kind: 'diagram', stId: ALPHA });
+    assert.ok('missing' in cut);
+    assert.match(cut.missing, /cut short/);
+    stub.refuse(ALPHA, 'not-svg');
+    const json = await ask({ kind: 'diagram', stId: ALPHA });
+    assert.ok('missing' in json);
+    assert.match(json.missing, /not an SVG/);
+  });
+});
+
+test('a render service that is not there is a missing figure that says why', async () => {
+  const gone = await startRenderStub();
+  const url = gone.url;
+  await gone.close();
+  const answer = await fetchFigure(url, { kind: 'diagram', stId: ALPHA }, { timeoutMs: 500 });
+  assert.ok('missing' in answer);
+  assert.match(answer.missing, /ECONNREFUSED/);
 });

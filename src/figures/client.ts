@@ -14,7 +14,7 @@ export type FigureAnswer = { svg: string } | { missing: string };
 export interface ClientOptions {
   /** How long one request may take. */
   timeoutMs?: number;
-  /** The pause before the one retry of a 503, unless its Retry-After asks for less. */
+  /** The pause before the one retry of a 503 (the render service asks for 5 s). */
   retryPauseMs?: number;
 }
 
@@ -44,7 +44,7 @@ export async function fetchFigure(
     try {
       response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     } catch (error) {
-      return { missing: `${request.stId}: no answer (${(error as Error).name})` };
+      return { missing: `${request.stId}: no answer (${reason(error)})` };
     }
     if (response.ok) {
       const type = response.headers.get('content-type') ?? '';
@@ -52,19 +52,26 @@ export async function fetchFigure(
         await response.body?.cancel();
         return { missing: `${request.stId}: not an SVG (${type || 'no type'})` };
       }
-      return { svg: await response.text() };
+      // The timeout covers the body too: one cut short is a missing figure, not a failure
+      try {
+        return { svg: await response.text() };
+      } catch (error) {
+        return { missing: `${request.stId}: the answer was cut short (${reason(error)})` };
+      }
     }
     await response.body?.cancel();
     if (response.status === 503 && attempt === 1) {
-      const asked = Number(response.headers.get('retry-after')) * 1000;
-      await new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          Number.isFinite(asked) && asked > 0 ? Math.min(asked, retryPauseMs) : retryPauseMs
-        )
-      );
+      await new Promise((resolve) => setTimeout(resolve, retryPauseMs));
       continue;
     }
     return { missing: `${request.stId}: the render service answered ${String(response.status)}` };
   }
+}
+
+/** An error's name, and its cause's code where there is one (ECONNREFUSED, say). */
+function reason(error: unknown): string {
+  const name = error instanceof Error ? error.name : String(error);
+  const cause =
+    error instanceof Error ? (error.cause as { code?: unknown } | undefined) : undefined;
+  return typeof cause?.code === 'string' ? `${name}: ${cause.code}` : name;
 }

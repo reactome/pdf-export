@@ -17,7 +17,11 @@ const PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
   token: (value) => value.length > 0,
 };
 
-export type Refusal = 404 | 503 | 'timeout';
+/**
+ * How to refuse: a status, no answer at all, an answer whose body stops part way, or an
+ * answer that is not SVG.
+ */
+export type Refusal = 404 | 503 | 'timeout' | 'stall-body' | 'not-svg';
 
 export interface RenderStub {
   /** The base URL: requests go to `${url}/render/{stId}.svg`. */
@@ -91,6 +95,16 @@ export async function startRenderStub(): Promise<RenderStub> {
       refusal.left -= 1;
       if (refusal.how === 'timeout') {
         hanging.add(res);
+        return;
+      }
+      if (refusal.how === 'stall-body') {
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' });
+        res.write('<svg');
+        hanging.add(res);
+        return;
+      }
+      if (refusal.how === 'not-svg') {
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
         return;
       }
       if (refusal.how === 503) error(503, 'Busy', { 'Retry-After': '5' });

@@ -6,14 +6,21 @@
 
 export function prefixIds(svg: string, prefix: string): string {
   const p = `${prefix}-`;
-  return svg
-    .replace(/(\sid=")([^"]+)"/g, (_m, attr: string, id: string) => `${attr}${p}${id}"`)
-    .replace(
-      /url\(\s*(['"]?)#([^'")\s]+)\1\s*\)/g,
-      (_m, quote: string, id: string) => `url(${quote}#${p}${id}${quote})`
-    )
-    .replace(
-      /(\s(?:xlink:)?href=")#([^"]+)"/g,
-      (_m, attr: string, id: string) => `${attr}#${p}${id}"`
-    );
+  return (
+    svg
+      .replace(
+        /(\sid=)(["'])([^"']+)\2/g,
+        (_m, attr: string, quote: string, id: string) => `${attr}${quote}${p}${id}${quote}`
+      )
+      // url(#x), url('#x'), url("#x"), and url(&quot;#x&quot;) as a serializer writes it in
+      // a style attribute
+      .replace(
+        /url\(\s*(['"]|&quot;)?#([^'"&)\s]+)\1?\s*\)/g,
+        (_m, quote: string | undefined, id: string) => `url(${quote ?? ''}#${p}${id}${quote ?? ''})`
+      )
+      .replace(
+        /(\s(?:xlink:)?href=")#([^"]+)"/g,
+        (_m, attr: string, id: string) => `${attr}#${p}${id}"`
+      )
+  );
 }
