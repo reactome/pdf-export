@@ -24,7 +24,7 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
   - a single-event PDF goes on without it.
 - **The text** is set in Roboto. pdf-export's page supplies the font, at weights 300 to
   600 (research R5).
-- **The labels are 16 px** in the SVG, from which pdf-export sets the figure's scale
+- **Node labels are 12 px** in the SVG (compartments' 80 px), and the smallest sets the figure's scale
   against the legibility floor (research R4).
 
 ## Settings for the book's run (research R3)
