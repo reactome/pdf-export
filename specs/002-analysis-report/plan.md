@@ -112,6 +112,8 @@ else (constitution I).
      printing (twice, for the contents);
    - **then the time budget's decision with the user** (R4), before the service is
      built to one answer;
+   - whether the render service captures each kind of figure (diagram, illustration,
+     overview) with the analysis overlay, and with the result's default resource (R3);
    - **and the overview's FoamTree agreement** (Complexity Tracking), recorded in spec
      Assumptions, before tasks are written.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
@@ -127,7 +129,8 @@ else (constitution I).
 7. **The checks:** the replay (User Story 2), the comparison by FR-208, SC-203's timing,
    SC-205's search of logs and files; each shown failing.
 8. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
-   pdf-export, and the render service's `resource`.
+   pdf-export, the render service's `resource`, and, if step 1 finds figures captured
+   before their overlay, the render page waiting for it.
 
 ## Complexity Tracking
 

@@ -264,10 +264,11 @@ working files for the submitted identifiers.
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
   diagram that holds it with its events selected, or its illustration), for the
   report's resource; and the genome-wide overview, for the result's default resource, as
-  today's (spec 001 FR-008). The render service takes no resource yet and overlays every
-  figure for the result's default resource: adding one is a WebsiteAngular task, and
-  until it ships a pathway's figure for a report whose resource is not the default is
-  a listed difference.
+  today's (spec 001 FR-008). The render service takes no resource yet; by its code, its
+  page overlays a figure for the result's default resource once it has settled, which
+  the plan measures first. Adding a resource is a WebsiteAngular task, and until it
+  ships a pathway's figure for a report whose resource is not the default is a listed
+  difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
   split across pages or below the legibility floor, a page number on every page but the
@@ -284,7 +285,7 @@ working files for the submitted identifiers.
   - the properties' values;
   - the pathways reported, in order, with their statistics;
   - each pathway's detail: its figure present, its compartments, diseases, inferred
-    from, descriptions, references, its edit history's rows (their names as a set), its entities
+    from, descriptions, references, its edit history's rows (their names as a set, the "et al." alone past five names), its entities
     found per resource and its interactors;
   - the identifiers found, with their values, and the interactors;
   - the identifiers not found.

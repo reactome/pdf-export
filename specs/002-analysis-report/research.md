@@ -65,7 +65,8 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
   keys a sorted set by identifier, pathway by pathway, and the first wins.) The heading's
   "mapping to N Reactome entities" is the union of the mapped accessions.
   - When today's overview colours pathways by expression values (an expression or GSVA
-    result, or GSA statistics with expression values shown), today's order is call 2's
+    result, or GSA statistics where a pathway of the overview's species has values at or
+    under the p-value threshold), today's order is call 2's
     only up to ties: drawing the overview filters the shared result again, re-sorting it
     by the result's default resource's comparator, before the identifiers are gathered (the diagrams'
     stable sort by the report's own comparator then restores call 2's order except
@@ -118,7 +119,8 @@ no diagram of its own. Three additions:
   (`coverNames`) take every edit's authors. So spec 001's build filters the edits to its
   four kinds where it reads them, before both (`src/model/build.ts`), with a test that
   fails without that filter, on the rows and on the cover's names; spec 001's PDFs are
-  otherwise unchanged. (The graph keeps one `modified` per object,
+  otherwise unchanged. The report reads the extended query's edits itself, for its own
+  rule, not through spec 001's `assemble`, whose sections hold spec 001's merged rows. (The graph keeps one `modified` per object,
   the latest, so there is at most one Modified row, as today.)
 - **The edit history** follows today's report's rule, not spec 001's: one row for each
   date and action (created, modified, authored, edited, reviewed, revised), sorted by
@@ -163,10 +165,15 @@ is fast; a new token is always cold.
 **The resource.** The render service takes no `resource` (a request with one is refused
 with 400). Its page sets the resource as the pathway browser does: the result's default
 (the only resource besides `TOTAL` when it holds just one, otherwise `TOTAL`), by the
-browser's analysis service. That is read from the code, not measured: whether the
-default is applied before the figure is captured is measured in step 1. So every figure
-is overlaid for the result's default resource. The overview is then as today's; a
-pathway's figure differs where the report's resource is not the result's default.
+browser's analysis service, once the page has settled. That is read from the code, not
+measured, and settling is not assured: the page's readiness check waits for what is
+drawn, not for the analysis result, and the default needs a second fetch of the result
+after the first gives its resources. So a figure may be captured with `TOTAL`'s overlay,
+or none, and then cached under its token. Step 1 measures whether each kind of figure
+(diagram, illustration, overview) is captured with an overlay, and with the default's;
+if not, the render page's readiness waiting for the analysis overlay is a WebsiteAngular
+task beside `resource`. Once settled, the overview is as today's, and a pathway's figure
+differs where the report's resource is not the result's default.
 Adding `resource` is a WebsiteAngular task; until it ships, that is a listed difference
 (spec, FR-204).
 
