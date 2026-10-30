@@ -39,11 +39,13 @@ inside the analysis service. It draws its figures with the same Java exporters a
 - **At most two** reports are made at once; more wait, without limit. A failure while
   making the PDF is answered 500, as is a service that cannot answer.
 - **Its errors** are JSON in the analysis service's form (`code`, `reason`, `messages`),
-  as are the analysis gateway's own refusals before it, but for a failure while making
-  the PDF, whose 500 has the web framework's default body.
+  as are the analysis gateway's own refusals before it, and any other failure's 500;
+  only a failure of the PDF library itself (or of the exporters it calls) is answered
+  500 with the web framework's default body.
 - **The figures' overlays:** each pathway's diagram is overlaid for the report's
-  resource; the genome-wide overview for the result's default resource (as above), never
-  for importable identifiers only.
+  resource; the genome-wide overview shows the pathways the report's filter kept,
+  coloured for the result's default resource (as above). Neither is ever for importable
+  identifiers only.
 - **The pathways reported** are the result's pathways for the species, with something
   found, in the analysis service's default sort for the resource: by the entities'
   p-value counted over all identifiers, lowest first, even when the table shows the
@@ -59,8 +61,9 @@ inside the analysis service. It draws its figures with the same Java exporters a
 3. **An introduction:** about Reactome, with Reactome's own references.
 4. **The analysis's properties:** its type, explained, with a link to the user guide;
    the identifiers found and the total (found plus not found), and the number of
-   pathways hit, the found and hit counted after the resource and importable-only
-   filters; whether it was projected to
+   pathways hit: both over the pathways the resource and importable-only filters kept,
+   the identifiers found across all of those pathways' resources, not narrowed to
+   importable ones; whether it was projected to
    human (with a link to how inferred events are made) and whether interactors were
    included (each said only when it was); the species and resource the report is for; and the token, with how long it is
    kept.
@@ -343,8 +346,8 @@ working files for the submitted identifiers.
 - **The analysis service stays:** its analysis stays in Java and is not ported; only the
   report moves. Its report endpoint is retired once the website routes to pdf-export.
 - **The website's part:** WebsiteAngular routes `/AnalysisService/report/` to pdf-export
-  through its analysis gateway, in a task in its own specs, and offers the same "Report
-  (PDF)" button.
+  through its analysis gateway, in a task in its own specs, and offers the same "PDF Result"
+  button.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
   FoamTree under a commercial licence; pdf-export ships none of it (as spec 001's
   Assumptions say of the render service).
@@ -375,12 +378,11 @@ working files for the submitted identifiers.
   - the overlays for all resources together, until the render service takes a resource
     (FR-204);
   - a 503, where today's answers 500, when a service it needs cannot answer;
-  - the order of a pathway's compartments (today's sorted by their natural order) and
-    of what it was inferred from (today's in no set order), each in the curators'
-    order; its references (and so which five are shown), diseases and descriptions are
-    in the curators' order in both, and must match;
-  - every error body in the analysis service's JSON form, where today's 500 for a PDF
-    that fails has the framework's default body;
+  - the order of what a pathway was inferred from (today's in no set order), in the
+    curators' order; its compartments, references (and so which five are shown),
+    diseases and descriptions are in the curators' order in both, and must match;
+  - every error body in the analysis service's JSON form, where today's 500 for a
+    failure of the PDF library has the framework's default body;
   - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
   - today's service also sends each report's timing, with the client's address and
