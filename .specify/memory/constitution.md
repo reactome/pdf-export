@@ -6,19 +6,25 @@ so the rule can be argued with rather than merely obeyed.
 
 ## Core Principles
 
-### I. One implementation, for the release's book and the website's PDF
+### I. One implementation, for the release's book and the website's PDFs
 
-Reactome publishes its pathways as PDFs in two ways:
+Reactome publishes PDFs in three ways:
 
 - **the release's book**, `TheReactomeBook`: a folder of pathway PDFs, made by
   `reactome/event-pdf`'s command line during the release and published with it;
 - **the website's PDF of one pathway or reaction**, made by the same library inside
-  the content service, on request.
+  the content service, on request;
+- **the website's analysis report**, made on request by `reactome/analysis-report`
+  inside the analysis service.
 
-Both come from `event-pdf` today, which is why one fix reaches both.
+The first two come from `event-pdf` today, which is why one fix reaches both; the
+third comes from another library, under the same restrictive licence, with its own look
+and its own layout of the same kinds of part, so a fix to a page of one never reached
+the other.
 
-**So:** this repository is the one implementation of both. A change lands once and
-is seen in both, and neither keeps a copy of its own.
+**So:** this repository is the one implementation of all of them, and of any PDF the
+website makes later. They share one look, one way of drawing figures and one way of
+printing. A change lands once and is seen in each, and none keeps a copy of its own.
 
 ### II. Loose licences only
 
@@ -76,9 +82,10 @@ reference taken from Reactome's servers, and they are kept out of the repository
 
 ### VII. People's names stay out of the repository
 
-This repository is public. A pathway's PDF carries the names of the authors of its
-literature and of the curators in its edit history. A fixture, a test log or a
-sample PDF copied from real output would publish them.
+This repository is public. A pathway's PDF, and an analysis report's pathway details,
+carry the names of the authors of its literature and of the curators in its edit
+history. A fixture, a test log or a sample PDF copied from real output would publish
+them.
 
 **So:** fixtures and samples replace those values with placeholders, and
 comparisons never print them.
@@ -112,4 +119,4 @@ This constitution outranks other practice in this repository. It is changed by p
 request, with the reason for the change; a principle is removed only with the cost
 it was guarding against shown to be gone.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-29 | **Last Amended**: 2026-10-29
+**Version**: 1.1.0 | **Ratified**: 2026-10-29 | **Last Amended**: 2026-10-30
