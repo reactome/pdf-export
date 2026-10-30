@@ -111,7 +111,9 @@ else (constitution I).
      for a large expression dataset), the figures (spec 001's T005, part c), layout and
      printing (twice, for the contents);
    - **then the time budget's decision with the user** (R4), before the service is
-     built to one answer.
+     built to one answer;
+   - **and the overview's FoamTree agreement** (Complexity Tracking), recorded in spec
+     Assumptions, before tasks are written.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
    not built yet: the analysis stub (its T010), the analysis client (T020, T021) and the
    service (T022), besides the layout and printing already merged. Its own work starts

@@ -36,9 +36,10 @@ One of the first `number` pathways of the report's species, in the service's ord
   resource they interact through.
 - From the graph (R2): spec 001's Section for it: compartments, diseases, inferred-from,
   summations, the first five references, the edit history (today's report's rule: one
-  row per date and action, created and modified included (spec 001's query extended
-  to read them), authorless edits kept, research R2), and its figure (its own diagram, the diagram that holds it with its
-  events selected, or its illustration).
+  row per date and action in today's order, created and modified included (spec 001's
+  query extended to read them), authorless edits kept, undated ones left out, research
+  R2), and its figure (its own diagram, the diagram that holds it with its events
+  selected, or its illustration).
 
 ## Identifier lists
 

@@ -56,21 +56,22 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
   Today's report never fills KEGG COMPOUND's or NCBI Protein's: it compares their
   display names, upper-cased, with the mappings' resources (`COMPOUND`,
   `NCBI_PROTEIN`), which never match, so those tables are empty and left out, in each
-  pathway's detail and in the identifiers found, whatever the report's resource. The
-  new report fills them; this fixes an obvious bug and is a listed difference (spec,
+  pathway's detail and in the identifiers found, whatever the report's resource, for
+  found entities and interactors alike. The new report fills them, interactors too; this fixes an obvious bug and is a listed difference (spec,
   Expected differences).
 - **The identifiers found** are not a union. For each resource, the pathways are read in
   call 2's order and an identifier is taken from the first pathway holding it, with
   that pathway's mappings and values; later pathways add nothing for it. (Today's report
   keys a sorted set by identifier, pathway by pathway, and the first wins.) The heading's
   "mapping to N Reactome entities" is the union of the mapped accessions.
-  - Today's order is call 2's only up to ties: drawing the overview re-sorts the shared
-    result by `TOTAL`'s comparator, and each diagram by the report's resource's, before
-    the identifiers are gathered. Pathways that tie under the report's comparator may
-    so come in another order, and where the report's resource is not `TOTAL` and no
-    diagram is drawn, the whole list is in `TOTAL`'s order. Only which pathway's
-    values an identifier shows can differ, an edge case the FR-208 comparison names
-    when it meets it.
+  - For an expression or GSVA result, today's order is call 2's only up to ties:
+    drawing the overview filters the shared result again, re-sorting it by the result's
+    default resource's comparator, before the identifiers are gathered (the diagrams'
+    stable sort by the report's own comparator then restores call 2's order except
+    among ties, and where no diagram is drawn the list keeps the default resource's
+    order). For over-representation the overview does not re-sort, and the order is
+    call 2's. Only which pathway's values an identifier shows can differ, an edge case
+    the FR-208 comparison names when it meets it.
 - **The count of identifiers found** (the properties' and the heading's) is the number
   of distinct identifiers in call 4's found entities, in every resource, not only the
   report's: today's counts every resource of the pathways the filters kept.
@@ -111,17 +112,25 @@ no diagram of its own. Three additions:
 
 - **The edits read:** spec 001's `edits` query matches only `authored`, `edited`,
   `reviewed` and `revised`, and its `EditKind` has no others. The report also needs
-  `created` and `modified`, so the query takes those two as well, and spec 001's rule
-  keeps leaving them out (its `KINDS`), so spec 001's PDFs are unchanged, which its
-  tests show.
+  `created` and `modified`, so the query takes those two as well. Spec 001's `editRows`
+  filters only on a date and an author, not on kind, so spec 001's path then filters
+  explicitly to its four kinds (in `editRows`), with a test that fails without that
+  filter; its PDFs are otherwise unchanged. (The graph keeps one `modified` per object,
+  the latest, so there is at most one Modified row, as today.)
 - **The edit history** follows today's report's rule, not spec 001's: one row for each
   date and action (created, modified, authored, edited, reviewed, revised), sorted by
   date, each with that row's names (up to five, then "et al."), and an edit with no
-  author kept as a row with no names. Within a date, today's rows come in no set order
-  (a hash map's), so the new report puts them in the order above, a listed difference;
-  FR-208 compares the rows' count. Spec 001's `editRows` merges neighbouring edits and
-  drops authorless ones, as `event-pdf` did, so the report has a rule of its own beside
-  it (`src/report/`).
+  author kept as a row with no names.
+  - **Within a date**, today's rows come in a fixed order, a hash map's over six fixed
+    keys: Modified, Revised, Edited, Created, Authored, Reviewed. The new report keeps
+    that order, so FR-208 compares the rows themselves.
+  - **A row's names** come from a hash set today, in no order a reader can rely on; the
+    new report lists them in the edits' authors' order, without repeats, and FR-208
+    compares them as a set.
+  - **An edit with no date** makes today's report fail; the new report leaves it out,
+    a listed difference. Spec 001's `editRows` merges neighbouring edits and
+    drops authorless ones, as `event-pdf` did, so the report has a rule of its own beside
+    it (`src/report/`).
 - **The release** and the species' names, read once per report.
 
 **Rationale.** One reading of an event for both PDFs (constitution I), and the lists'
@@ -152,9 +161,10 @@ WebsiteAngular task (the page already has a resource filter state, unset on the 
 path); until it ships, the overlay is a listed difference (spec, FR-204).
 
 **The overview's pathways.** Today's overview is drawn from the result after the
-report's resource and importable-only filters (it then overlays it for `TOTAL`), so
+report's resource and importable-only filters, overlaid for the result's default
+resource (the second of its resources when it has exactly two, otherwise `TOTAL`), so
 either filter narrows which pathways it shows; the render service draws the whole token,
-for its default resource. With the website's defaults (`TOTAL`, all identifiers) the two
+for the same default resource. With the website's defaults (`TOTAL`, all identifiers) the two
 are the same; otherwise it is a listed difference (spec, Expected differences).
 
 **Render slots.** A report holding both of the render service's slots for minutes slows

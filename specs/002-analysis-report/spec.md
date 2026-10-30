@@ -263,9 +263,9 @@ working files for the submitted identifiers.
   with the analysis by its token: each reported pathway's figure, chosen as spec 001's
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
   diagram that holds it with its events selected, or its illustration), for the
-  report's resource; and the genome-wide overview, for all resources, as today's (spec
-  001 FR-008). The render service takes no resource yet: adding one is
-  a WebsiteAngular task, and until it ships the overlays are for all resources together,
+  report's resource; and the genome-wide overview, for the result's default resource, as
+  today's (spec 001 FR-008). The render service takes no resource yet: adding one is a
+  WebsiteAngular task, and until it ships the overlays are for all resources together,
   a listed difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
@@ -361,8 +361,10 @@ working files for the submitted identifiers.
   through its analysis gateway, in a task in its own specs, and offers the same "PDF Result"
   button.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
-  FoamTree under a commercial licence; pdf-export ships none of it (as spec 001's
-  Assumptions say of the render service).
+  FoamTree under a commercial licence; pdf-export ships none of it. Unlike spec 001's
+  figures, the overview cannot be drawn without FoamTree, so this dependency has no end:
+  it needs the user's or the release owners' agreement, recorded here, or an amendment
+  to constitution Principle II, before tasks are written (plan, Complexity Tracking).
 - **The identifiers found** are gathered across the whole result, as today's; how the
   public interface gives them at that scale, within SC-203, is the plan's to measure.
 - **ReactomeGSA results:** in scope as far as today's report covers them; anything more
@@ -392,11 +394,11 @@ working files for the submitted identifiers.
   - the genome-wide overview showing the whole result's pathways, where today's shows
     only those the report's resource and importable-only filters kept (the same with
     the website's defaults);
-  - KEGG COMPOUND's and NCBI Protein's identifiers shown, in each pathway's detail and
-    in the identifiers found, where today's tables for them are always empty and left
-    out (an obvious bug: it compares their display names with the mappings' resources);
-  - the edit history's rows within a date in a fixed order of action, where today's
-    are in no set order;
+  - KEGG COMPOUND's and NCBI Protein's identifiers and interactors shown, in each
+    pathway's detail and in the identifiers found, where today's tables for them are
+    always empty and left out (an obvious bug: it compares their display names with the
+    mappings' resources);
+  - an edit with no date left out of the edit history, where today's report fails;
   - a 503, where today's answers 500, when a service it needs cannot answer before the
     PDF is begun (after that, the Background's build-dependent answers);
   - the order of what a pathway was inferred from (today's in no set order), in the
