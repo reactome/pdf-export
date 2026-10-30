@@ -12,7 +12,7 @@ content as today's report, by the same implementation as spec 001."
 
 ## Background: what today's report holds
 
-The website offers a "Report (PDF)" download of an analysis result, made on request by
+The website offers a "PDF Result" download of an analysis result, made on request by
 the analysis service at `/AnalysisService/report/{token}/{species}/{filename}.pdf`. It is
 written by `reactome/analysis-report`, a library under the AGPL-3.0 built on iText 7,
 inside the analysis service. It draws its figures with the same Java exporters as
@@ -39,23 +39,28 @@ inside the analysis service. It draws its figures with the same Java exporters a
 - **At most two** reports are made at once; more wait, without limit. A failure while
   making the PDF is answered 500, as is a service that cannot answer.
 - **Its errors** are JSON in the analysis service's form (`code`, `reason`, `messages`),
-  as are the analysis gateway's own refusals before it.
-- **The figures are overlaid for the resource** the report is for.
+  as are the analysis gateway's own refusals before it, but for a failure while making
+  the PDF, whose 500 has the web framework's default body.
+- **The figures' overlays:** each pathway's diagram is overlaid for the report's
+  resource; the genome-wide overview for the result's default resource (as above), never
+  for importable identifiers only.
 - **The pathways reported** are the result's pathways for the species, with something
-  found, sorted by their entities' p-value, lowest first (the analysis service's default
-  sort), for the resource; disease pathways included.
+  found, in the analysis service's default sort for the resource: by the entities'
+  p-value counted over all identifiers, lowest first, even when the table shows the
+  importable-only p-values; disease pathways included.
 
 ### What it holds, in order
 
 1. **A cover:** Reactome's logo, the title "Pathway Analysis Report", the analysis's
    name (the sample's name, else the file's, else the species compared with, else the
-   type, else the token; the PDF's title is the same), the release, the date the report was made, the link to the result in the
+   type, else the token; the PDF's title is "Pathway Analysis Report - " and that name), the release, the date the report was made, the link to the result in the
    pathway browser, and how long results are kept.
 2. **A contents list,** linking each part below.
 3. **An introduction:** about Reactome, with Reactome's own references.
 4. **The analysis's properties:** its type, explained, with a link to the user guide;
-   the identifiers found of those submitted, and the number of pathways hit, both
-   counted after the resource and importable-only filters; whether it was projected to
+   the identifiers found and the total (found plus not found), and the number of
+   pathways hit, the found and hit counted after the resource and importable-only
+   filters; whether it was projected to
    human (with a link to how inferred events are made) and whether interactors were
    included (each said only when it was); the species and resource the report is for; and the token, with how long it is
    kept.
@@ -203,6 +208,9 @@ working files for the submitted identifiers.
 - **A figure that cannot be drawn** (the render service refuses or times out): the
   report is made without it and the absence is logged, as for spec 001's single-event
   PDF.
+- **Up to 51 figures** (the overview and 50 pathways) are asked of the render service
+  at its own concurrency, not all at once: a burst past its queue would be refused, and
+  those figures lost.
 - **The analysis service, the graph or the render service cannot answer at all:** the
   request is answered "unavailable" with a time to retry; no partial report is sent.
 - **Very many identifiers** (tens of thousands found, or not found): the lists are
@@ -232,16 +240,18 @@ working files for the submitted identifiers.
   (`code`, `reason`, `messages`), the form the analysis gateway in front of it also uses,
   so the address keeps one error format: 404 for a species the graph does not know
   (before the token is read), 404 for an unknown token, 410 for one a release deleted
-  (by the analysis service's answers), 500 when making the PDF fails, and 503 when the
+  (by the analysis service's answers), a number or flag that is not one as today's (the
+  replay records which), 500 when making the PDF fails, and 503 when the
   analysis service, the graph or the render service cannot answer or the service is at
   its limit (today's answers 500 to the first and has no limit: a listed difference).
 - **FR-204**: Figures MUST be drawn as the website's pathway browser draws them, overlaid
-  with the analysis by its token, for the report's resource: the genome-wide overview,
-  and each reported pathway's figure, chosen as spec 001's Background ("Its figures")
-  and its Figure entity choose (its own diagram, or the diagram that holds it with its
-  events selected, or its illustration) (spec 001 FR-008). The render service takes no
-  resource yet: adding one is a WebsiteAngular task, and until it ships the overlays
-  are for all resources together, a listed difference.
+  with the analysis by its token: each reported pathway's figure, chosen as spec 001's
+  Background ("Its figures") and its Figure entity choose (its own diagram, or the
+  diagram that holds it with its events selected, or its illustration), for the
+  report's resource; and the genome-wide overview, for the result's default resource,
+  as today's (spec 001 FR-008). The render service takes no resource yet: adding one is
+  a WebsiteAngular task, and until it ships the overlays are for all resources together,
+  a listed difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
   split across pages or below the legibility floor, a page number on every page but the
@@ -344,6 +354,15 @@ working files for the submitted identifiers.
   (several samples, its own statistics) is a later spec.
 - **Measured privately:** against a private analysis service on a private copy of the
   graph, with made-up identifiers; no production requests, and no real ReactomeGSA runs.
+- **An open risk for the plan, to settle with the user:** the time FR-210 leaves is
+  about 40 s (the edge's 100 s less the gateway's wait of up to 60 s). The render
+  service's measured times (about 5–7 s for a diagram with a token, two at a time)
+  suggest a cold report of 50 pathways needs about 2 minutes. The plan measures it
+  (spec 001's T005 part c) and, if it is over, brings the user the choices: a shorter
+  wait on the gateway's report lane, more render concurrency, a lower SC-203 target, or
+  a report made in the background and fetched when ready.
+- **The website's button** is labelled "PDF Result" today and is hidden for ReactomeGSA
+  results; the address serves any token.
 - **Expected differences from today's report** (FR-208):
   - the look: layout, colours, typefaces and figures (spec 001's User Stories 3 and 6);
   - bookmarks, which today's has none of;
@@ -356,9 +375,12 @@ working files for the submitted identifiers.
   - the overlays for all resources together, until the render service takes a resource
     (FR-204);
   - a 503, where today's answers 500, when a service it needs cannot answer;
-  - the order of a pathway's lists (compartments, references and so which five are
-    shown, and the rest), the curators' order where today's is the database's, as in
-    spec 001;
+  - the order of a pathway's compartments (today's sorted by their natural order) and
+    of what it was inferred from (today's in no set order), each in the curators'
+    order; its references (and so which five are shown), diseases and descriptions are
+    in the curators' order in both, and must match;
+  - every error body in the analysis service's JSON form, where today's 500 for a PDF
+    that fails has the framework's default body;
   - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
   - today's service also sends each report's timing, with the client's address and
