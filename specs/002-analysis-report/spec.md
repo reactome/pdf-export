@@ -20,8 +20,10 @@ inside the analysis service. It draws its figures with the same Java exporters a
 
 ### What it is asked, and how it answers
 
-- **The species** is looked up first: one the graph does not know is answered 404, before
-  the token is read. A species the analysis has no result for gives a report with no
+- **The species** is looked up first, as a name (any case, `_` read as a space), a
+  taxonomy id or a Reactome database id; the website's own button sends a taxonomy id, a
+  database id or "Homo sapiens". One the graph does not know is answered 404, before the
+  token is read. A species the analysis has no result for gives a report with no
   pathways.
 - **The token:** one the service does not know is answered 404; one whose result a new
   release deleted, 410.
@@ -29,12 +31,16 @@ inside the analysis service. It draws its figures with the same Java exporters a
 - **The resource** to sort and filter by (`TOTAL` by default): one the result does not
   hold is silently replaced by the result's default (the second of its resources when
   it has exactly two, otherwise the first).
-- **Importable only:** when set, only the pathways found through importable identifiers
-  are kept.
+- **Importable only:** when set, with the `TOTAL` resource, only the pathways found
+  through importable identifiers are kept, and the table's statistics count importable
+  identifiers only.
 - **Three colour profiles** (diagram, analysis and overview).
 - **The file name** in the address is ignored: the download is always named `report.pdf`.
 - **At most two** reports are made at once; more wait, without limit. A failure while
-  making the PDF is answered 500.
+  making the PDF is answered 500, as is a service that cannot answer.
+- **Its errors** are JSON in the analysis service's form (`code`, `reason`, `messages`),
+  as are the analysis gateway's own refusals before it.
+- **The figures are overlaid for the resource** the report is for.
 - **The pathways reported** are the result's pathways for the species, with something
   found, sorted by their entities' p-value, lowest first (the analysis service's default
   sort), for the resource; disease pathways included.
@@ -42,14 +48,16 @@ inside the analysis service. It draws its figures with the same Java exporters a
 ### What it holds, in order
 
 1. **A cover:** Reactome's logo, the title "Pathway Analysis Report", the analysis's
-   name, the release, the date the report was made, the link to the result in the
+   name (the sample's name, else the file's, else the species compared with, else the
+   type, else the token; the PDF's title is the same), the release, the date the report was made, the link to the result in the
    pathway browser, and how long results are kept.
 2. **A contents list,** linking each part below.
 3. **An introduction:** about Reactome, with Reactome's own references.
 4. **The analysis's properties:** its type, explained, with a link to the user guide;
-   the identifiers found of those submitted; the number of pathways hit; whether it was
-   projected to human and whether interactors were included (each said only when it
-   was); the species and resource the report is for; and the token, with how long it is
+   the identifiers found of those submitted, and the number of pathways hit, both
+   counted after the resource and importable-only filters; whether it was projected to
+   human (with a link to how inferred events are made) and whether interactors were
+   included (each said only when it was); the species and resource the report is for; and the token, with how long it is
    kept.
 5. **The genome-wide overview:** the species overview (Reacfoam), overlaid with the
    analysis, with a caption.
@@ -60,11 +68,13 @@ inside the analysis service. It draws its figures with the same Java exporters a
 7. **Each of those pathways in detail:** its name, with its stable identifier linked to
    its page on the website; its figure (its own diagram, or the diagram that holds it
    with its events selected, or its illustration), overlaid with the analysis; its
-   compartments, diseases and what it was inferred from; its descriptions; its first five
-   references; its edit history (created, modified, authored, edited, reviewed and
-   revised, each with up to five names and then "et al."); the entities it found, for
+   compartments, diseases (the generic "disease" left out) and what it was inferred
+   from; its descriptions; its first five references; its edit history, one row for each
+   date and action (created, modified, authored, edited, reviewed, revised) with that
+   row's names, up to five and then "et al."; the entities it found, for
    each resource; and, with interactors, the interactors it found.
-8. **The identifiers found,** across the whole result: what each submitted identifier
+8. **The identifiers found,** across the whole result after the resource and
+   importable-only filters: what each submitted identifier
    mapped to, with its values for an expression analysis, and interactors apart.
 9. **The identifiers not found,** complete, without repeats, sorted. Left out when there
    are none (though today's contents list still links it).
@@ -126,7 +136,8 @@ use; people's scripts call it and save what it sends.
 
 **Independent Test**: replay a recorded set of requests to today's service on a private
 copy (each parameter, each answer: 200, 404 for a species and for a token, 410, a
-resource the result lacks, a number out of range) against the new service, and compare
+resource the result lacks, a number out of range, a number or flag that is not one, and
+the species as a name, a taxonomy id and a database id) against the new service, and compare
 the statuses, the file names and the reports.
 
 **Acceptance Scenarios**:
@@ -166,7 +177,7 @@ installed, and fails when a restrictive one is planted.
 ### User Story 4 - What users submitted stays theirs (Priority: P2)
 
 A report holds the identifiers a user submitted. The service keeps nothing of them
-beyond the request, and logs only counts.
+beyond the request, and logs only FR-211's fields: none of them a submitted identifier.
 
 **Why this priority**: identifiers are not personal data, but they are the user's
 research data.
@@ -217,23 +228,28 @@ working files for the submitted identifiers.
   service. From the graph it reads only what that interface does not give: the
   release, species' names, and each reported pathway's compartments, diseases, inferred
   from, descriptions, references, edit history and the diagram that holds it.
-- **FR-203**: The report MUST answer, with a JSON reason as spec 001's service answers:
-  404 for a species the graph does not know (before the token is read), 404 for an
-  unknown token, 410 for one a release deleted (by the analysis service's answers),
-  503 when the analysis service, the graph or the render service cannot answer or the
-  service is at its limit, and 500 when making the PDF fails.
+- **FR-203**: The report MUST answer errors in the analysis service's JSON form
+  (`code`, `reason`, `messages`), the form the analysis gateway in front of it also uses,
+  so the address keeps one error format: 404 for a species the graph does not know
+  (before the token is read), 404 for an unknown token, 410 for one a release deleted
+  (by the analysis service's answers), 500 when making the PDF fails, and 503 when the
+  analysis service, the graph or the render service cannot answer or the service is at
+  its limit (today's answers 500 to the first and has no limit: a listed difference).
 - **FR-204**: Figures MUST be drawn as the website's pathway browser draws them, overlaid
-  with the analysis by its token: the genome-wide overview, and each reported pathway's
-  figure, chosen as spec 001's Figure is (its own diagram, or the diagram that holds it
-  with its events selected, or its illustration) (spec 001 FR-007, FR-008).
+  with the analysis by its token, for the report's resource: the genome-wide overview,
+  and each reported pathway's figure, chosen as spec 001's Background ("Its figures")
+  and its Figure entity choose (its own diagram, or the diagram that holds it with its
+  events selected, or its illustration) (spec 001 FR-008). The render service takes no
+  resource yet: adding one is a WebsiteAngular task, and until it ships the overlays
+  are for all resources together, a listed difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
   typefaces, and FR-016's rules (no boxes, the same margins on every page, no figure
   split across pages or below the legibility floor, a page number on every page but the
   cover, and a running header naming the report, or on its front parts that part).
 - **FR-206**: The report MUST have a contents list before its parts and bookmarks: the
   parts, and under the pathways' details each pathway. It links each pathway's row in
-  the most-significant table to its detail, and each pathway's name to its page on the
-  website.
+  the most-significant table to its detail, and each pathway's stable identifier to its
+  page on the website, as today's.
 - **FR-207**: Characters no embedded typeface draws MUST follow spec 001 FR-017 for PDFs
   made on request: the fixed list substituted, any other printed as the replacement mark
   and logged, the request never failing on it.
@@ -255,13 +271,15 @@ working files for the submitted identifiers.
   default, as today), queue a bounded number more, and answer "unavailable" with a time
   to retry beyond that; a report that takes longer than its time budget is abandoned
   and answered "unavailable". On the website's path the analysis gateway's queue comes
-  first; the service's own limit protects it from callers that do not pass the gateway,
-  and its budget fits within the gateway's wait.
+  first; the service's own limit protects it from callers that do not pass the gateway.
+  The PDF is sent only once it is complete, and the edge closes a request after 100 s,
+  so the budget is what is left of those 100 s after the longest wait in the gateway's
+  queue and the service's own.
 - **FR-211**: The service MUST log, for each report, the token, the species, the number
   of pathways, its time, its size and any character FR-207 replaced, and no submitted
   identifier and nothing about the client. It keeps no file of a report after sending
   it.
-- **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009/FR-010).
+- **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009, SC-006).
 - **FR-213**: Fixtures and samples MUST use made-up identifiers and placeholder names
   for the authors and curators a report names (constitution Principle VII; spec 001
   FR-013).
@@ -270,8 +288,8 @@ working files for the submitted identifiers.
 
 - **Report request:** the species, token, number of pathways (1–50), resource,
   importable-only choice and file name; the profiles, ignored.
-- **Analysis summary:** from the analysis service: its type, species, projection,
-  interactors, the counts of identifiers submitted and found, the pathways hit, and its
+- **Analysis summary:** from the analysis service: its type, sample and file names,
+  species, projection, interactors, the counts of identifiers submitted and found, the pathways hit, and its
   server.
 - **Reported pathway:** a pathway's stable identifier, name and statistics from the
   analysis service, its entities and interactors found; from the graph, the parts of its
@@ -291,8 +309,8 @@ working files for the submitted identifiers.
   file name as today's, but where Assumptions lists a difference.
 - **SC-203**: A report of 25 pathways is made in no more time than today's for the same
   token on the same private services, and one of 50 within a budget the plan sets from
-  that measurement and the gateway's wait; the time is measured with the render
-  service's cache empty.
+  that measurement and FR-210's limit (what is left of the edge's 100 s after the
+  queues); the time is measured with the render service's cache empty.
 - **SC-204**: Every colour and typeface in the report's own text and layout is one spec
   001 SC-009 allows, as its check shows.
 - **SC-205**: No submitted identifier is found in the service's logs or working files
@@ -335,7 +353,12 @@ working files for the submitted identifiers.
     page number counted from the cover;
   - the identifiers not found, when there are none, also left out of the contents list,
     where today's links to a part that is not there;
-  - the error answers' bodies, now JSON reasons (their statuses are as today's);
+  - the overlays for all resources together, until the render service takes a resource
+    (FR-204);
+  - a 503, where today's answers 500, when a service it needs cannot answer;
+  - the order of a pathway's lists (compartments, references and so which five are
+    shown, and the rest), the curators' order where today's is the database's, as in
+    spec 001;
   - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
   - today's service also sends each report's timing, with the client's address and

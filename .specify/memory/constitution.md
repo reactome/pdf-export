@@ -84,8 +84,8 @@ reference taken from Reactome's servers, and they are kept out of the repository
 
 This repository is public. A pathway's PDF, and an analysis report's pathway details,
 carry the names of the authors of its literature and of the curators in its edit
-history. A fixture, a test log or a
-sample PDF copied from real output would publish them.
+history. A fixture, a test log or a sample PDF copied from real output would publish
+them.
 
 **So:** fixtures and samples replace those values with placeholders, and
 comparisons never print them.
