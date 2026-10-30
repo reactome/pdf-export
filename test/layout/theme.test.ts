@@ -5,7 +5,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
-import { FAMILIES, codePointName, fontFiles, uncoveredCharacters } from '../../src/layout/fonts.ts';
+import {
+  FAMILIES,
+  codePointName,
+  fontFaceCss,
+  fontFiles,
+  uncoveredCharacters,
+  unicodeRange,
+} from '../../src/layout/fonts.ts';
 import { themeCss, themeVariables } from '../../src/layout/theme.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -44,7 +51,18 @@ test('no colour value is written in our own code', () => {
   walk(join(ROOT, 'src'));
   walk(join(ROOT, 'theme'));
   for (const file of files) {
-    assert.doesNotMatch(readFileSync(file, 'utf8'), /#[0-9a-f]{6}\b|rgba?\(/i, file);
+    const text = readFileSync(file, 'utf8');
+    // hex in any length, colour functions, and a named colour given to a colour property
+    assert.doesNotMatch(
+      text,
+      /#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|light-dark|color-mix)\(/i,
+      file
+    );
+    assert.doesNotMatch(
+      text,
+      /\b(?:color|background(?:-color)?|border(?:-[a-z]+)?-color|fill|stroke|outline-color)\s*:\s*(?!var\(|inherit|currentColor|transparent|none)[a-z]+/i,
+      file
+    );
   }
 });
 
@@ -63,6 +81,7 @@ test('every family has its upright files at the weights the pages use', () => {
 test('the fonts draw what the website writes, and a character none draws is found', () => {
   assert.deepEqual(uncoveredCharacters('ATP → ADP; α-helix ≥ 2 μM, Ca²⁺ ✓ 𝔄'), []);
   assert.deepEqual(uncoveredCharacters('a\tb\n​'), [], 'white space and format characters');
+  assert.deepEqual(uncoveredCharacters('\u2713\ufe0f'), [], 'a variation selector is never drawn');
   const missing = uncoveredCharacters('The 中 character, twice: 中');
   assert.deepEqual(missing.map(codePointName), ['U+4E2D']);
 });
@@ -70,4 +89,31 @@ test('the fonts draw what the website writes, and a character none draws is foun
 test('each Noto font is there for characters only it draws', () => {
   // braille (Symbols 2), a combining caron (Math), a Cyrillic supplement letter (Noto Sans)
   assert.deepEqual(uncoveredCharacters('\u2801 a\u030c \u0514'), []);
+});
+
+test('unicodeRange writes runs and single points as CSS does', () => {
+  assert.equal(unicodeRange([0x43, 0x41, 0x42, 0x20ac, 0x41]), 'U+41-43, U+20AC');
+});
+
+test("each face declares the range its own file draws, so Chromium's choice and the check agree", () => {
+  const css = fontFaceCss();
+  const faces = [...css.matchAll(/font-family: '([^']+)';[\s\S]*?unicode-range: ([^;]+);/g)];
+  assert.equal(faces.length, fontFiles().length);
+  const declares = (point: number) =>
+    faces
+      .filter(([, , range]) =>
+        (range ?? '').split(', ').some((r) => {
+          const [lo, hi] = r
+            .slice(2)
+            .split('-')
+            .map((h) => parseInt(h, 16));
+          return lo !== undefined && point >= lo && point <= (hi ?? lo);
+        })
+      )
+      .map(([, family]) => family);
+  // characters only Noto Sans Math draws, though @fontsource declares its file as Latin
+  assert.ok(declares(0x1d504).includes('Noto Sans Math'), 'U+1D504');
+  assert.ok(declares(0x030c).includes('Noto Sans Math'), 'U+030C');
+  // and a face never claims what its file cannot draw
+  assert.equal(declares(0x4e2d).length, 0, 'U+4E2D');
 });

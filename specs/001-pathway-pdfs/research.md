@@ -244,7 +244,7 @@ synthetic documents, on this host under load.
 
 - **The theme compiles without Angular itself.** The website's theme package, with Sass
   and Angular Material's Sass (`@angular/material` and `@angular/cdk`), compiles in
-  0.6 s to CSS variables: 160 `--mat-sys-*` values in the light theme, 29 distinct
+  0.6 s to CSS variables: 160 `--mat-sys-*` values in the light theme (165 as T017 compiles it, with the website's pinned versions), 29 distinct
   colours as hex. For example: primary `#006781`, on-primary `#ffffff`, tertiary
   `#1660a5`, surface `#effbff`, on-surface `#001f25`, surface-container-lowest
   `#ffffff`, outline `#6d797f`.
