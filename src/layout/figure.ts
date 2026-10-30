@@ -140,7 +140,9 @@ const STYLE_END = /<\/(?:[\w-]+:)?style\s*>/gi;
 /**
  * An SVG's markup and its style elements' rules, without the text it draws, comments or
  * character data, in one pass: a tag ends at the first `>` outside a quoted value, so a `>`
- * in an attribute's value does not end it early.
+ * in an attribute's value does not end it early. A `<` met outside quotes before that `>`
+ * begins the next tag; what came before it is kept as markup, as a malformed tag's may
+ * hold a size.
  */
 function markupOf(svg: string): string {
   const kept: string[] = [];
@@ -174,6 +176,9 @@ function markupOf(svg: string): string {
       }
     }
     if (stray) {
+      // kept as markup, so a malformed tag's size is still read: more markup can only read
+      // a label smaller, or unread, never more legible
+      kept.push(svg.slice(open, close));
       at = close;
       continue;
     }

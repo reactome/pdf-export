@@ -141,6 +141,12 @@ describe("a figure's size", () => {
     );
     // a self-closing style element holds no rules
     assert.deepEqual(read('<style/><text font-size="12">font-size: 1px</text>'), [12, 0]);
+    // a tag with no > of its own, or an unquoted < in its value, still gives its size
+    assert.deepEqual(
+      read('<text font-size="12">a</text><text font-size="1"<tspan>b</tspan></text>'),
+      [1, 0]
+    );
+    assert.deepEqual(read('<text style="font-size:1px" data-x=a<b>c</text>'), [1, 0]);
     // a < in text, with no > before the next tag, does not swallow that tag
     assert.deepEqual(
       read('<text font-size="12">a</text> < <style>.a{font-size:5px}</style>'),
@@ -150,8 +156,9 @@ describe("a figure's size", () => {
 
   test('inputs that made earlier readers backtrack are read quickly', () => {
     // each took seconds with an earlier reader, measured: digits with no unit in the
-    // shorthand (30,000: 1.9 s), a tail of > after the last < (50,000: 7 s), unclosed style
-    // elements (20,000: 3.2 s), and a stray <svg with no root (20,000: 2.6 s)
+    // shorthand (30,000: 2.0 s, #41's), a tail of > after the last < (50,000: 7.0 s, #42's),
+    // unclosed style elements (20,000: 1.4–3.2 s, #42's), and a stray <svg with no root
+    // (20,000: 2.7 s, every reader before #44's)
     const svg = (body: string) => `<svg width="9" height="9">${body}</svg>`;
     const inputs: [string, () => unknown][] = [
       [
