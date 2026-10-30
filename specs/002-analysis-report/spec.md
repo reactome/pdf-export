@@ -263,8 +263,8 @@ working files for the submitted identifiers.
   with the analysis by its token: each reported pathway's figure, chosen as spec 001's
   Background ("Its figures") and its Figure entity choose (its own diagram, or the
   diagram that holds it with its events selected, or its illustration), for the
-  report's resource; and the genome-wide overview, for the result's default resource,
-  as today's (spec 001 FR-008). The render service takes no resource yet: adding one is
+  report's resource; and the genome-wide overview, for all resources, as today's (spec
+  001 FR-008). The render service takes no resource yet: adding one is
   a WebsiteAngular task, and until it ships the overlays are for all resources together,
   a listed difference.
 - **FR-205**: The report MUST follow spec 001's look and layout: FR-015's theme and
@@ -389,6 +389,14 @@ working files for the submitted identifiers.
     where today's links to a part that is not there;
   - the overlays for all resources together, until the render service takes a resource
     (FR-204);
+  - the genome-wide overview showing the whole result's pathways, where today's shows
+    only those the report's resource and importable-only filters kept (the same with
+    the website's defaults);
+  - KEGG COMPOUND's and NCBI Protein's identifiers shown, in each pathway's detail and
+    in the identifiers found, where today's tables for them are always empty and left
+    out (an obvious bug: it compares their display names with the mappings' resources);
+  - the edit history's rows within a date in a fixed order of action, where today's
+    are in no set order;
   - a 503, where today's answers 500, when a service it needs cannot answer before the
     PDF is begun (after that, the Background's build-dependent answers);
   - the order of what a pathway was inferred from (today's in no set order), in the

@@ -36,16 +36,19 @@ One of the first `number` pathways of the report's species, in the service's ord
   resource they interact through.
 - From the graph (R2): spec 001's Section for it: compartments, diseases, inferred-from,
   summations, the first five references, the edit history (today's report's rule: one
-  row per date and action, created and modified included, authorless edits kept,
-  research R2), and its figure (its own diagram, the diagram that holds it with its
+  row per date and action, created and modified included (spec 001's query extended
+  to read them), authorless edits kept, research R2), and its figure (its own diagram, the diagram that holds it with its
   events selected, or its illustration).
 
 ## Identifier lists
 
-- **Found:** for each resource, the pathways read in call 2's order, each identifier
-  taken from the first pathway holding it, with that pathway's mappings and, for an
-  expression analysis, its values; interactors apart. Not a union (research R1). The
-  heading's count of Reactome entities is the union of the mapped accessions.
+- **Found:** for each resource the report is for (KEGG COMPOUND and NCBI Protein
+  included, which today's leaves empty, research R1), the pathways read in call 2's
+  order, each identifier taken from the first pathway holding it, with that pathway's
+  mappings and, for an expression analysis, its values; interactors apart. Not a union
+  (research R1). Their count is the distinct identifiers of call 4's entities in every
+  resource; the heading's count of Reactome entities is the union of the mapped
+  accessions.
 - **Not found:** call 5's list, sorted, without repeats. Left out of the report and its
   contents when empty.
 
