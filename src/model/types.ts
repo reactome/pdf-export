@@ -27,10 +27,16 @@ export interface EditRow {
   authors: string[];
 }
 
+/**
+ * An event's facts as a section holds them: its lists that have rules (summations,
+ * diseases, inferred-from) are the section's own, filtered and ordered, not these.
+ */
+export type SectionEvent = Omit<EventFacts, 'summations' | 'diseases' | 'inferredFrom'>;
+
 /** One event's full section. */
 export interface Section {
   anchor: string;
-  event: EventFacts;
+  event: SectionEvent;
   /** The pathways above it in this PDF, outermost first. */
   path: EventRef[];
   figure: Figure | null;

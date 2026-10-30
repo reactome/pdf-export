@@ -5,6 +5,14 @@ import sanitizeHtml from 'sanitize-html';
 import type { Edit, EventRef, Named } from '../graph/queries.ts';
 import type { EditRow } from './types.ts';
 
+/**
+ * Strings compared by their code units, as Java's String.compareTo does: what today's
+ * PDFs sort by, and the same on every host (localeCompare depends on the host's locale).
+ */
+export function byCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /** Diseases, leaving out the one named exactly "disease", as today. */
 export function diseases(list: readonly Named[]): string[] {
   return list.filter((d) => d.name !== 'disease').map((d) => d.name);
@@ -15,15 +23,20 @@ export function inferredFrom<T extends EventRef & { speciesName: string }>(
   list: readonly T[]
 ): T[] {
   return [...list].sort(
-    (a, b) => a.speciesName.localeCompare(b.speciesName) || a.name.localeCompare(b.name)
+    (a, b) => byCodeUnits(a.speciesName, b.speciesName) || byCodeUnits(a.name, b.name)
   );
 }
 
+/** The kinds of edit in event-pdf's order: a row lists its kinds so. */
+const KINDS: readonly string[] = ['authored', 'edited', 'reviewed', 'revised'];
+
 /**
- * The edit history (research R2): edits with no date or no author dropped; the date as
- * YYYY-MM-DD; sorted by date, then the first author's surname; an edit sharing a date with
- * the row before and either its kind or its authors joins that row; each row's authors by
- * database id.
+ * The edit history (research R2, as event-pdf's Tables.createEditionsTable writes it):
+ * edits with no date or no author dropped; the date as YYYY-MM-DD; sorted by date, then
+ * the first author's surname; an edit joins the row of the edit before it when the two
+ * share a date and either their kind or their authors (compared as sets, an obvious fix
+ * to today's order-sensitive comparison); a row's kinds in event-pdf's order, and its
+ * authors by database id.
  */
 export function editRows(edits: readonly Edit[]): EditRow[] {
   const kept = edits
@@ -31,20 +44,27 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
     .map((e) => ({ ...e, date: (e.dateTime ?? '').slice(0, 10) }))
     .sort(
       (a, b) =>
-        a.date.localeCompare(b.date) ||
-        (a.authors[0]?.surname ?? '').localeCompare(b.authors[0]?.surname ?? '')
+        byCodeUnits(a.date, b.date) ||
+        byCodeUnits(a.authors[0]?.surname ?? '', b.authors[0]?.surname ?? '')
     );
+  const sameAuthors = (a: Edit, b: Edit): boolean => {
+    const ids = new Set(a.authors.map((p) => p.dbId));
+    return (
+      ids.size === new Set(b.authors.map((p) => p.dbId)).size &&
+      b.authors.every((p) => ids.has(p.dbId))
+    );
+  };
   const rows: { date: string; kinds: Set<string>; authors: Map<number, string> }[] = [];
-  for (const edit of kept) {
-    const last = rows.at(-1);
-    const ids = edit.authors.map((a) => a.dbId).sort((a, b) => a - b);
-    const sameAuthors =
-      last !== undefined &&
-      ids.length === last.authors.size &&
-      ids.every((id) => last.authors.has(id));
-    if (last?.date === edit.date && (last.kinds.has(edit.kind) || sameAuthors)) {
-      last.kinds.add(edit.kind);
-      for (const a of edit.authors) last.authors.set(a.dbId, a.name);
+  kept.forEach((edit, i) => {
+    const before = kept[i - 1];
+    const row = rows.at(-1);
+    if (
+      row &&
+      before?.date === edit.date &&
+      (before.kind === edit.kind || sameAuthors(before, edit))
+    ) {
+      row.kinds.add(edit.kind);
+      for (const a of edit.authors) row.authors.set(a.dbId, a.name);
     } else {
       rows.push({
         date: edit.date,
@@ -52,32 +72,47 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
         authors: new Map(edit.authors.map((a) => [a.dbId, a.name])),
       });
     }
-  }
+  });
   return rows.map((row) => ({
     date: row.date,
-    kinds: [...row.kinds],
+    kinds: KINDS.filter((k) => row.kinds.has(k)),
     authors: [...row.authors.entries()].sort(([a], [b]) => a - b).map(([, name]) => name),
   }));
 }
 
-/** The cover's names: every author of the edits of the events held, sorted, each once. */
+/**
+ * The cover's names: every author of the edits of the events held, each name once (as
+ * event-pdf removes duplicates, by name), sorted by code units, case and all.
+ */
 export function coverNames(edits: Iterable<readonly Edit[]>): string[] {
-  const names = new Map<number, string>();
-  for (const list of edits)
-    for (const e of list) for (const a of e.authors) names.set(a.dbId, a.name);
-  return [...names.values()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const names = new Set<string>();
+  for (const list of edits) for (const e of list) for (const a of e.authors) names.add(a.name);
+  return [...names].sort(byCodeUnits);
 }
 
 /**
- * A summation's HTML, as a page may show it: text formatting, lists and links to web
- * addresses only. Scripts, images, styles and event handlers go, and any other tag keeps
- * its text.
+ * A summation's HTML, as the website shows it (Angular's default sanitiser, through which
+ * its pages render summations, keeps text formatting, lists and tables): those tags, and
+ * links to web addresses only. Scripts, styles, images and event handlers go; any other
+ * tag keeps its text; a link that is relative, or to a place in the page, keeps its text
+ * and loses its address, which in a PDF would point nowhere or at a section's anchor.
  */
 export function sanitiseSummation(html: string): string {
   return sanitizeHtml(html, {
-    allowedTags: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'sub', 'sup', 'ul', 'ol', 'li', 'a'],
-    allowedAttributes: { a: ['href'] },
+    allowedTags: [
+      ...['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'sub', 'sup', 'span'],
+      ...['ul', 'ol', 'li', 'a'],
+      ...['table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'],
+    ],
+    allowedAttributes: { a: ['href'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] },
     allowedSchemes: ['http', 'https'],
+    allowProtocolRelative: false,
+    transformTags: {
+      a: (tagName, attribs) => ({
+        tagName,
+        attribs: /^https?:\/\//i.test(attribs['href'] ?? '') ? { href: attribs['href'] ?? '' } : {},
+      }),
+    },
     disallowedTagsMode: 'discard',
   });
 }

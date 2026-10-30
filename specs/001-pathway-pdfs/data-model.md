@@ -72,9 +72,11 @@ the short entry alone, pointing at the full section, and not its subtree again.
 **Choosing a pathway's figure** (research R2, as graph-core does today):
 
 1. Its own diagram, if it has one.
-2. Otherwise its nearest ancestor with a diagram, with the reactions reached without
-   crossing another diagram selected. Among several parents, the ancestor nearest a
-   top-level pathway wins.
+2. Otherwise its nearest ancestor with a diagram on each path up (none between), with the
+   reactions reached without crossing another diagram selected. Among several, as
+   graph-core does today: the one nearest a top-level pathway below it wins, a top-level
+   pathway itself last (graph-core gives it no level, and Neo4j sorts that last), then the
+   smaller database id.
 3. The EHLD in place of the chosen diagram where the summary names it.
 
 Where the chosen diagram is an EHLD and events would be selected, the render service
@@ -91,8 +93,8 @@ Cases).
   - the book's: "The Reactome Book" and the release (FR-002);
   - a single-event PDF's: the event's name.
 - `figure`: a pathway's diagram (single-event only).
-- `names`: the distinct authors of the edits of every event the PDF holds, sorted by
-  name, each once.
+- `names`: the authors of the edits of every event the PDF holds, each name once (as
+  `event-pdf` removes duplicates, by name), sorted by code units, case and all.
 - `excerpt`: true for a single pathway at depth 1 or less. Its note points at the book.
 - `statements`: Reactome's institutions and licence, and the date.
 
@@ -106,6 +108,10 @@ Cases).
   PDF (FR-006).
 
 ## Book
+
+In the code (`src/model/types.ts`), the book and a single event's PDF are one `Document`
+with `kind: 'book' | 'single'`; its `places` hold the chapters' trees in document order,
+and `contents` is a list of `ContentsEntry`.
 
 - `release`, `cover`, `introduction`, `contents`.
 - `chapters`: one per top-level pathway, by name ignoring case. Each is printed as one

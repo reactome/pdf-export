@@ -16,7 +16,14 @@ import {
   type EventFacts,
   type EventRef,
 } from '../graph/queries.ts';
-import { coverNames, diseases, editRows, inferredFrom, sanitiseSummation } from './rules.ts';
+import {
+  byCodeUnits,
+  coverNames,
+  diseases,
+  editRows,
+  inferredFrom,
+  sanitiseSummation,
+} from './rules.ts';
 import type { ContentsEntry, Document, Figure, Place, Section } from './types.ts';
 
 export const anchorOf = (stId: string): string => `s-${stId}`;
@@ -39,12 +46,24 @@ export function chooseFigure(
       ? { kind: 'ehld', stId: event.stId }
       : { kind: 'diagram', stId: event.stId };
   }
-  const nearest = choice?.ancestors[0];
+  const nearest = nearestAncestor(choice?.ancestors ?? []);
   if (!nearest) return null;
   if (illustrated.has(nearest.stId)) {
     return { kind: 'ehld', stId: nearest.stId, unselectedFor: event.stId };
   }
-  return { kind: 'ancestor', stId: nearest.stId, highlight: choice.reactions };
+  return { kind: 'ancestor', stId: nearest.stId, highlight: choice?.reactions ?? [] };
+}
+
+/**
+ * The ancestor that draws a pathway with no diagram, as graph-core does today: the one
+ * nearest a top-level pathway below it, a top-level pathway itself last (graph-core gives
+ * it no level, and Neo4j sorts that last), then by database id.
+ */
+export function nearestAncestor<T extends { dbId: number; depthFromTop: number }>(
+  ancestors: readonly T[]
+): T | undefined {
+  const rank = (a: T): number => (a.depthFromTop === 0 ? Infinity : a.depthFromTop);
+  return [...ancestors].sort((a, b) => rank(a) - rank(b) || a.dbId - b.dbId)[0];
 }
 
 interface Walked {
@@ -59,7 +78,11 @@ async function walk(graph: Graph, roots: readonly Child[], maxDepth: number): Pr
     const wanted = level.filter((p) => !kids.has(p.dbId)).map((p) => p.dbId);
     const read = await readChildren(graph, wanted);
     for (const id of wanted) kids.set(id, read.get(id) ?? []);
-    level = level.flatMap((p) => kids.get(p.dbId) ?? []).filter((c) => c.kind === 'pathway');
+    const next = new Map<number, Child>();
+    for (const p of level)
+      for (const c of kids.get(p.dbId) ?? []) if (c.kind === 'pathway') next.set(c.dbId, c);
+    // each pathway once, and none already read: a level is read once, whatever the paths to it
+    level = [...next.values()].filter((p) => !kids.has(p.dbId));
   }
   const places: Walked['places'] = [];
   const seen = new Set<number>();
@@ -85,12 +108,14 @@ async function assemble(
 ): Promise<{ places: Place[]; sections: Section[]; names: string[]; version: number }> {
   const { places: walked } = await walk(graph, roots, maxDepth);
   const ids = walked.filter((p) => p.full).map((p) => p.child.dbId);
-  const [facts, refs, edits, version] = await Promise.all([
-    eventFacts(graph, ids),
-    literature(graph, ids),
-    readEdits(graph, ids),
-    readRelease(graph),
+  const held = new Set(ids);
+  // in chunks, so the book's thousands of events are never one query (research R2)
+  const [facts, refs, edits] = await Promise.all([
+    inChunks(ids, (chunk) => eventFacts(graph, chunk)),
+    inChunks(ids, (chunk) => literature(graph, chunk)),
+    inChunks(ids, (chunk) => readEdits(graph, chunk)),
   ]);
+  const version = await readRelease(graph);
   const needChoice = [...facts.values()]
     .filter((f) => f.kind === 'pathway' && !f.hasDiagram)
     .map((f) => f.dbId);
@@ -109,14 +134,27 @@ async function assemble(
     }
     const event = facts.get(child.dbId);
     if (!event) throw new Error(`${child.stId} was not read from the graph`);
+    const {
+      summations: rawSummations,
+      diseases: rawDiseases,
+      inferredFrom: rawInferred,
+      before,
+      after,
+      ...facts1
+    } = event;
     const section: Section = {
       anchor: anchorOf(event.stId),
-      event,
+      // the events before and after, only those the PDF holds (the Background, part 10)
+      event: {
+        ...facts1,
+        before: before.filter((e) => held.has(e.dbId)),
+        after: after.filter((e) => held.has(e.dbId)),
+      },
       path: path.map(ref),
       figure: chooseFigure(event, choices.get(event.dbId), illustrated),
-      diseases: diseases(event.diseases),
-      inferredFrom: inferredFrom(event.inferredFrom),
-      summations: event.summations.map(sanitiseSummation),
+      diseases: diseases(rawDiseases),
+      inferredFrom: inferredFrom(rawInferred),
+      summations: rawSummations.map(sanitiseSummation),
       references: refs.get(event.dbId) ?? [],
       edits: editRows(edits.get(event.dbId) ?? []),
       depth,
@@ -156,7 +194,7 @@ export async function buildBook(
 ): Promise<Document> {
   const tops = (await topLevelPathways(graph, species))
     .map((p): Child => ({ ...p, kind: 'pathway', schemaClass: 'TopLevelPathway' }))
-    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.dbId - b.dbId);
+    .sort((a, b) => byCodeUnits(a.name.toLowerCase(), b.name.toLowerCase()) || a.dbId - b.dbId);
   const { places, sections, names, version } = await assemble(graph, tops, Infinity, illustrated);
   return {
     kind: 'book',
@@ -194,4 +232,17 @@ export async function buildSingle(
     // A reaction alone, or depth 0, has none (the Background, item 5)
     contents: isPathway && depth > 0 ? contents(places, analysis) : null,
   };
+}
+
+/** A query over many ids, a chunk at a time, its answers merged. */
+async function inChunks<V>(
+  ids: readonly number[],
+  read: (chunk: number[]) => Promise<Map<number, V>>,
+  size = 2000
+): Promise<Map<number, V>> {
+  const merged = new Map<number, V>();
+  for (let i = 0; i < ids.length; i += size) {
+    for (const [k, v] of await read(ids.slice(i, i + size))) merged.set(k, v);
+  }
+  return merged;
 }

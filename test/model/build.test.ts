@@ -73,11 +73,17 @@ describe('the model', { skip }, () => {
       stId: 'R-HSA-90000200',
       highlight: ['R-HSA-90000211', 'R-HSA-90000212'],
     });
-    // two parents with diagrams: the one nearest a top-level pathway
+    // two parents with diagrams: as graph-core, the deeper one; a top-level pathway ranks last
     assert.deepEqual(fullOf(book, 'R-HSA-90000250').figure, {
       kind: 'ancestor',
-      stId: 'R-HSA-90000200',
+      stId: 'R-HSA-90000230',
       highlight: ['R-HSA-90000251'],
+    });
+    // a diagram between: only the nearer draws it, and reactions under another diagram are not selected
+    assert.deepEqual(fullOf(book, 'R-HSA-90000131').figure, {
+      kind: 'ancestor',
+      stId: 'R-HSA-90000130',
+      highlight: ['R-HSA-90000132'],
     });
     // beneath an illustration: the illustration, unselected, and recorded as such
     assert.deepEqual(fullOf(book, 'R-HSA-90000310').figure, {
@@ -124,8 +130,8 @@ describe('the model', { skip }, () => {
     assert.equal(new Set(book.cover.names).size, book.cover.names.length);
     assert.deepEqual(book.cover.names, [...book.cover.names].sort());
     assert.equal(book.release.version, 98);
-    assert.equal(book.release.reactions, 6);
-    assert.equal(book.release.pathways, 7);
+    assert.equal(book.release.reactions, 8);
+    assert.equal(book.release.pathways, 10);
     const contents = book.contents;
     assert.ok(contents);
     assert.equal(contents[0]?.target, 'introduction');
@@ -146,6 +152,11 @@ describe('the model', { skip }, () => {
       'Alpha sub one',
       'Two-parent sub',
     ]);
+    // a section holds its own lists, not the raw ones
+    const first = single.places[0];
+    assert.ok(first?.full);
+    assert.ok(!('summations' in first.section.event));
+    assert.ok(!('diseases' in first.section.event));
     assert.equal(single.cover.excerpt, true);
     assert.deepEqual(single.cover.figure, { kind: 'diagram', stId: 'R-HSA-90000200' });
     assert.ok(single.contents);
@@ -161,5 +172,38 @@ describe('the model', { skip }, () => {
     assert.equal(single.contents, null);
     assert.equal(single.cover.figure, null);
     assert.equal(single.cover.excerpt, false);
+  });
+
+  test('the events before and after are only those the PDF holds', async () => {
+    const found = await eventByIdentifier(graph, 'R-HSA-90000210');
+    assert.ok(found && 'event' in found);
+    const single = await buildSingle(graph, found.event, { depth: 1, illustrated });
+    const r1 = single.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
+    assert.ok(r1?.full);
+    assert.deepEqual(
+      r1.section.event.after.map((e) => e.name),
+      ['Black box two']
+    );
+    assert.deepEqual(r1.section.event.before, []);
+  });
+
+  test("a pathway's selection leaves out reactions under another diagram", async () => {
+    const { diagramChoices } = await import('../../src/graph/queries.ts');
+    const choices = await diagramChoices(graph, [90000210, 90000131]);
+    assert.deepEqual(choices.get(90000210)?.reactions, ['R-HSA-90000211', 'R-HSA-90000212']);
+    assert.deepEqual(
+      choices.get(90000131)?.ancestors.map((a) => a.stId),
+      ['R-HSA-90000130']
+    );
+    // an ancestor's depth is its nearest top-level pathway's: Alpha sub two is one below Alpha,
+    // two below beta
+    const two = await diagramChoices(graph, [90000250]);
+    assert.deepEqual(
+      two.get(90000250)?.ancestors.map((a) => [a.stId, a.depthFromTop]),
+      [
+        ['R-HSA-90000200', 0],
+        ['R-HSA-90000230', 1],
+      ]
+    );
   });
 });

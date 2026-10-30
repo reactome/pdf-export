@@ -324,7 +324,6 @@ export interface DiagramAncestor {
   stId: string;
   /** How far it is from the nearest top-level pathway above it: 0 for one itself. */
   depthFromTop: number;
-  hasEHLD: boolean;
 }
 
 export interface DiagramChoice {
@@ -353,8 +352,7 @@ export async function diagramChoices(
        WITH DISTINCT a
        OPTIONAL MATCH top = (:TopLevelPathway)-[:hasEvent*0..]->(a)
        WITH a, min(length(top)) AS depth
-       RETURN collect({dbId: a.dbId, stId: a.stId, depthFromTop: coalesce(depth, 0),
-                       hasEHLD: coalesce(a.hasEHLD, false)}) AS ancestors
+       RETURN collect({dbId: a.dbId, stId: a.stId, depthFromTop: coalesce(depth, 0)}) AS ancestors
      }
      CALL {
        WITH p
