@@ -22,14 +22,13 @@
   "devDependencies": {
     "@angular/cdk": "21.2.14",
     "@angular/material": "21.2.14",
+    "@cantoo/pdf-lib": "2.11.1",
     "@eslint/js": "10.0.1",
     "@types/fontkit": "2.0.9",
     "@types/node": "24.19.2",
     "@types/sanitize-html": "2.16.2",
     "eslint": "10.13.0",
     "ngx-reactome-style": "github:reactome/ngx-reactome-base#606de81b66283029fb0ccfa170ed757e95701a35",
-    "pdfjs-dist": "6.4.299",
-    "playwright-core": "1.64.1",
     "prettier": "3.9.10",
     "sass": "1.97.3",
     "typescript": "6.0.3",
@@ -43,6 +42,8 @@
     "@fontsource/roboto-mono": "5.3.0",
     "fontkit": "2.0.4",
     "neo4j-driver": "5.28.3",
+    "pdfjs-dist": "6.4.299",
+    "playwright-core": "1.64.1",
     "sanitize-html": "2.18.1"
   }
 }
