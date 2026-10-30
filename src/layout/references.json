@@ -1,5 +1,5 @@
 {
-  "_note": "Reactome's own papers, for the introduction (spec 001 T016). Titles, journals, years and DOIs are from the website's publications page (WebsiteAngular content/community/publications.mdx). The authors are left for the release's owners to fill in, each as written on that page: the code does not write people's names.",
+  "_note": "Reactome's own papers, for the introduction (spec 001 T016). Titles, journals and DOIs are from the website's publications page (WebsiteAngular content/community/publications.mdx); the year is the journal issue's, where the page gives the earlier online date (the 2026 paper went online in November 2025). The authors are left for the release's owners to fill in, each as written on that page: the code does not write people's names.",
   "references": [
     {
       "pubMedId": 41251150,
