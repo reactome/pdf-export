@@ -36,12 +36,17 @@ inside the analysis service. It draws its figures with the same Java exporters a
   identifiers only.
 - **Three colour profiles** (diagram, analysis and overview).
 - **The file name** in the address is ignored: the download is always named `report.pdf`.
-- **At most two** reports are made at once; more wait, without limit. A failure while
-  making the PDF is answered 500, as is a service that cannot answer.
+- **At most two** reports are made at once; more wait, without limit.
 - **Its errors** are JSON in the analysis service's form (`code`, `reason`, `messages`),
-  as are the analysis gateway's own refusals before it, and any other failure's 500;
-  only a failure of the PDF library itself is answered 500 with the web framework's
-  default body. A figure whose exporter fails is left out, and the report still answered 200.
+  as are the analysis gateway's own refusals before it: the 404s, the 410, and a 500
+  for a service that cannot answer. A figure whose exporter reports a failure is left
+  out (logged), and the report is still answered 200.
+- **A failure while the PDF is being made** is answered differently by the two builds of
+  the controller: on the analysis service's main branch the PDF is streamed as it is
+  made, so a failure part way through ends a 200 answer early (a truncated file), while
+  an unmerged branch buffers it and answers 500 with the web framework's default body.
+  Which build the deployments run is to be confirmed by the plan's replay before this
+  part of the comparison is relied on.
 - **The figures' overlays:** each pathway's diagram is overlaid for the report's
   resource; the genome-wide overview shows the pathways the report's filter kept,
   coloured for the result's default resource (as above). Neither is ever for importable
@@ -381,8 +386,9 @@ working files for the submitted identifiers.
   - the order of what a pathway was inferred from (today's in no set order), in the
     curators' order; its compartments, references (and so which five are shown),
     diseases and descriptions are in the curators' order in both, and must match;
-  - every error body in the analysis service's JSON form, where today's 500 for a
-    failure of the PDF library has the framework's default body;
+  - a failure while making the PDF answered 500 in the analysis service's JSON form,
+    before any of the PDF is sent, where today's either ends a 200 early or answers 500
+    with the framework's default body, by build (the Background);
   - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
   - today's service also sends each report's timing, with the client's address and
