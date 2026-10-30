@@ -107,11 +107,10 @@ for WebsiteAngular to ship it (T042).
   - cold, with an empty `RENDER_CACHE` directory, or a fresh `RENDER_CACHE_KEY`, for each run;
   - a sample of at least 2,000 figures in the book's mix: 85% reactions, 6% own diagrams, 1% illustrations, 8% selections.
 
-  Measure two things:
+  Measure three things:
   - **(a) The render service as it is,** at `RENDER_CONCURRENCY` 1, 2, 4 and 8, with `RENDER_QUEUE` raised to match so the run measures renders, not 503s. The service deliberately opens a fresh page per render, because a reused page leaks state such as a stale analysis token.
   - **(b) Page reuse,** through a harness on WebsiteAngular's `render-core` in `ci/measure/`: 1, 2, 4 and 8 reused pages, each reset between figures, with any leak checked by comparing a figure drawn after another with the same figure drawn fresh.
-
-  - **(c) One figure on request,** for the PDFs made on the fly (a single event's, and spec 002's analysis report, which draws a pathway overview and up to 50 overlaid diagrams per request): the time for one figure with an analysis token, cold, at the service's settings for the website, and how it grows with requests at once.
+  - **(c) One figure on request,** for the PDFs made on the fly (a single event's, and the analysis report of spec 002, proposed in #51, which draws a genome-wide overview and up to 50 overlaid diagrams per request): the time for one figure with an analysis token, cold, at the service's settings for the website, and how it grows with requests at once.
 
   Record figures per second, CPU and memory, and the extrapolation to 19,313 figures, in research R7, and (c)'s times beside SC-005's budget. The script's output carries no names.
   - **Go** if (a) fits 19,313 figures in 44 minutes. A go on (b) alone is conditional: page reuse must ship in WebsiteAngular's render service first (T042), and Phase 4 then waits for it.
@@ -287,7 +286,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
     - 503 `unavailable` when a service cannot answer or the limit is reached.
   - **Health:** the version, the graph's release, and whether the render and analysis services answer.
   - **Content:** bookmarks in every PDF (FR-006). A figure that cannot be drawn leaves its section without it, logged.
-  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD and logged with the stable identifier or token; never a failed request.
+  - **Characters (FR-017):** T024's substitutions, then any character no font covers printed as U+FFFD; each code point logged once per PDF with the stable identifier or token, never the text; never a failed request. Tested with a planted character, and with a thousand of them in one text (one log line).
 
   Tests in `test/serve.test.ts` against the stubs:
   - each status, seen failing;
@@ -311,12 +310,13 @@ passes.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir>` (contracts/cli.md).
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
-  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts`, applied to every text the layout writes: U+2011 (non-breaking hyphen) by U+2010, U+FB01 (the ﬁ ligature) by "fi", and U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022. These three are every character release 98's summations and event names hold that no font draws (T018's measurement). Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector).
+  - **Characters (FR-017):** first FR-017's substitutions, in `src/layout/characters.ts`, applied to every text the layout writes and to the text of every inlined figure: U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities, which the figures' labels draw (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), over the texts and the figures' labels.
   - Either fault means exit 1, with no book written (Story 5, scenario 3).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
-  - each of the three substitutions is made, and none of them is a fault;
+  - each of the four substitutions is made, in a text and in a figure's label, and none is a fault;
+  - a character off the list in a figure's label is a fault;
   - the fixture summary's entry for an absent event is not a fault.
 
 - [ ] T025 [US1] Parts, `src/print/parts.ts`.
@@ -347,7 +347,7 @@ passes.
 - [ ] T029 [US1] `book` end to end, `src/cli.ts` (contracts/cli.md).
   - **Flags and their environment variables** (contracts/cli.md): `--graph` (`NEO4J_URI`), `--database` (`NEO4J_DATABASE`), `--render` (`RENDER_SERVICE`), `--site` (`REACTOME_SITE`), `--files`, `--species`, `--out`, `--parallel` and `--report`. Credentials come from `NEO4J_USER` and `NEO4J_PASSWORD`, never the command line.
   - **Writing:** the file is written beside its name and moved into place.
-  - **The run report:** the release; each stage's time; pages and size; figures by kind; the figures below the legibility floor; missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
+  - **The run report:** the release; the characters FR-017's list replaced, by code point and count; each stage's time; pages and size; figures by kind; the figures below the legibility floor; missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
 
   Tests:
   - exit 0 on the fixture with one PDF (provisional until T030 adds the check);

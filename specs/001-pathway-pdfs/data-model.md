@@ -149,6 +149,8 @@ What the book's step and the service log.
 - Figures by kind, and those missing, by stable identifier.
 - Figures below the legibility floor, by stable identifier.
 - Release files missing, by name, from the preflight.
+- Characters FR-017's list replaced, by code point and count; characters off the list, by
+  code point and stable identifier (a fault in the book, U+FFFD in a PDF made on request).
 - Each stage's time, against research R7's budget.
 - Each FR-011 check, and its result.
 - No names (FR-013).

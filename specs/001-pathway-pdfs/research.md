@@ -278,7 +278,9 @@ synthetic documents, on this host under load.
   - with no fallback, a character none of the fonts covers would be drawn as an empty
     box, still silently. So before printing, each text's characters are checked against
     the fonts' character maps (`fontkit`, MIT), and one no font covers is a fault,
-    named by its code point and its section's stable identifier;
+    named by its code point and its section's stable identifier. Amended by FR-017
+    (30 Oct 2026): a fixed list is substituted first, and a PDF made on request prints
+    any other as U+FFFD, logged, instead of failing;
   - the check of FR-011 and SC-009 lists every font in the PDF.
 
 **Alternatives considered.**

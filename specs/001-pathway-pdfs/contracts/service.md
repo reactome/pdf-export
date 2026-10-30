@@ -28,6 +28,9 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   They never carry a path, a host or a name.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
+- **A character no font draws** does not fail the PDF (FR-017): after the fixed list's
+  substitutions, it prints as U+FFFD, and each such code point is logged once per PDF
+  with the stable identifier or token, never the text.
 - **The species** of the overlay is the event's (FR-006). The analysis options the
   website does not send are ignored (spec, Assumptions).
 

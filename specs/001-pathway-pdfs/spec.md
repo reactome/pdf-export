@@ -240,6 +240,9 @@ damage the output in each way FR-011 names, and see the check fail on each.
    fails and names the fault.
 3. **Given** a release file the step needs is missing, **When** the step runs, **Then**
    it fails and names the file, and writes no book.
+4. **Given** a text or a figure's label holding a character no font draws and FR-017's
+   list does not hold, **When** the step runs, **Then** it fails before printing, naming
+   the character and the event, and writes no book.
 
 ---
 
@@ -405,16 +408,6 @@ of pages with today's book.
   identifiers, and the Noto Sans family (Noto Sans, Noto Sans Symbols 2 and Noto Sans
   Math) only for characters they lack. Each typeface is embedded
   and under a licence FR-009 allows.
-- **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026):
-  - **the book:** those on a fixed list are replaced by what the typefaces draw, without
-    changing what the text says (a ligature by its letters, a non-breaking hyphen by a
-    hyphen, a spacing dot above used as a radical dot by a bullet). The list is kept with
-    the code, and each entry was found in a release's text. Any character not on it fails
-    the step, naming it and the event, so the release's owners see a new one;
-  - **a PDF made on request** (a single event's, or any other the website asks for on the
-    fly, whose text can include what users submit): the same list is applied, and any
-    other such character prints as the replacement mark (U+FFFD) and is logged with the
-    event or token, never failing the request.
 - **FR-016**: The PDFs' layout MUST have:
   - parts set apart by space, type and at most thin rules, with no boxes or borders;
   - the same margins on every page;
@@ -425,6 +418,20 @@ of pages with today's book.
     sets, unless it is already at the largest a landscape page of its own allows, in
     which case it is listed in the run report;
   - a cover in the website's style (User Story 6, scenario 3).
+- **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026), in
+  the text the layout writes and in the figures' labels alike:
+  - **the book:** those on a fixed list are replaced by what the typefaces draw, without
+    changing what the text says (a ligature by its letters, a non-breaking hyphen by a
+    hyphen, a spacing dot above used as a radical's dot by a bullet, a geresh used as a
+    prime by a prime). The list is kept with the code, each entry with the release
+    text it was found in. Any character not on it fails the step before anything is
+    printed, naming it and the event, so the release's owners see a new one;
+  - **a PDF made on request** (a single event's, or any other the website asks for on the
+    fly, whose text can include what users submit): the same list is applied, and any
+    other such character prints as the replacement mark (U+FFFD). Each such code point is
+    logged once per PDF, with the stable identifier or the token, never the text it was
+    in; the request never fails on it;
+  - a figure's label changed by the list is a recorded difference for SC-008.
 
 ### Key Entities
 
