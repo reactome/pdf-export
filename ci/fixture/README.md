@@ -44,9 +44,11 @@ names `R-HSA-99999999`, an event the graph does not hold, which the preflight mu
 ```sh
 docker run -d --name pdfx-fixture -p 127.0.0.1:17700:7687 -e NEO4J_AUTH=none \
   -e NEO4J_dbms_default__database=graph.db \
-  -v "$PWD/ci/fixture/fixture.cypher:/fixture.cypher:ro" neo4j:4.4.48-community
-docker exec pdfx-fixture cypher-shell -d graph.db -f /fixture.cypher
+  neo4j:4.4.48-community
+docker exec -i pdfx-fixture cypher-shell -d graph.db < ci/fixture/fixture.cypher
 NEO4J_URI=bolt://127.0.0.1:17700 npm test
 ```
 
-Without `NEO4J_URI` the graph tests are skipped; CI sets it.
+To reload after an edit, delete everything (`MATCH (n) DETACH DELETE n`) and load it again
+through standard input. Mounting the file instead would keep the copy git replaced on a
+branch change. Without `NEO4J_URI` the graph tests are skipped; CI sets it.

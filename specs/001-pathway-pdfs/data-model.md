@@ -6,7 +6,7 @@ that apply to it.
 
 ## Release
 
-- `version`: from `(:DBInfo).version`.
+- `version`: from `(:DBInfo).releaseNumber` (`version` reads null on release 98).
 - `counts`: the distinct pathways and reactions the PDF holds, for the introduction.
 - `files`: the release's folder (`--files`): its EHLD summary, read to choose figures,
   and the diagram and EHLD files the preflight expects (contracts/cli.md).

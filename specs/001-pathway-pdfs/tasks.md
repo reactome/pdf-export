@@ -152,13 +152,18 @@ for WebsiteAngular to ship it (T042).
   Record time and peak memory per stage against research R7's 13 + 6 minutes. The script lives in `ci/measure/`. If the join does not fit in memory, take T012.
 
 - [ ] T012 Only if T011's join does not fit in memory: join in groups (research R4). Join the parts a few at a time into intermediate files, then join those, keeping the links' and the outline's targets. Record the memory and time against the budget.
-- [ ] T013 The graph reader, `src/graph/`:
+- [x] T013 The graph reader, `src/graph/`: — #28, replacing #26 after its review.
   - the Neo4j driver (`neo4j-driver`), with the database name and the `NEO4J_*` settings;
   - the batched queries of research R2: the tree by level; each part across a level's events; literature, the first five by `order`, with six authors and whether there are more; edits with their authors; the release; the top-level pathways;
   - rows mapped to plain objects;
   - every list sorted by its relationship's `order`.
 
   Tests in `test/graph/` against the fixture graph. Show a test failing on a list read without `ORDER BY`, and on an inferred source read the wrong way.
+
+  - **What it is:** `connection.ts` reads the settings (`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) and opens read sessions, integers as numbers. `queries.ts` has the release (`DBInfo.releaseNumber`); a species' top-level pathways; what an identifier names (an event, something that is not one, or nothing: the service's 200, 400 and 404), by stable id, versioned stable id or database id, each by its own index lookup; a level's children; each event's facts and short lists; the first five references, each with its first six authors, whether there are more, and a book's chapter; and edits with their authors (the model re-sorts a row's authors by database id, research R2).
+  - **From #26's review:** every query finds its events through `DatabaseObject`'s `dbId` index with the label in a `WHERE`; `MATCH (p:Pathway {dbId: …})` scanned every pathway, as `EXPLAIN` on the fixture showed (`NodeByLabelScan` against `NodeIndexSeek`). Each id is read once, so an event a level names twice gives its rows once. Pattern comprehensions come back in no set order, so `factsFromRow` sorts each list by its relationship's `order`, tested on scrambled rows without a graph.
+  - **The fixture** gains lists whose creation order is neither their order nor its reverse (three summations, three events before and three after), the eight-author reference among the first five, authors created in reverse of their order, and a book chapter: 58 nodes and 98 relationships.
+  - **Tests:** `test/graph/reader.test.ts` (9, on the fixture) and `test/graph/facts.test.ts` (2, no graph). Each of these mutants made one fail: literature or children read without `ORDER BY`; inference read the wrong way; more-authors always true; no cap of six; a reference's or an edit's authors unsorted; each of the six lists left unsorted; ids not made unique; a non-event read as nothing.
 
 - [ ] T014 [P] The figures client, `src/figures/` (contracts/render.md).
   - It asks the render service for each kind: `/render/{stId}.svg`, `?highlight=a,b`, `?layout=reaction`, and `?token=` decoded once.
