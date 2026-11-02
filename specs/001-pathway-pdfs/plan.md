@@ -118,7 +118,9 @@ _GATE: checked before research and again after design._
 
 **After design:** unchanged. The render service is a new dependency of the release's
 step, a tracked violation of II (Complexity Tracking) until R10's render bundle without
-FoamTree exists. The release's owners agree it (spec, Assumptions; R3).
+FoamTree exists. The release's owners agree it (spec, Assumptions; R3). Since
+constitution 1.2.0, Principle II allows this run-time use (its run-time exception);
+the bundle without FoamTree is still wanted, so it stays tracked here.
 
 ## Project Structure
 
