@@ -29,16 +29,16 @@ contracts/figures.md).
   `DBInfo` checksum, and the render service's health answer a `build` other than
   `unknown` (contracts/render.md), or the run is refused before anything is drawn
   (exit 2). What this cannot see is in contracts/figures.md.
-- **The manifest** (contracts/figures.md) records the folder's fingerprint and what each
-  file draws, in the order that contract gives, so a stopped run resumes safely. A folder
-  of another fingerprint is refused (exit 2).
+- **One run, one folder:** `--out` must be empty or absent (exit 2 otherwise); a
+  stopped run is not resumed. The manifest (contracts/figures.md) records the folder's
+  fingerprint and what each file draws.
 - **Exit 0:** every figure is in the folder. **Exit 1:** a preflight fault
   (`missing-file`, `uncovered-character`), a label fault after drawing, or a figure that
   could not be drawn, each named by stable identifier or file name. **Exit 2:** bad
   arguments; the render or content service unreachable at the start; another release
-  at `--content`; no graph checksum or no render `build`; or a folder of
-  another fingerprint, when a new, empty `--out` is needed. A `build` or content release
-  that differs from the fingerprint before any figure is exit 1 (contracts/figures.md).
+  at `--content`; no graph checksum or no render `build`; or an `--out` that is not
+  empty. A `build` or content release that changes during the run is exit 1
+  (contracts/figures.md).
 
 ## `pdf-export book`
 
@@ -62,9 +62,9 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
   lists the release's files the figures need (the events from the graph; which are
   illustrations from the summary, ignoring an entry for an event the graph does not
   hold) and the figures' files in `--figures`, and a file missing is a fault
-  `missing-file <name>`. The folder's manifest must carry the graph's release number and
-  checksum, or the fault is `stale-folder` naming both; its journal's last line must be a whole `complete` line equal to its first, with no torn line, or the fault is `incomplete-folder`; and the graph must have a checksum, or the fault is `no-checksum` (contracts/figures.md); and for each figure, what the
-  Figure rules choose now, or the fault is `stale-figure <stId>` (contracts/figures.md).
+  `missing-file <name>`. The folder must pass the checks contracts/figures.md lists under
+  "What `book` checks": `incomplete-folder`, `no-checksum`, `stale-folder`,
+  `stale-summary` and `stale-figure <stId>`.
   Any of these ends the step with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault
   `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4), checked

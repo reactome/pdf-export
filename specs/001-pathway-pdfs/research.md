@@ -507,7 +507,7 @@ is ignored, not a missing file.
   and needs no render service (contracts/cli.md, contracts/figures.md).
   - SC-003 is the book's time from figures already drawn; the figures' step has its own
     criterion, SC-010. At the rate above the step takes about 3.5 hours on this host
-    (inference), so it needs a larger machine, several machines each drawing a share, or
+    (inference), so it needs a larger machine, several machines each drawing a share (inference: the book reads one folder, so shares would need merging, not specified now), or
     many figures per page load (route 1, still wanted, T042) to come down.
   - This answers the shared cache's objection above: the step draws the new release
     from its own data, before the website serves it, and what it writes could (inference) fill the
