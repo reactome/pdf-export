@@ -63,7 +63,7 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
   illustrations from the summary, ignoring an entry for an event the graph does not
   hold) and the figures' files in `--figures`, and a file missing is a fault
   `missing-file <name>`. The folder's manifest must carry the graph's release number and
-  checksum, or the fault is `stale-folder` naming both; it must end with a `complete` line, or the fault is `incomplete-folder`; and the graph must have a checksum, or the fault is `no-checksum` (contracts/figures.md); and for each figure, what the
+  checksum, or the fault is `stale-folder` naming both; its journal's last line must be a whole `complete` line equal to its first, with no torn line, or the fault is `incomplete-folder`; and the graph must have a checksum, or the fault is `no-checksum` (contracts/figures.md); and for each figure, what the
   Figure rules choose now, or the fault is `stale-figure <stId>` (contracts/figures.md).
   Any of these ends the step with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault

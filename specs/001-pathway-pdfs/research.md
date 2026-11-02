@@ -611,7 +611,8 @@ packaging.
   no-go, and the figures moved to a step of their own; this would shorten that step.
 - **The render service's health answer naming what draws:** the build of the website's
   page it loads, and its content service's release and `DBInfo` checksum, so the
-  figures' folder's fingerprint (contracts/figures.md) need not trust the operator.
+  figures' folder's fingerprint (contracts/figures.md) need not trust the operator; and a
+  header on each drawing naming both, so each figure records what drew it.
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
   in its own process.
