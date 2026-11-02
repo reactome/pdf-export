@@ -46,8 +46,9 @@ bounds a request, not a report.
 **Constraints**: the analysis service's API only (FR-202); no submitted identifier logged,
 nor kept beyond the finished report in memory for an hour (FR-211); FR-017 for characters; constitution 1.2.0.
 
-**Scale/Scope**: up to 50 pathways and 51 figures a report; one report at a time behind
-the gateway's lane, two in the service by default.
+**Scale/Scope**: up to 50 pathways and 51 figures a report; two made at once and eight
+waiting, by pdf-export's own limits (FR-210), with a share per client at the gateway,
+which no longer queues report requests (step 8).
 
 ## Constitution Check
 
@@ -138,9 +139,11 @@ else (constitution I).
    pdf-export, and the render service's `resource` (the overlay wait is step 0). The
    "PDF Result" button opens the report's address in a new tab rather than downloading
    it, so the page shown while it is made (202) is seen, not saved as `report.pdf`. The
-   gateway's report lane passes report requests straight through to pdf-export rather
-   than queueing them one at a time: with pdf-export holding a request up to 30 s, a
-   lane of one would turn every browser's polling into a wait for the others (R6).
+   gateway's report lane sends report requests to pdf-export, a second upstream, without
+   queueing them one at a time: with pdf-export holding a request up to 30 s, a lane of
+   one would turn every browser's polling into a wait for the others. It keeps its share
+   per client, passes the client's address on, and answers 503 when pdf-export cannot be
+   reached (R6). The service's image mounts a `tmpfs` for the printer's working folder.
 
 ## Complexity Tracking
 

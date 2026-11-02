@@ -33,14 +33,19 @@ already call. The address and parameters are today's.
   species' database id, `number` after clamping, `resource` after defaulting,
   `importableOnly`), and waits up to 30 s. The same address answers 202 until the
   report is ready, then 200 with the PDF.
-- **A report that ends in an error** (500, or 503 including past its budget) answers
+- **A report that ends in an error** (FR-203's: 404 or 410 when the token goes while it
+  is made, 500, or 503 including past its budget) answers
   that error to every request then waiting and to the next request, then is forgotten,
   so the request after starts it again; unasked, it is forgotten after an hour.
-- **Kept** (FR-211): a finished report in the service's memory for one hour. Before it
-  is sent, the analysis service is asked about the token: a 404 or 410 drops it and is
-  answered as such. All are dropped when the graph's release changes.
+- **Kept** (FR-211): a finished report in the service's memory for one hour, at most
+  512 MB of them by default, the oldest dropped first. Every request asks the analysis
+  service about the token (contracts/analysis-api.md, the check): a 404 or 410 drops a
+  kept report and is answered as such; no answer within 5 s is a 503, the kept report
+  not sent. Every request reads the graph's release with the species: a change drops
+  every kept report.
 - **Limits** (FR-210): two reports made at once by default and eight more waiting (503
-  beyond that; a joining request is never counted); a time budget of 5 minutes from
+  beyond that; a joining request is never counted), and at most two of the eight from
+  one client, as the gateway tells it (`X-Forwarded-For`, set by the gateway); a time budget of 5 minutes from
   when a report starts being made. The render requests of all reports together are
   capped (two at once by default), so reports never take every one of the render
   service's slots from the website's own images.
@@ -51,9 +56,11 @@ already call. The address and parameters are today's.
   the 200, the PDF downloads (`Content-Disposition: attachment`) and the page stays as
   it was, saying the report is ready.
 - **One process:** jobs and kept reports live in the service's process. Several
-  instances do not share them (the gateway sends a token's requests to one, or
-  duplicate work is accepted), and a restart loses them; the next request starts the
-  report again.
+  instances do not share them, so the service runs as one instance; a restart loses
+  them, and the next request starts the report again.
+- **The working page** (FR-211): the printer's HTML, holding the submitted identifiers,
+  in a private folder on a memory-backed filesystem, removed when the print ends; the
+  folder is emptied when the service starts.
 - **A figure that cannot be drawn** leaves its part without it, logged; the report is
   still 200.
 - **Characters no font draws:** spec 001 FR-017 for PDFs made on request.

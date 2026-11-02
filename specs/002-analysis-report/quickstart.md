@@ -43,7 +43,9 @@ requests, and no ReactomeGSA runs.
   for one key making one report (the stubs count their calls); the PDF from a kept
   report, and none after the hour; a failed report's error given to each waiting
   request and the next, then a fresh start; a report abandoned at its budget; a kept
-  report whose token the analysis stub then answers 410 dropped and 410 answered.
+  report whose token the analysis stub then answers 410 dropped and 410 answered; kept
+  reports past the total cap dropped oldest first and made again when asked; a third
+  report waiting from one client refused while others' are taken.
 - **The look** (SC-204): spec 001's colour and font check on a sample report.
 - **The readers** (SC-207): the report opens, with its bookmarks and links working, in
   spec 001's three readers.

@@ -3,7 +3,12 @@
 The analysis service's public API, under `/AnalysisService`, called directly (not
 through the gateway). Research R1 says why these and not others.
 
-In this order (research R1):
+**The check,** on every request to the report's address, before anything else of the
+analysis is read and before a kept report is sent: call 1 below, with a 5 s timeout. Its
+404 or 410 is passed on (and drops a kept report); no answer, or any other failure, is 503. It is the only call a request makes when its report is being made or kept; a
+joining request makes no other.
+
+In this order, for a report being made (research R1):
 
 | Call | Request                                                                                                                                           | Used for                                                                                                                                  |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |

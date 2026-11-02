@@ -89,7 +89,7 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
 **Rationale.** The fewest calls that give everything, in the order their answers depend
 on, and none of the analysis's sums moves out of the analysis service (FR-202). The
 calls go to the analysis service directly, not through the gateway, which queues only
-`/AnalysisService/report/…` and submissions.
+submissions (report requests it passes on, R6).
 
 **To measure** (Order of work, step 1): call 4's size and time for a large expression
 dataset. It repeats every identifier for each pathway holding it, top-level pathways
@@ -266,8 +266,14 @@ with that copy's.
 pdf-export instead of the analysis service, and stops queueing it: today it makes one
 report at a time and holds each request until its answer ends, which with pdf-export's
 30 s wait would serialise every browser's polling, and three at once would exceed its
-60 s queue. pdf-export's own limits (FR-210) protect it instead. nginx's route to the
-gateway is unchanged. Both are a WebsiteAngular task, in its own specs (spec Assumptions).
+60 s queue. pdf-export's own limits (FR-210) protect it instead. The gateway keeps,
+for the report path, what it adds to its other lanes besides the queue: a share per
+client (a client's report requests in flight counted, and refused past its share, never
+queued), and the client's address passed on, which pdf-export uses for its own share
+of the waiting reports. So the gateway gains a second upstream for this path, pdf-export
+beside the analysis service; and when pdf-export cannot be reached it answers 503 in
+the analysis service's form, as FR-203 asks, not its 502 for the analysis service.
+nginx's route to the gateway is unchanged. Both are a WebsiteAngular task, in its own specs (spec Assumptions).
 
 **Alternatives considered.** A new address on the website: rejected, as people's scripts
 call today's (User Story 2).
@@ -278,10 +284,13 @@ call today's (User Story 2).
 the time per stage, the size, and the code points FR-207 replaced (once each). No
 submitted identifier, and nothing about the client; one line per report made, not per
 request. The PDF is built in memory, kept there for at most an hour once finished
-(FR-211, data-model Job), and sent once complete; no file of it is written. Spec 001's printer writes its HTML to
-a temporary file and removes it; for a report, that HTML holds submitted identifiers, so
-the folder is private to the service's user, and the file is removed in a `finally`,
-which a test shows (SC-205).
+(FR-211, data-model Job), at most 512 MB of them, and sent once complete; no file of
+it is written. Spec 001's printer writes its HTML to a temporary file and removes it;
+for a report, that HTML holds submitted identifiers and lives for the whole print,
+minutes long. So the folder is private to the service's user and on a memory-backed
+filesystem (the container's `tmpfs`), the file is removed in a `finally`, and the
+folder is emptied when the service starts, which a run killed while printing shows
+(SC-205). The log holds a hash of the token, not the token.
 
 **A request the client abandons** (the connection closes before the answer): only its
 wait ends. The report goes on to its end or its time budget, for the next request to

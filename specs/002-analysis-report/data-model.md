@@ -81,4 +81,6 @@ A report being made or kept, in the service's process (contracts/service.md).
 - **Waiting:** the requests waiting on it; none is needed for it to go on.
 - **Dropped:** an hour after it ended; a failed one also once its error has been
   answered; a kept one whose token the analysis service no longer knows; all when the
-  graph's release changes. Nothing of it is written to disk.
+  graph's release changes; the oldest first when the kept reports would pass their
+  total (512 MB by default). Nothing of it is written to disk but the printer's working
+  page, on memory-backed storage, while it prints (FR-211).

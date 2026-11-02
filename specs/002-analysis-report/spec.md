@@ -101,7 +101,8 @@ the page, from the third page on, numbered from 2. There are no bookmarks.
 
 The website's analysis gateway (WebsiteAngular) queues these requests before the
 analysis service, one at a time by default, with a bounded queue, and answers
-"unavailable" with a time to retry beyond it.
+"unavailable" with a time to retry beyond it (FR-210 changes this for the new
+service).
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -198,8 +199,9 @@ installed, and fails when a restrictive one is planted.
 ### User Story 4 - What users submitted stays theirs (Priority: P2)
 
 A report holds the identifiers a user submitted. The service keeps nothing of them
-beyond the request except the finished report, in its own memory, for at most an hour
-(FR-211), and logs only FR-211's fields: none of them a submitted identifier.
+beyond the request except the finished report, in its own memory, for at most an hour,
+and the printer's working page while it prints, in memory-backed storage (FR-211); it
+logs only FR-211's fields: none of them a submitted identifier.
 
 **Why this priority**: identifiers are not personal data, but they are the user's
 research data.
@@ -309,8 +311,9 @@ working files for the submitted identifiers.
   - a report ready by then is sent as the PDF, only once it is complete; one that is
     not is answered "accepted", with a time to ask again, and the same address answers
     the PDF once it is ready; a browser is given a page that asks again by itself;
-  - a report ended by an error (FR-203's, "unavailable" past its time budget included)
-    answers that error to every request then waiting and to the next request, and is
+  - a report ended by an error (any of FR-203's: 404 or 410 when the token goes while
+    it is made, 500, or "unavailable", past its time budget included) answers that
+    error to every request then waiting and to the next request, and is
     then forgotten, so the request after starts it again; an error nobody asks for is
     forgotten after an hour;
   - at most a set number of reports are made at once (two by default, as today), and at
@@ -321,13 +324,21 @@ working files for the submitted identifiers.
     analysis gateway passes report requests straight through, pdf-export's own limits
     protecting it (plan, step 8).
 - **FR-211**: The service MUST log one line for each report it makes (not for each
-  request): the token, the species, the number of pathways, its time, its size and any
-  character FR-207 replaced, and no submitted identifier and nothing about the client.
-  A finished report is kept in the service's memory only, never written to disk, for
-  its token and parameters, for one hour, then dropped; before a kept report is sent,
-  the analysis service is asked whether the token still stands, and a report whose
-  token it no longer knows (404, 410) is dropped and that answer given; all are dropped
-  when the graph's release changes. Nothing else of a report is kept.
+  request): a hash of the token (a live token unlocks the user's identifiers), the
+  species, the number of pathways, its time, its size and any character FR-207
+  replaced, and no submitted identifier and nothing about the client.
+  - **What is kept:** a finished report, in the service's memory only, for its token
+    and parameters, for one hour, then dropped; at most a set total (512 MB by
+    default), the oldest dropped first when a new one would pass it. A dropped report
+    is made again by the next request for it.
+  - **Checked before it is sent:** each request already asks the analysis service
+    about the token (contracts/analysis-api.md, the check); a token it no longer knows
+    (404, 410) drops the kept report and that answer is given. Each request also reads
+    the graph's release, with the species; a change drops every kept report.
+  - **On disk:** nothing of a report, but the printer's working HTML, which holds the
+    submitted identifiers: written only to a folder private to the service on a
+    memory-backed filesystem (the container's `tmpfs`), removed when the print ends,
+    the folder emptied when the service starts.
 - **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009, SC-006).
 - **FR-213**: Fixtures and samples MUST use made-up identifiers and placeholder names
   for the authors and curators a report names (constitution Principle VII; spec 001
@@ -363,8 +374,9 @@ working files for the submitted identifiers.
   report the only one being made and no other render traffic.
 - **SC-204**: Every colour and typeface in the report's own text and layout is one spec
   001 SC-009 allows, as its check shows.
-- **SC-205**: No submitted identifier is found in the service's logs or working files
-  after a sample of reports, some of them still kept in memory (User Story 4).
+- **SC-205**: No submitted identifier is found in the service's logs or on its disk
+  after a sample of reports, some of them still kept in memory, and after one of them
+  is killed while it is printed and the service is started again (User Story 4).
 - **SC-206**: CI's licence check passes, and fails on a planted restrictive dependency.
 - **SC-207**: The report opens, and its bookmarks and links work, in the three readers of
   spec 001 SC-004.
@@ -438,8 +450,8 @@ working files for the submitted identifiers.
     today's waits without limit;
   - a report not ready within a request's wait answered "accepted" (202) and fetched
     again from the same address, where today's answers in one request however long it
-    takes (FR-210); a script that saves whatever the address answers (`curl -o
-report.pdf`, even with `-f`, which treats 202 as success) saves the 202's JSON
+    takes (FR-210); a script that saves whatever the address answers
+    (`curl -o report.pdf`, even with `-f`, which treats 202 as success) saves the 202's JSON
     until it follows `Retry-After`;
   - today's service also sends each report's timing, with the client's address and
     browser, to a separate reporting service; the new one logs only what FR-211 lists.
