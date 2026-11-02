@@ -37,15 +37,23 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   - **A figure's own fault** (any figure the client returns as missing after its retry,
     or one failing its label check) leaves it with no file and no line, and the run goes
     on with the rest: it ends with exit 1, no `complete` line, and every such figure
-    named in its report, so one run finds them all. But a figure missing for want of an
-    answer (no connection, a timeout, a 5xx) is first followed by the same read of the
-    render service's health and the content release: no answer to it, or a changed
-    value, stops the run at once, as a changed deployment, so a service that hangs or
-    dies is not waited out figure by figure.
+    named in its report, so one run finds them all. Two things stop the run at once
+    instead:
+    - **after a figure missing for want of an answer** (cause `unanswered`: no
+      connection, a timeout, a body cut short, a 5xx), the same read of the render
+      service's health and the content release, within `--timeout`: no answer, or a
+      changed value, is a deployment changed or gone;
+    - **a breaker:** `2 × --parallel` figures in a row `unanswered`, or nothing drawn for
+      `5 × --timeout`, is a render service stuck while its health still answers.
+
+    The client names each missing figure's cause: `unanswered`, `refused` (a 4xx), or
+    `invalid` (a 200 that is not SVG); only `unanswered` triggers the read and counts
+    towards the breaker.
+
   - **Its last line, when every figure has its line:** `complete`, whose fingerprint
     fields equal the first line's.
-- **A deployment changed, or a service gone, during a run** is seen at the next figure to
-  finish or fail, which stops the run at once with exit 1 and no `complete` line.
+- **A deployment changed, a service gone, or the breaker tripped, during a run** stops it
+  at once with exit 1 and no `complete` line.
   Figures still being drawn when it stops get no line. The report is written either way,
   naming the reason it stopped and each figure's own fault so far.
 - **What the fingerprint cannot see** (research R10):
@@ -81,5 +89,6 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   holding no names, only stable identifiers, kinds, times and counts. Any other file
   is ignored, so a folder drawn for a release can be read again by a book made from the
   same graph.
-- **A figure that could not be drawn** has no file and no line: `figures` draws the rest,
+- **A figure that could not be drawn** has no file and no line: `figures` draws the rest
+  (unless the run stops at once, above),
   exits 1 with no `complete` line, and the book refuses the folder.

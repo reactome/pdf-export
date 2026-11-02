@@ -149,7 +149,8 @@ From the analysis service's API (research R6).
 ## Run report
 
 What the book's step and the service log. The figures' step writes its own: figures by
-kind, each kind's times, the release, and those it could not draw, by stable identifier.
+kind, each kind's times, the release, those it could not draw, by stable identifier and
+cause, and, if it stopped at once, why.
 
 - `release`, the time taken, the page count and the size.
 - Figures by kind, and those missing or stale in the figures' folder, by stable identifier.

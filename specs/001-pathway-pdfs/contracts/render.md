@@ -28,9 +28,10 @@ of WebsiteAngular (research R10).
   `url(#…)` and `href="#…"` in it with the section's anchor, and applies FR-017 to the
   text of its labels: their text content only, never an element, an id or an
   attribute.
-- **A refusal** (any 4xx, a 5xx, or a timeout): the figure is missing. Retried once
-  after a pause for a 503, and in `figures` (not `serve`, whose time SC-005 bounds) for a
-  timeout too, the body's included. Then:
+- **A refusal** (no connection, any 4xx, a 5xx, or a timeout): the figure is missing,
+  with its cause (contracts/figures.md). Retried once after a pause for a 503, and in
+  `figures` (not `serve`, whose time SC-005 bounds) for a 504 or a timeout too, the
+  body's included. Then:
   - `figures` draws the rest and exits 1 naming it, with no `complete` line, so the
     book refuses the folder (contracts/figures.md);
   - a single-event PDF goes on without it.
@@ -44,8 +45,10 @@ of WebsiteAngular (research R10).
 `pdf-export figures` is the only caller for the book; `book` itself asks no render service.
 
 - The service's concurrency, queue and timeout are raised for the run, by its own
-  settings, with the service's own timeout below the client's, so an overloaded service
-  answers a 503 or 504 rather than leaving the client to time out.
+  settings, with the service's own timeout below `figures`' `--timeout` (contracts/cli.md),
+  so an overloaded service answers a 503 or 504 rather than leaving the client to time
+  out. The operator sets both; the service's health answer does not report its timeout,
+  so `figures` cannot check it.
 - Its cache is not used for the run, so every figure is drawn from the release's data.
 - It reads the release's graph, through its content service, and the release's diagram
   and EHLD files.
