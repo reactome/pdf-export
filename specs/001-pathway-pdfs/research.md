@@ -428,6 +428,65 @@ is ignored, not a missing file.
     in service, but SC-005 is measured cold, so it is no answer to the criterion.
   - If the measurement still exceeds `event-pdf`'s times, SC-005 is amended with the
     user, with the numbers.
+  - **Measured (T007), 2 Nov 2026:** each event of the baseline's sample at depth 1, in
+    a render service of its own (the website's image at its website settings, two at
+    once; a fresh `RENDER_CACHE_KEY`; the release's files read locally through
+    `RENDER_FILES`; its browser warmed on a reaction under Digestion and absorption,
+    R-HSA-8878787, which no sampled event draws, the warm-up's 200 checked), on this
+    host, by pdf-export's own code: the graph read and model, the figures two at once,
+    the layout, and the print with the contents' second pass. No figure came from a
+    cache (each output records the service's hit count across its run: 0) and none was
+    missing. Outputs in `ci/measure/results/2026-11-02/single/`: `events.jsonl`, one
+    line per event, each from its own run of the script, with the render service's
+    `build`, the warm-up and the hit count added; `token.json`, the token runs, from a
+    container of their own, likewise. An earlier run (`events-unwarmed.jsonl`), whose
+    warm-up asked for a pathway as a reaction and was refused unchecked, gave totals
+    within 2.2 s of these (R-HSA-68875, 15.99 s then, 18.14 s now; the warmed run was
+    the slower one on its three widest differences). The per-event containers, the
+    warm-up and its status check, and the hit counts were done by a wrapper outside the
+    repository; the outputs record the warm-up's event and the hit count, not its
+    status.
+
+    | Event                                | Figures | Pages | Graph (s) | Figures (s) | Print (s) | Total (s) | `event-pdf` (s) |
+    | ------------------------------------ | ------- | ----- | --------- | ----------- | --------- | --------- | --------------- |
+    | Five reactions                       | 1 each  | 3–6   | 0.1       | 2.3–3.0     | 0.3–0.4   | 3.9–4.9   | 0.5–1.7         |
+    | Pathways, 1–34 reactions beneath (6) | 2–13    | 6–28  | 0.1–0.2   | 5.1–18.6    | 1.0–2.3   | 7.4–21.5  | 1.3–3.8         |
+    | Pathways, 143–1,150 beneath (4)      | 5–9     | 13–26 | 0.1–0.2   | 10.6–20.7   | 2.3–3.3   | 14.2–25.3 | 4.4–9.5         |
+    | Signal Transduction (2,589 beneath)  | 18      | 36    | 0.2       | 26.7        | 5.2       | 33.2      | 46              |
+    - **The layout** took about 1 s in each, the first layout of a process (its styles
+      and fonts compiled once). In one process over all sixteen (`one-process.json`, an
+      earlier run whose render cache served 5 of its 104 figures, which does not touch
+      the layout; its page counts, from an earlier count, are superseded) it took
+      0.0–0.1 s after the first, so a running service pays it once. The totals above
+      include it.
+    - **Figures alone exceed `event-pdf`'s whole time** for every reaction and every
+      pathway but Signal Transduction, which is faster (33.2 s against 46 s): in each
+      group the fastest figures (2.3, 5.1 and 10.6 s) are over the group's slowest
+      `event-pdf` time (1.7, 3.8 and 9.5 s). R7's `event-pdf` times are ranges per group,
+      not per event, so the comparison is per group. At two at once a pathway's figures
+      take about 1.8 s each (1.3–2.6 s per pathway).
+    - **One figure with an analysis token** (T005's (c), cold, at the website settings; a
+      plain diagram, the only kind with an overlay today, T042): 4.6 s alone; 5.6 s for
+      the slower of two at once; 9.3 s for the last of four; 18.7 s for the last of
+      eight, each later pair waiting for the service's two slots. None was refused (the
+      queue is 8). A plain diagram took about 3.4 s alone without a token in T005, a
+      run that fetched its files from the public site: not like for like, so a token's
+      cost is not measured here; T023 measures it.
+    - So SC-005 cannot be met as written by drawing figures on request; raised with the
+      user, with these numbers (T007), who left the choice to us.
+    - **Decided:** a PDF without an analysis, of an event the release's figures' folder
+      holds (the human book's, SC-010), reads its figures from it and must keep
+      `event-pdf`'s times. What is left without drawing (graph 0.1–0.2 s; layout, 0.0–0.1
+      s in a running service; print 0.3–5.2 s) is under `event-pdf`'s ranges for the
+      larger groups and overlaps them for the small pathways (about 1.0–2.4 s in
+      `one-process.json` against 1.3–3.8 s), before reading and inlining the folder's
+      files; per event, to be measured in T023. A PDF with an analysis cannot use the folder, its figures
+      carrying the analysis, nor can one of another species, whose figures the folder
+      lacks: their figures are drawn on request, within 8 s plus 3 s per figure. Every
+      event above meets it with room: the tightest by margin is R-HSA-68881 (8.3 s against
+      14 s, 5.7 s to spare), by share R-HSA-73857 (25.3 s against 35 s); against
+      run-to-run variation of up to 2.2 s between the two runs, and a token's cost, which
+      T023 measures.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages if four pages ran four times as fast, which they do not, still
@@ -478,6 +537,11 @@ is ignored, not a missing file.
   | 2                                                  | 200     | 0.712            | 7 h 32 min        | 2.86                                 | 4.0                   | 0.7 GB      |
   | 4                                                  | 200     | 1.166            | 4 h 36 min        | 5.13                                 | 4.4                   | 1.2 GB      |
   | 8                                                  | 200     | 1.523            | 3 h 31 min        | 6.96 (7.7 at peak)                   | 4.6                   | 1.9 GB      |
+  - **The diagrams' files came from the public download site:** before WebsiteAngular
+    #777, the render page fetched a diagram's and an illustration's files there, so
+    these runs did too (about 430 requests, up to 8 at once) and their pathway times
+    include those fetches. Reactions fetch no such files. From T007 on, every run reads
+    the release's files from a local folder (`RENDER_FILES`).
   - Every figure asked was drawn. One at a time a reaction took 2.3 s (median), a
     diagram 3.4 s and a selection 3.7 s; at 8 at once a reaction took 4.6 s and a
     selection 8.7 s. Medians and p90s are lower-rank quantiles.
@@ -607,6 +671,9 @@ packaging.
 - **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
   the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
+- **The release's files from a local folder** (`RENDER_FILES`, WebsiteAngular #777): the
+  render page otherwise fetches diagram and EHLD files from the public download site,
+  which holds a release's files only once it is published.
 - **Many figures per page load,** an in-page API on the render page: R7's go/no-go was a
   no-go, and the figures moved to a step of their own; this would shorten that step.
 - **The render service's health answer naming what draws:** the build of the website's

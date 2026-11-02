@@ -1,0 +1,11 @@
+[
+  { "atOnce": 1, "wallS": 4.52, "each": [4.52], "missing": 0 },
+  { "atOnce": 2, "wallS": 4.76, "each": [3.64, 4.76], "missing": 0 },
+  { "atOnce": 4, "wallS": 9.12, "each": [4.29, 4.64, 7.86, 9.12], "missing": 0 },
+  {
+    "atOnce": 8,
+    "wallS": 19.58,
+    "each": [4.9, 6.05, 9.66, 10.18, 14.4, 15.52, 18.58, 19.57],
+    "missing": 0
+  }
+]

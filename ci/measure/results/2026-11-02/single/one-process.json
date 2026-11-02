@@ -1,0 +1,292 @@
+{
+  "render": "http://127.0.0.1:4311/",
+  "build": "40589f642da0",
+  "parallel": 2,
+  "events": [
+    {
+      "stId": "R-HSA-1225956",
+      "kind": "reaction",
+      "reactionsBeneath": 1,
+      "figures": 1,
+      "missing": 0,
+      "pages": 5,
+      "seconds": {
+        "graph": 0.53,
+        "figures": 2.76,
+        "layout": 1.13,
+        "print": 0.33,
+        "total": 4.8
+      },
+      "figureTimes": [2.76]
+    },
+    {
+      "stId": "R-HSA-15869",
+      "kind": "pathway",
+      "reactionsBeneath": 143,
+      "figures": 5,
+      "missing": 0,
+      "pages": 15,
+      "seconds": {
+        "graph": 0.16,
+        "figures": 10.57,
+        "layout": 0.05,
+        "print": 2.11,
+        "total": 12.89
+      },
+      "figureTimes": [2.44, 3.65, 3.73, 3.7, 4.4]
+    },
+    {
+      "stId": "R-HSA-162582",
+      "kind": "pathway",
+      "reactionsBeneath": 2589,
+      "figures": 18,
+      "missing": 0,
+      "pages": 36,
+      "seconds": {
+        "graph": 0.14,
+        "figures": 27.86,
+        "layout": 0.11,
+        "print": 4.98,
+        "total": 33.13
+      },
+      "figureTimes": [
+        2.44, 2.49, 2.58, 2.59, 2.55, 2.6, 2.61, 3.78, 4.24, 4.58, 2.77, 2.63, 2.57, 2.48, 2.42,
+        3.54, 2.46, 3.29
+      ]
+    },
+    {
+      "stId": "R-HSA-173642",
+      "kind": "reaction",
+      "reactionsBeneath": 1,
+      "figures": 1,
+      "missing": 0,
+      "pages": 5,
+      "seconds": {
+        "graph": 0.08,
+        "figures": 2.25,
+        "layout": 0,
+        "print": 0.28,
+        "total": 2.62
+      },
+      "figureTimes": [2.25]
+    },
+    {
+      "stId": "R-HSA-450358",
+      "kind": "reaction",
+      "reactionsBeneath": 1,
+      "figures": 1,
+      "missing": 0,
+      "pages": 3,
+      "seconds": {
+        "graph": 0.08,
+        "figures": 2.47,
+        "layout": 0,
+        "print": 0.28,
+        "total": 2.84
+      },
+      "figureTimes": [2.47]
+    },
+    {
+      "stId": "R-HSA-68595",
+      "kind": "reaction",
+      "reactionsBeneath": 1,
+      "figures": 1,
+      "missing": 0,
+      "pages": 3,
+      "seconds": {
+        "graph": 0.08,
+        "figures": 2.49,
+        "layout": 0,
+        "print": 0.27,
+        "total": 2.84
+      },
+      "figureTimes": [2.49]
+    },
+    {
+      "stId": "R-HSA-68616",
+      "kind": "pathway",
+      "reactionsBeneath": 11,
+      "figures": 12,
+      "missing": 0,
+      "pages": 25,
+      "seconds": {
+        "graph": 0.09,
+        "figures": 15.07,
+        "layout": 0.01,
+        "print": 1.14,
+        "total": 16.33
+      },
+      "figureTimes": [2.71, 3.59, 2.55, 2.63, 2.5, 2.39, 0, 2.53, 2.42, 2.4, 2.5, 2.38]
+    },
+    {
+      "stId": "R-HSA-68689",
+      "kind": "pathway",
+      "reactionsBeneath": 2,
+      "figures": 3,
+      "missing": 0,
+      "pages": 9,
+      "seconds": {
+        "graph": 0.1,
+        "figures": 5.07,
+        "layout": 0.01,
+        "print": 0.88,
+        "total": 6.07
+      },
+      "figureTimes": [2.65, 3.68, 2.42]
+    },
+    {
+      "stId": "R-HSA-68712",
+      "kind": "reaction",
+      "reactionsBeneath": 1,
+      "figures": 1,
+      "missing": 0,
+      "pages": 6,
+      "seconds": {
+        "graph": 0.09,
+        "figures": 2.4,
+        "layout": 0,
+        "print": 0.33,
+        "total": 2.82
+      },
+      "figureTimes": [2.4]
+    },
+    {
+      "stId": "R-HSA-68867",
+      "kind": "pathway",
+      "reactionsBeneath": 23,
+      "figures": 13,
+      "missing": 0,
+      "pages": 29,
+      "seconds": {
+        "graph": 0.15,
+        "figures": 15.66,
+        "layout": 0.03,
+        "print": 1.56,
+        "total": 17.41
+      },
+      "figureTimes": [0.01, 0, 2.68, 3.7, 2.65, 2.54, 0.01, 2.68, 2.85, 3.14, 3.53, 3.06, 3.03]
+    },
+    {
+      "stId": "R-HSA-68875",
+      "kind": "pathway",
+      "reactionsBeneath": 34,
+      "figures": 6,
+      "missing": 0,
+      "pages": 20,
+      "seconds": {
+        "graph": 0.19,
+        "figures": 12.47,
+        "layout": 0.09,
+        "print": 2.09,
+        "total": 14.87
+      },
+      "figureTimes": [4.37, 4.39, 4.18, 4.31, 2.38, 3.9]
+    },
+    {
+      "stId": "R-HSA-68881",
+      "kind": "pathway",
+      "reactionsBeneath": 1,
+      "figures": 2,
+      "missing": 0,
+      "pages": 6,
+      "seconds": {
+        "graph": 0.08,
+        "figures": 3.89,
+        "layout": 0.02,
+        "print": 1.08,
+        "total": 5.09
+      },
+      "figureTimes": [2.4, 3.89]
+    },
+    {
+      "stId": "R-HSA-68882",
+      "kind": "pathway",
+      "reactionsBeneath": 32,
+      "figures": 3,
+      "missing": 0,
+      "pages": 10,
+      "seconds": {
+        "graph": 0.08,
+        "figures": 7.49,
+        "layout": 0.05,
+        "print": 1.51,
+        "total": 9.14
+      },
+      "figureTimes": [3.89, 3.96, 3.6]
+    },
+    {
+      "stId": "R-HSA-69278",
+      "kind": "pathway",
+      "reactionsBeneath": 367,
+      "figures": 6,
+      "missing": 0,
+      "pages": 13,
+      "seconds": {
+        "graph": 0.09,
+        "figures": 12.27,
+        "layout": 0.09,
+        "print": 3.15,
+        "total": 15.61
+      },
+      "figureTimes": [2.54, 5.16, 3.6, 2.58, 5.03, 3.56]
+    },
+    {
+      "stId": "R-HSA-73857",
+      "kind": "pathway",
+      "reactionsBeneath": 940,
+      "figures": 9,
+      "missing": 0,
+      "pages": 26,
+      "seconds": {
+        "graph": 0.1,
+        "figures": 20.16,
+        "layout": 0.11,
+        "print": 2.97,
+        "total": 23.37
+      },
+      "figureTimes": [3.65, 4.02, 4.07, 3.98, 4.03, 4, 5.01, 5.06, 3.4]
+    },
+    {
+      "stId": "R-HSA-74160",
+      "kind": "pathway",
+      "reactionsBeneath": 1150,
+      "figures": 7,
+      "missing": 0,
+      "pages": 18,
+      "seconds": {
+        "graph": 0.11,
+        "figures": 9.74,
+        "layout": 0.06,
+        "print": 2.75,
+        "total": 12.67
+      },
+      "figureTimes": [2.43, 0.01, 3.4, 3.36, 3.25, 2.52, 3.95]
+    }
+  ],
+  "tokenRuns": [
+    {
+      "atOnce": 1,
+      "wallS": 4.75,
+      "each": [4.75],
+      "missing": 0
+    },
+    {
+      "atOnce": 2,
+      "wallS": 4.63,
+      "each": [3.62, 4.63],
+      "missing": 0
+    },
+    {
+      "atOnce": 4,
+      "wallS": 8.48,
+      "each": [4.17, 4.53, 7.85, 8.47],
+      "missing": 0
+    },
+    {
+      "atOnce": 8,
+      "wallS": 19.31,
+      "each": [5.4, 6.66, 8.81, 10.33, 13.17, 15.14, 16.59, 19.3],
+      "missing": 0
+    }
+  ]
+}

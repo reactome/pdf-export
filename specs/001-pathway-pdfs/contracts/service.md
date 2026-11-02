@@ -26,6 +26,17 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   `unknown-token`; the service's 404 is `unknown-token` and its 410 `gone-token`.
 - **The reasons** are for the content service, which writes WebsiteAngular's envelope.
   They never carry a path, a host or a name.
+- **Where a figure comes from:** without a token, from the release's figures' folder
+  (`--figures`, contracts/figures.md), if it passes `book`'s folder checks against the
+  graph's current release: the full checks when the service starts and whenever the
+  folder's fingerprint or the graph's release and checksum change, which are read again
+  at most once a minute; a folder of another
+  release, or incomplete, is not used, and every figure is drawn on request until one
+  that passes is in place. A figure the folder lacks (another species' event) is drawn
+  on request and logged. With a token, every figure is drawn on request, with the
+  analysis's overlay (SC-005). A PDF can so mix figures from the folder with figures
+  drawn on request by another render build; contracts/figures.md lists what the
+  fingerprint cannot see.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's
@@ -36,5 +47,6 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 
 ## `GET /health`
 
-200 with the package's version, the graph's release and whether the render and analysis
-services answer. Used by the container's health check.
+200 with the package's version, the graph's release, whether the render and analysis
+services answer, and the figures' folder: `ready` (its release and checksum),
+`stale`, `incomplete` or `none`. Used by the container's health check.
