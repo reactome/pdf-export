@@ -128,7 +128,7 @@ for WebsiteAngular to ship it (T042).
 
 - [x] T007 [P] Measure a single-event PDF's stages, cold (SC-005, research R7). With T005's (c): one figure with an analysis token, cold, at the service's website settings, and how it grows with requests at once. The render service runs with an empty cache directory. Use research R7's sample: five reactions, pathways of five sizes, and Signal Transduction. Time each figure, two at once. Record the times against `event-pdf`'s warm times in research R7. If figures alone exceed `event-pdf`'s whole time, raise SC-005 with the user, with the numbers.
 
-  **Done** (research R7): figures alone exceed `event-pdf`'s whole time for every reaction and every pathway in the sample but Signal Transduction; one figure with a token takes 4.5 s, and 19.6 s at eight at once. SC-005 raised with the user, who left the choice to us: a PDF without an analysis reads its figures from the figures' folder and keeps `event-pdf`'s times; one with an analysis draws on request within 6 s plus 2 s per figure (spec SC-005; T022, T023). The script is `ci/measure/single.ts`.
+  **Done** (research R7): figures alone exceed `event-pdf`'s whole time for every reaction and every pathway in the sample but Signal Transduction; one figure with a token takes 4.6 s, and 18.7 s for the last of eight at once. SC-005 raised with the user, who left the choice to us: a PDF without an analysis, of an event the figures' folder holds, reads its figures from it and must keep `event-pdf`'s times (T023 measures it); one with an analysis, or of another species, draws them on request within 8 s plus 3 s per figure (spec SC-005; T022, T023). The script is `ci/measure/single.ts`.
 
 - [ ] T008 [P] Measure the diagrams' widths (FR-016's floor, research R4). From the release's diagram files, take each diagram's width in SVG pixels at the website's 12 px node labels. Count how many fit at 5 pt in portrait (about 1,155 px), in landscape (about 1,750 px), and in neither. Record the counts in research R4. If more than 5% fit neither, raise FR-016's floor with the user. Measure the illustrations' lettering too (their text is outlines, so the layout cannot read it and reports them as unmeasured, T018): the smallest letter height in a sample of release 98's EHLDs, rasterised, and the scale that keeps it at 5 pt; then give `place()` a rule for them.
 - [ ] T009 [P] Measure the analysis service's answers (research R6), on a private instance with a submitted analysis, never production. For each case, record the status and body in research R6:
@@ -285,7 +285,8 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
   Tests for each case of T009's table, each seen failing.
 
 - [ ] T022 [US2] The service, `src/serve.ts` (contracts/service.md).
-  - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`. - **Figures:** without a token, read from `--figures` (T024's folder checks at start, so a stale or incomplete folder refuses to start the service); a figure missing from it drawn on request and logged; with a token, all drawn on request (contracts/service.md). Tests: a PDF without a token asks the render stub nothing; one with a token asks for each figure with the token; a figure missing from the folder is drawn and logged.
+  - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`.
+  - **Figures** (contracts/service.md): with `--figures`, and a folder that passes T024's folder checks against the graph's current release (read again at most once a minute), a PDF without a token takes its figures from it; with no folder, or one of another release or incomplete, every figure is drawn on request and `/health` says so; with a token, or for an event the folder has no figure for (another species), drawn on request. T022 ships before T024 and T046: until then it draws every figure on request, and the folder is wired in once T024's checks exist. Tests (after T024): a PDF without a token asks the render stub nothing; one with a token asks for each figure with the token; a folder of another release is not used, and `/health` reports it; a figure the folder lacks is drawn and logged.
   - **Settings:** bind address (loopback by default), port, `--graph`, `--figures`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable where contracts/cli.md gives one.
   - **Answers:**
     - 200 with `Content-Disposition` naming the stable identifier;
@@ -304,7 +305,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
   - a bad identifier with a bad token gives the identifier's answer;
   - no reason carries a path, a host or a name.
 
-- [ ] T023 [US2] SC-005, measured. Run the service against a private copy for research R7's sample: without a token, reading a figures' folder drawn by T046; with a token, cold (a fresh `RENDER_CACHE_KEY`), against the 6 s plus 2 s per figure of SC-005. Compare the first against `event-pdf`'s warm times, and record both in research R7.
+- [ ] T023 [US2] SC-005, measured, after T046. Run the service against a private copy for research R7's sample, the service's process already running (its first layout paid) and the render service cold (a fresh `RENDER_CACHE_KEY`, its browser warmed on a figure no sampled event draws): without a token, reading a figures' folder drawn by T046, against `event-pdf`'s warm times; with a token, against the 8 s plus 3 s per figure of SC-005, including an illustration and a reaction once their overlays exist (T042). Record both in research R7. If either is over, raise SC-005 with the user, with the numbers.
 
 **Checkpoint:** the website's PDF works on its own, and WebsiteAngular can route to it
 (T042).
@@ -492,7 +493,8 @@ passes.
 - [ ] T042 [P] In WebsiteAngular, an issue, and later a spec there, for its part (research R10, FR-014):
   - the single-event route, in the content service, nginx and the dev proxy;
   - a cache-off setting for the render service;
-  - many figures per page load, to shorten the figures' step (T005, T006); - the release's diagram and EHLD files read from a local folder, never the download site: `RENDER_FILES`, #777 in WebsiteAngular; and its health answer naming that folder's release (contracts/figures.md);
+  - many figures per page load, to shorten the figures' step (T005, T006);
+  - the release's diagram and EHLD files read from a local folder, never the download site: `RENDER_FILES`, #777 in WebsiteAngular; and its health answer naming that folder's release (contracts/figures.md);
   - the render service's health answer naming its page's build and its content service's release and checksum, and a header on each drawing naming both (contracts/figures.md);
   - an overlay on a reaction's drawing;
   - the plain diagram on demand;
@@ -521,7 +523,7 @@ passes.
     - T013 → T015 → T018 → T019.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
-- **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
+- **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022, drawing every figure on request until T024's folder checks exist; T022's folder reading after T024; T023 after T046.
 - **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031, with T046 after T024 and before T031 (T029's tests write their own folder). T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
@@ -538,11 +540,11 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 beside US2; T024 once T022 is done, beside T023, and T046 after it; the rest of US1 after T024 and T025.
+- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 beside US2; T024 once T022 is done, and T046 after it, then T023; the rest of US1 after T024 and T025.
 
 ## Implementation strategy
 
 1. **Phase 1 and the measurements first.** T005's answer decides whether the book is built as planned.
-2. **US2 first.** The website's PDF is smaller, exercises every part except the parts and the join, and replaces `event-pdf` in the content service.
+2. **US2 first.** The website's PDF is smaller, exercises every part except the parts and the join, and replaces `event-pdf` in the content service. It draws every figure on request until the book's figures' folder exists (T024, T046); SC-005's measurement (T023) waits for it.
 3. **Then US1, the book,** with its check.
 4. **Then the remaining checks and the release's step:** the look's check, the figures' check, the fixture baseline, the image and the release's step, with the comparison against `event-pdf` as the proof.

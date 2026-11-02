@@ -429,34 +429,57 @@ is ignored, not a missing file.
   - If the measurement still exceeds `event-pdf`'s times, SC-005 is amended with the
     user, with the numbers.
   - **Measured (T007), 2 Nov 2026:** each event of the baseline's sample at depth 1, in
-    a render service of its own (the website's image, at its website settings of two at
-    once, a fresh `RENDER_CACHE_KEY`, its browser warmed on one pathway, R-HSA-69091, whose figure no sampled event draws, the
-    release's files read locally through `RENDER_FILES`), on this host. No figure came from a cache (the service's own hit count, read before and after each run, did not move) and none was missing. Outputs in `ci/measure/results/2026-11-02/single/`: `events.jsonl`, one line per event, each from its own run of the script with the render service's `build` added; `token.json`, the token runs, from a container of their own (fresh key, the same warm-up).
+    a render service of its own (the website's image at its website settings, two at
+    once; a fresh `RENDER_CACHE_KEY`; the release's files read locally through
+    `RENDER_FILES`; its browser warmed on a reaction under Digestion and absorption,
+    R-HSA-8878787, which no sampled event draws, the warm-up's 200 checked), on this
+    host, by pdf-export's own code: the graph read and model, the figures two at once,
+    the layout, and the print with the contents' second pass. No figure came from a
+    cache (each output records the service's hit count across its run: 0) and none was
+    missing. Outputs in `ci/measure/results/2026-11-02/single/`: `events.jsonl`, one
+    line per event, each from its own run of the script, with the render service's
+    `build`, the warm-up and the hit count added; `token.json`, the token runs, from a
+    container of their own, likewise. An earlier run (`events-unwarmed.jsonl`), whose
+    warm-up asked for a pathway as a reaction and was refused unchecked, gave totals
+    within 1.3 s of these.
 
-    | Event                                | Figures | Pages | Graph   | Figures (s) | Print   | Total (s) | `event-pdf` (s) |
-    | ------------------------------------ | ------- | ----- | ------- | ----------- | ------- | --------- | --------------- |
-    | Five reactions                       | 1 each  | 3–6   | 0.1–0.2 | 2.6–2.7     | 0.3–0.5 | 4.0–4.9   | 0.5–1.7         |
-    | Pathways, 1–34 reactions beneath (6) | 2–13    | 6–28  | 0.1–0.2 | 4.0–19.8    | 1.0–2.2 | 6.5–22.6  | 1.3–3.8         |
-    | Pathways, 143–1,150 beneath (4)      | 5–9     | 13–26 | 0.1–0.2 | 11.0–18.9   | 2.2–3.2 | 14.5–23.2 | 4.4–9.5         |
-    | Signal Transduction (2,589 beneath)  | 18      | 36    | 0.2     | 26.3        | 5.2     | 32.9      | 46              |
-    - The layout took about 1 s in each, the first layout of a process (its styles and
-      fonts compiled once); in one process over all sixteen (`one-process.json`, an earlier run whose render cache served 5 of its 104 figures, which does not touch the layout) it took 0.0–0.1 s after the first, so a running service pays it once. The totals above include it.
+    | Event                                | Figures | Pages | Graph (s) | Figures (s) | Print (s) | Total (s) | `event-pdf` (s) |
+    | ------------------------------------ | ------- | ----- | --------- | ----------- | --------- | --------- | --------------- |
+    | Five reactions                       | 1 each  | 3–6   | 0.1       | 2.3–3.0     | 0.3–0.4   | 3.9–4.9   | 0.5–1.7         |
+    | Pathways, 1–34 reactions beneath (6) | 2–13    | 6–28  | 0.1–0.2   | 5.1–18.6    | 1.0–2.3   | 7.4–21.5  | 1.3–3.8         |
+    | Pathways, 143–1,150 beneath (4)      | 5–9     | 13–26 | 0.1–0.2   | 10.6–20.7   | 2.3–3.3   | 14.2–25.3 | 4.4–9.5         |
+    | Signal Transduction (2,589 beneath)  | 18      | 36    | 0.2       | 26.7        | 5.2       | 33.2      | 46              |
+    - **The layout** took about 1 s in each, the first layout of a process (its styles
+      and fonts compiled once). In one process over all sixteen (`one-process.json`, an
+      earlier run whose render cache served 5 of its 104 figures, which does not touch
+      the layout; its page counts, from an earlier count, are superseded) it took
+      0.0–0.1 s after the first, so a running service pays it once. The totals above
+      include it.
     - **Figures alone exceed `event-pdf`'s whole time** for every reaction and every
-      pathway but Signal Transduction, which is faster (32.9 s against 46 s). At two at
-      once a pathway's figures take about 1.8 s each on average (1.4–2.6 s per pathway).
-    - **One figure with an analysis token** (T005's (c), cold, at the website settings):
-      4.5 s alone; 4.8 s for the slower of two at once; 9.1 s for four; 19.6 s for eight,
-      each later pair waiting for the service's two slots. None was refused (the queue
-      is 8). - So SC-005 cannot be met as written by drawing figures on request; raised with the
+      pathway but Signal Transduction, which is faster (33.2 s against 46 s): in each
+      group the fastest figures (2.3, 5.1 and 10.6 s) are over the group's slowest
+      `event-pdf` time (1.7, 3.8 and 9.5 s). R7's `event-pdf` times are ranges per group,
+      not per event, so the comparison is per group. At two at once a pathway's figures
+      take about 1.8 s each (1.3–2.6 s per pathway).
+    - **One figure with an analysis token** (T005's (c), cold, at the website settings; a
+      plain diagram, the only kind with an overlay today, T042): 4.6 s alone; 5.6 s for
+      the slower of two at once; 9.3 s for the last of four; 18.7 s for the last of
+      eight, each later pair waiting for the service's two slots. None was refused (the
+      queue is 8). A plain diagram took about 3.4 s alone without a token (T005).
+    - So SC-005 cannot be met as written by drawing figures on request; raised with the
       user, with these numbers (T007), who left the choice to us.
-    - **Decided:** a PDF without an analysis reads its figures from the release's
-      figures' folder, the book's (SC-010), and keeps `event-pdf`'s times: what is left
-      (graph 0.1–0.2 s, layout, print 0.3–5.2 s) is under them for every event but the
-      largest pathways' prints (inference, to measure in T023). A PDF with an analysis
-      cannot use the folder, its figures carrying the analysis, so it draws them on
-      request within 6 s plus 2 s per figure, which every event above meets without a
-      token (the tightest, R-HSA-73857, 23.2 s against 24 s; R-HSA-68882, 11.4 s
-      against 12 s), though a diagram with a token took 4.5 s alone against 3.4 s without one in T005, so a PDF with an analysis may run closer to the budget, which T023 measures.
+    - **Decided:** a PDF without an analysis, of an event the release's figures' folder
+      holds (the human book's, SC-010), reads its figures from it and must keep
+      `event-pdf`'s times. What is left without drawing (graph 0.1–0.2 s; layout, 0.0–0.1
+      s in a running service; print 0.3–5.2 s) is under `event-pdf`'s ranges in every
+      group, the small pathways closest (about 1.0–2.4 s in `one-process.json` against 1.3–3.8 s); per event,
+      to be measured in T023. A PDF with an analysis cannot use the folder, its figures
+      carrying the analysis, nor can one of another species, whose figures the folder
+      lacks: their figures are drawn on request, within 8 s plus 3 s per figure. Every
+      event above meets it with room (by margin the tightest is R-HSA-73857, 25.3 s
+      against 35 s), leaving room for run-to-run variation (up to 1.3 s on one event
+      between the two runs) and for a token's slower figure (4.6 s against 3.4 s alone),
+      which T023 measures.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages if four pages ran four times as fast, which they do not, still

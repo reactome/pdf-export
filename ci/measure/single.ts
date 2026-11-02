@@ -7,7 +7,7 @@
 // The render service is the caller's to start, at its website settings, reading the
 // release's files (RENDER_FILES). The script does not make it cold: its cache cannot be
 // turned off, so T007 ran each event in a container of its own with a fresh
-// RENDER_CACHE_KEY, its browser warmed on one figure no sampled event draws, and read the
+// RENDER_CACHE_KEY, its browser warmed on one figure no sampled event draws (its 200 checked), and read the
 // service's hit count before and after (research R7).
 //
 //   NEO4J_URI=bolt://127.0.0.1:7687 node ci/measure/single.ts \

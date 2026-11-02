@@ -476,10 +476,11 @@ of pages with today's book.
   viewer on Linux.
 - **SC-005**: A single-event PDF at depth 1, for a sample of pathways and reactions on
   the same private graph:
-  - **without an analysis,** its figures read from the release's figures' folder
-    (SC-010), is made in no more time than `event-pdf` takes for the same event;
-  - **with an analysis,** its figures drawn on request with the analysis's overlay, is
-    made within 6 s plus 2 s per figure, cold, at the render service's website settings
+  - **without an analysis, for an event whose figures the release's figures' folder
+    holds** (the human book's, SC-010), its figures read from it, is made in no more
+    time than `event-pdf` takes for the same event;
+  - **with an analysis, or for an event of another species,** its figures drawn on
+    request, is made within 8 s plus 3 s per figure, cold, at the render service's website settings
     (research R7: drawing on request is slower than `event-pdf` for all but the
     largest events, and cannot be avoided where the figure carries the analysis).
 - **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
@@ -513,7 +514,10 @@ of pages with today's book.
   at it.
 - **The figures' folder in service:** the single-event service reads the release's
   figures' folder, the one the book's figures step drew, so a PDF without an analysis
-  draws none on request. The release's step makes it available to the service.
+  of a human event draws none on request; other species' figures, and any the folder
+  lacks, are drawn on request. The release's step draws the figures before the service
+  is pointed at the new release's graph and makes the folder available to it; a folder
+  of another release is not used.
 - **The figures' step:** drawing the figures before the book adds a step of its own,
   about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
   machine and time are open, to be agreed with the release's owners (SC-010).
