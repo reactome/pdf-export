@@ -46,12 +46,13 @@ figures in the website's look, loads FoamTree under a commercial licence. Using
 FoamTree is a project decision (2026-11-02), and the genome-wide overview cannot be
 drawn without it. So pdf-export may call that service, which loads FoamTree, for its
 figures, at run time, over HTTP. It installs, links and ships none of the service or
-FoamTree, so FoamTree's terms do not reach pdf-export's own licence, and CI's licence check covers everything it does
-install and ship, with no exception added for this. The exception covers FoamTree
-only: any other restrictive licence the service comes to load needs its own
-amendment. It does not narrow when a render bundle without FoamTree exists;
-pdf-export uses that bundle where it can, as its specs say. The cost that remains: anyone
-reusing pdf-export's figures needs that service, and its FoamTree licence.
+FoamTree, so FoamTree's terms do not reach pdf-export's own licence, and CI's
+licence check covers everything it does install and ship, with no exception added
+for this. The exception covers FoamTree only: any other restrictive licence the
+service comes to load needs its own amendment. It does not narrow when a render
+bundle without FoamTree exists; pdf-export uses that bundle where it can, as its
+specs say. The cost that remains: anyone reusing pdf-export's figures needs that
+service, and its FoamTree licence.
 
 ### III. The graph, and nothing relational
 
@@ -131,4 +132,4 @@ This constitution outranks other practice in this repository. It is changed by p
 request, with the reason for the change; a principle is removed only with the cost
 it was guarding against shown to be gone.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-29 | **Last Amended**: 2026-11-02
+**Version**: 1.2.1 | **Ratified**: 2026-10-29 | **Last Amended**: 2026-11-02
