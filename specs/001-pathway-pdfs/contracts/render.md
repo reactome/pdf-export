@@ -28,7 +28,8 @@ of WebsiteAngular (research R10).
   `url(#…)` and `href="#…"` in it with the section's anchor, and applies FR-017 to the
   text of its labels: their text content only, never an element, an id or an
   attribute.
-- **A refusal** (no connection, any 4xx, a 5xx, or a timeout): the figure is missing,
+- **A refusal** (no connection, any 4xx, a 5xx, a timeout, or a 200 that is not SVG):
+  the figure is missing,
   with its cause (contracts/figures.md). Retried once after a pause for a 503, and in
   `figures` (not `serve`, whose time SC-005 bounds) for a 504 or a timeout too, the
   body's included. Then:

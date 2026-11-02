@@ -8,16 +8,16 @@ environment variables named beside them. A password never goes on the command li
 Draws every figure the book needs, before the book, into a folder (SC-010, research R7,
 contracts/figures.md).
 
-| Flag                                 | Environment       | Meaning                                                                                                                                                |
-| ------------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--graph`, `--database`, `--species` |                   | as for `book`                                                                                                                                          |
-| `--files`                            |                   | as for `book`: the EHLD summary decides the illustrations                                                                                              |
-| `--render`                           | `RENDER_SERVICE`  | the render service's base URL (contracts/render.md)                                                                                                    |
-| `--content`                          | `CONTENT_SERVICE` | the content service the render service draws from, asked only `GET /data/database/version` (contracts/figures.md)                                      |
-| `--out`                              |                   | the folder written (contracts/figures.md)                                                                                                              |
-| `--parallel`                         |                   | figures asked at once; default 2, the service's own default; set it to the service's `RENDER_CONCURRENCY`                                              |
-| `--timeout`                          |                   | seconds the client waits for one figure, and for each health or release read; default 60; above the render service's own timeout (contracts/render.md) |
-| `--report`                           |                   | where its run report is written, as JSON                                                                                                               |
+| Flag                                 | Environment       | Meaning                                                                                                                                                              |
+| ------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--graph`, `--database`, `--species` |                   | as for `book`                                                                                                                                                        |
+| `--files`                            |                   | as for `book`: the EHLD summary decides the illustrations                                                                                                            |
+| `--render`                           | `RENDER_SERVICE`  | the render service's base URL (contracts/render.md)                                                                                                                  |
+| `--content`                          | `CONTENT_SERVICE` | the content service the render service draws from, asked only `GET /data/database/version` (contracts/figures.md)                                                    |
+| `--out`                              |                   | the folder written (contracts/figures.md)                                                                                                                            |
+| `--parallel`                         |                   | figures asked at once; default 2, the service's own default; set it to the service's `RENDER_CONCURRENCY`                                                            |
+| `--timeout`                          |                   | seconds the client waits for each attempt at a figure, and for each health or release read; default 60; above the render service's own timeout (contracts/render.md) |
+| `--report`                           |                   | where its run report is written, as JSON                                                                                                                             |
 
 - **Which figures:** the events' Figure rules (data-model.md), from the graph and the
   EHLD summary, the same code `book` uses, so the folder holds exactly what the book

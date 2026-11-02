@@ -150,7 +150,7 @@ From the analysis service's API (research R6).
 
 What the book's step and the service log. The figures' step writes its own: figures by
 kind, each kind's times, the release, those it could not draw, by stable identifier and
-cause, and, if it stopped at once, why.
+cause (`unanswered`, `failed`, `refused`, `invalid` or `label`, contracts/figures.md), and, if it stopped at once, why.
 
 - `release`, the time taken, the page count and the size.
 - Figures by kind, and those missing or stale in the figures' folder, by stable identifier.
