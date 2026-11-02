@@ -17,7 +17,7 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
 ## Its health answer
 
 `GET /health` answers JSON with `build`: twelve hex digits hashing the service's own
-modules (WebsiteAngular `tools/render/service.ts`), or `unknown`. `figures` records it
+modules (WebsiteAngular `tools/render/service.ts`), or `unknown` when the service cannot read its own directory, which a working image does not do. `figures` records it
 in its folder's fingerprint and refuses `unknown` (contracts/figures.md). It does not
 identify the website's built page the service loads, which is what draws; that is asked
 of WebsiteAngular (research R10).

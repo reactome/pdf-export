@@ -372,7 +372,7 @@ of pages with today's book.
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
   files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder. Its figures are drawn before it, by a step of the same image with the render
+  folder. Its figures are drawn before it, by a step of the same image with the render service and its content
   service beside it, into a folder the book's step also takes as an input (SC-010).
 - **FR-011**: A check MUST fail the book's step on any of these:
   - a missing top-level pathway;

@@ -489,7 +489,9 @@ is ignored, not a missing file.
     in the render container alone (mean CPU ÷ figures a second), rising with concurrency;
     the content service, the graph and the client share the host uncounted. So all 8
     cores would give at most about 1.7–2.3 figures a second (inference), against the 7.3
-    needed. The runs' outputs are in `ci/measure/results/2026-11-02/`.
+    needed. The runs' outputs are in `ci/measure/results/2026-11-02/`, written before the script
+    recorded the release, species, seed (98, Homo sapiens, 98 for all four) and the render
+    service's `build`.
   - **Not run, and why:** the samples are 100–200 figures, not the 2,000 T005 set; the
     gap to the threshold is close to fivefold at the best setting, and the cost per
     figure rises rather than falls with concurrency, so a larger sample would not turn

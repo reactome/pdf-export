@@ -170,6 +170,7 @@ const health = await fetch(new URL('health', render.endsWith('/') ? render : `${
   }
 );
 if (!health.ok) throw new Error(`the render service's health answered ${String(health.status)}`);
+const { build } = (await health.json()) as { build?: string };
 
 const graph = openGraph(graphSettings(process.env));
 let requests: FigureRequest[];
@@ -251,6 +252,7 @@ console.log(
     {
       render,
       release: graphRelease,
+      build: build ?? null,
       species: values.species,
       seed,
       figuresAsked: total,
