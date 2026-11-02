@@ -367,9 +367,9 @@ working files for the submitted identifiers.
   it, which the report waits for (FR-204), and later takes a `resource`.
 - **The genome-wide overview** is drawn by WebsiteAngular's render service, which loads
   FoamTree under a commercial licence; pdf-export ships none of it. Unlike spec 001's
-  figures, the overview cannot be drawn without FoamTree, so this dependency has no end:
-  it needs the user's or the release owners' agreement, recorded here, or an amendment
-  to constitution Principle II, before tasks are written (plan, Complexity Tracking).
+  figures, the overview cannot be drawn without FoamTree, so this dependency has no end.
+  Using FoamTree is a project decision (2026-11-02), written into constitution
+  Principle II (1.2.0) as a run-time exception, and the report keeps the overview.
 - **The identifiers found** are gathered across the whole result, as today's; how the
   public interface gives them at that scale, within SC-203, is the plan's to measure.
 - **ReactomeGSA results:** in scope as far as today's report covers them; anything more

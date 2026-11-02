@@ -146,7 +146,7 @@ WebsiteAngular's render and content services on the release's graph. The time me
 in R7 decides whether the book is made beside the website's own release testing, or by
 its own step.
 
-**A limitation** (constitution II): the render service loads FoamTree, under a commercial
+**A limitation** (constitution II's run-time exception, 1.2.0): the render service loads FoamTree, under a commercial
 licence. pdf-export ships none of it, but cannot make figures without that service
 running, until WebsiteAngular's render bundle without FoamTree exists (R10).
 

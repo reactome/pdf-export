@@ -358,7 +358,9 @@ of pages with today's book.
   website's pathway browser draws it, with its analysis overlay when there is one.
 - **FR-009**: Every dependency, and every font, icon and boilerplate file the repository
   ships into the PDFs, MUST be under a non-restrictive licence (MIT, BSD, Apache-2.0,
-  ISC, OFL for fonts, or similar). CI MUST fail on any other, including none.
+  ISC, OFL for fonts, or similar). CI MUST fail on any other, including none. A
+  dependency here is what the repository installs or ships; the render service it
+  calls at run time is constitution Principle II's run-time exception.
   - Reactome's content (its data and EHLD illustrations), the literature's metadata and
     Reactome's logo are not shipped assets. They stay under their own terms; the cover
     states Reactome's licence.
@@ -501,8 +503,8 @@ of pages with today's book.
   render service, with its content service, run on the release's graph and files beside
   the book's step (plan, research R3). That service loads FoamTree, under a commercial
   licence: pdf-export ships none of it, but cannot draw figures without the service
-  until WebsiteAngular's render bundle without FoamTree exists (plan, Complexity
-  Tracking). The release's owners agree both.
+  until WebsiteAngular's render bundle without FoamTree exists (research R10). That
+  run-time use is constitution Principle II's run-time exception (1.2.0).
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;

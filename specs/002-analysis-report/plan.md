@@ -44,7 +44,7 @@ budget is what the edge's 100 s leaves after the gateway's wait (R4), likely too
 for a cold report; the plan measures it first.
 
 **Constraints**: the analysis service's API only (FR-202); no submitted identifier logged
-or kept (FR-211); FR-017 for characters; constitution 1.1.0.
+or kept (FR-211); FR-017 for characters; constitution 1.2.0.
 
 **Scale/Scope**: up to 50 pathways and 51 figures a report; one report at a time behind
 the gateway's lane, two in the service by default.
@@ -53,17 +53,17 @@ the gateway's lane, two in the service by default.
 
 _GATE: checked before research and again after design._
 
-| Principle                          | How the plan meets it                                                                                                                                                                                                                                       | Status                                                 |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client.                                                                                                             | Pass                                                   |
-| II. Loose licences only            | No new dependency. The render service's FoamTree remains spec 001's tracked violation, and for the genome-wide overview it has no end: the overview is FoamTree's own drawing.                                                                              | **Needs agreement** before tasks (Complexity Tracking) |
-| III. The graph, nothing relational | The graph and the analysis service's public API: Principle III's "So" names the graph and the release's files; the analysis API is a third source, read because FR-202 keeps the analysis's sums in the analysis service, and it is no relational database. | Pass, by FR-202                                        |
-| IV. The pathway browser's look     | Every figure is the render service's, overlaid for the result's default resource once the page waits for its overlay (step 0, gating the report). The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3).                 | Pass, with R3's gaps tracked                           |
-| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                                                                                                                                         | Pass                                                   |
-| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                                                                                                                                  | Pass                                                   |
-| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                                                                                                                                      | Pass                                                   |
+| Principle                          | How the plan meets it                                                                                                                                                                                                                                       | Status                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| I. One implementation              | The report reuses spec 001's graph reading, sections, layout, figures and printing; its new code is the report's parts and the analysis client.                                                                                                             | Pass                         |
+| II. Loose licences only            | No new dependency. The render service, FoamTree among what it loads, is called at run time and never shipped: Principle II's run-time exception (constitution 1.2.0), a project decision.                                                                   | Pass                         |
+| III. The graph, nothing relational | The graph and the analysis service's public API: Principle III's "So" names the graph and the release's files; the analysis API is a third source, read because FR-202 keeps the analysis's sums in the analysis service, and it is no relational database. | Pass, by FR-202              |
+| IV. The pathway browser's look     | Every figure is the render service's, overlaid for the result's default resource once the page waits for its overlay (step 0, gating the report). The resource it cannot yet take is a listed difference until WebsiteAngular adds it (R3).                 | Pass, with R3's gaps tracked |
+| V. Verify the instrument           | The replay and the FR-208 comparison are each shown failing on a planted fault; the time is measured, not inferred.                                                                                                                                         | Pass                         |
+| VI. No production                  | A private analysis service on a private graph copy, with made-up identifiers; no production requests, no ReactomeGSA runs.                                                                                                                                  | Pass                         |
+| VII. No names                      | Fixtures use placeholder people and made-up identifiers (FR-213); comparisons print counts and hashes.                                                                                                                                                      | Pass                         |
 
-**After design:** unchanged; Principle II's gate stays open until that agreement.
+**After design:** unchanged.
 
 ## Project Structure
 
@@ -116,9 +116,7 @@ else (constitution I).
      for a large expression dataset), the figures (spec 001's T005, part c), layout and
      printing (twice, for the contents);
    - **then the time budget's decision with the user** (R4), before the service is
-     built to one answer;
-   - **and the overview's FoamTree agreement** (Complexity Tracking), recorded in spec
-     Assumptions, before tasks are written.
+     built to one answer.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
    not built yet: the analysis stub (its T010), the analysis client (T020, T021) and the
    service (T022), besides the layout and printing already merged. Its own work starts
@@ -137,6 +135,5 @@ else (constitution I).
 
 ## Complexity Tracking
 
-| Violation                                                                    | Why Needed                                                             | Simpler Alternative Rejected Because                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The genome-wide overview needs the render service, which loads FoamTree (II) | Today's report shows it, and only the website draws it in the new look | Unlike spec 001's figures, the overview is FoamTree's own drawing, so a render bundle without FoamTree cannot draw it: the violation lasts as long as the report shows today's overview. Dropping the overview would break FR-201's parts. Principle II says such a dependency is not added, and spec 001's violation was agreed because it ends; this one does not, so it needs the user's or the release owners' agreement, recorded in spec Assumptions, or a constitution amendment, before tasks are written |
+None. The render service's FoamTree, which the genome-wide overview needs, is
+constitution Principle II's run-time exception (1.2.0), not a violation.
