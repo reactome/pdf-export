@@ -29,8 +29,9 @@ of WebsiteAngular (research R10).
   text of its labels: their text content only, never an element, an id or an
   attribute.
 - **A refusal** (any 4xx, a 5xx, or a timeout): the figure is missing. Retried once
-  after a pause for a 503. Then:
-  - `figures` fails on it, and so the book's preflight would (contracts/figures.md);
+  after a pause for a 503 or a timeout. Then:
+  - `figures` draws the rest and exits 1 naming it, with no `complete` line, so the
+    book refuses the folder (contracts/figures.md);
   - a single-event PDF goes on without it.
 - **The text** is set in Roboto. pdf-export's page supplies the font, at weights 300 to
   600 (research R5).

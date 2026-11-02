@@ -32,12 +32,17 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
     (`source`) and its sorted `highlight` ids. A figure's line is appended only after its
     file is written, synced and moved into place, and only if the render service's
     `build` and the content release, read again after the file is in place, still equal
-    the fingerprint's; otherwise its file is removed and the run ends with exit 1. A
-    figure whose label check fails gets no line either, and the run ends with exit 1.
+    the fingerprint's (a service that does not answer that read counts as changed);
+    otherwise its file is removed and the run stops at once (below).
+  - **A figure's own fault** (refused after the client's retry, timed out, or failing its
+    label check) leaves it with no file and no line, and the run goes on with the rest:
+    it ends with exit 1, no `complete` line, and every such figure named in its report,
+    so one run finds them all.
   - **Its last line, when every figure has its line:** `complete`, whose fingerprint
     fields equal the first line's.
-- **A deployment changed during a run** is seen at the next figure to finish, which ends
-  the run with no `complete` line. Figures still being drawn when it ends get no line.
+- **A deployment changed during a run** is seen at the next figure to finish, which stops
+  the run at once with exit 1 and no `complete` line. Figures still being drawn when it
+  stops get no line.
 - **What the fingerprint cannot see** (research R10):
   - the render service's `build` hashes its own code, not the website's built page it
     loads, which is what draws;
@@ -63,12 +68,12 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
     `stale-folder <folder's release>/<checksum> <graph's release>/<checksum>`;
   - the fingerprint's summary hash is that of its `--files`' summary, or the fault is
     `stale-summary`;
-  - each figure's line is what the Figure rules choose, or the fault is
-    `stale-figure <stId>`;
+  - each figure the Figure rules choose has a line, and it is what they choose; a line
+    for an event they give no figure is a fault too: `stale-figure <stId>`;
   - each figure's file is there, or the fault is `missing-file {stId}.svg`.
 - **Beside the figures:** the manifest, `figures.jsonl`, and `report.json` when `--report` points there,
   holding no names, only stable identifiers, kinds, times and counts. Any other file
   is ignored, so a folder drawn for a release can be read again by a book made from the
   same graph.
-- **A figure that could not be drawn** has no file and no line: `figures` exits 1 with no
-  `complete` line, and the book refuses the folder.
+- **A figure that could not be drawn** has no file and no line: `figures` draws the rest,
+  exits 1 with no `complete` line, and the book refuses the folder.
