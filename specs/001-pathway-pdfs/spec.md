@@ -506,6 +506,9 @@ of pages with today's book.
   is, without an archive around it (a PDF compresses its own content). The release's
   owners agree the name. The website's download page and the cover's excerpt note point
   at it.
+- **The figures' step:** drawing the figures before the book adds a step of its own,
+  about 3.5 hours on an 8-core host as the render service is today (research R7). Its
+  machine and time are open, to be agreed with the release's owners (SC-010).
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
 - **The render service beside the figures' step:** the figures come from the website's

@@ -12,6 +12,12 @@
 //
 // The sample comes from the release graph, seeded, so every run draws the same
 // figures. The output is identifiers and numbers only: no names.
+//
+// Two limits. Illustrations are told from diagrams by the graph's `hasEHLD`, not the EHLD
+// summary the book reads; the request is the same, only the kind's label differs, and a
+// selection in an illustrated ancestor (none at release 98, research R7) is asked as a
+// diagram with a highlight. The CPU is the render container's only: the content service,
+// the graph and this client share the host's cores uncounted.
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseArgs, promisify } from 'node:util';
@@ -39,6 +45,7 @@ const { values } = parseArgs({
   },
 });
 if (!values.render) throw new Error('--render is required: the render service to measure');
+if (!URL.canParse(values.render)) throw new Error(`--render is not a URL: ${values.render}`);
 const render = values.render;
 /** A whole number of at least `min`, or the run stops before it starts. */
 function whole(name: string, value: string, min = 1): number {
@@ -134,19 +141,18 @@ function freeMb(): number {
  */
 async function containerStats(name: string): Promise<{ cpu: number; memMb: number } | null> {
   try {
-    const { stdout } = await promisify(execFile)('docker', [
-      'stats',
-      '--no-stream',
-      '--format',
-      '{{.CPUPerc}} {{.MemUsage}}',
-      name,
-    ]);
+    const { stdout } = await promisify(execFile)(
+      'docker',
+      ['stats', '--no-stream', '--format', '{{.CPUPerc}} {{.MemUsage}}', name],
+      { timeout: 10_000 }
+    );
     const out = stdout.trim();
     const [cpu = '', mem = ''] = out.split(' ');
     const amount = Number.parseFloat(mem);
     const memMb = /GiB/.test(mem) ? amount * 1024 : /KiB/.test(mem) ? amount / 1024 : amount;
     return { cpu: Number.parseFloat(cpu), memMb: Math.round(memMb) };
-  } catch {
+  } catch (error) {
+    console.error(`docker stats ${name}: ${String(error)}`);
     return null;
   }
 }
@@ -165,7 +171,10 @@ const stats: { cpu: number; memMb: number }[] = [];
 let lowestFreeMb = freeMb();
 if (Number.isNaN(lowestFreeMb))
   throw new Error('no MemAvailable in /proc/meminfo: the memory guard cannot run');
-let stoppedFor: string | null = null;
+if (lowestFreeMb < minFreeMb)
+  throw new Error(`host memory is ${String(lowestFreeMb)} MB, under --min-free-mb`);
+// Set inside the timer, which narrowing cannot see.
+let stoppedFor = null as string | null;
 let sampling = false;
 
 const watch = setInterval(() => {
@@ -239,7 +248,8 @@ console.log(
       seconds: Math.round(seconds),
       figuresPerSecond: Number(perSecond.toFixed(3)),
       byKind,
-      bookMinutes: Math.round(BOOK / perSecond / 60),
+      // A stopped run's rate is from part of the sample: no extrapolation from it.
+      bookMinutes: stoppedFor === null ? Math.round(BOOK / perSecond / 60) : null,
       budgetMinutes: BUDGET_S / 60,
       neededPerSecond: Number((BOOK / BUDGET_S).toFixed(2)),
       container: values.container
@@ -255,3 +265,4 @@ console.log(
     2
   )
 );
+if (stoppedFor !== null) process.exitCode = 1;

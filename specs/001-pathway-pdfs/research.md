@@ -472,12 +472,12 @@ is ignored, not a missing file.
   private copy of release 98's graph, drawing a seeded sample in the book's mix through
   pdf-export's own client (`ci/measure/throughput.ts`):
 
-  | `RENDER_CONCURRENCY` and the client's `--parallel` | Figures | Figures a second | The book's 19,313 | Service CPU, mean (cores) | Core-seconds a figure | Peak memory |
-  | -------------------------------------------------- | ------- | ---------------- | ----------------- | ------------------------- | --------------------- | ----------- |
-  | 1                                                  | 100     | 0.394            | 13 h 37 min       | 1.37                      | 3.5                   | 0.7 GB      |
-  | 2                                                  | 200     | 0.712            | 7 h 32 min        | 2.86                      | 4.0                   | 0.7 GB      |
-  | 4                                                  | 200     | 1.166            | 4 h 36 min        | 5.13                      | 4.4                   | 1.2 GB      |
-  | 8                                                  | 200     | 1.523            | 3 h 31 min        | 6.96 (7.7 at peak)        | 4.6                   | 1.9 GB      |
+  | `RENDER_CONCURRENCY` and the client's `--parallel` | Figures | Figures a second | The book's 19,313 | Render container's CPU, mean (cores) | Core-seconds a figure | Peak memory |
+  | -------------------------------------------------- | ------- | ---------------- | ----------------- | ------------------------------------ | --------------------- | ----------- |
+  | 1                                                  | 100     | 0.394            | 13 h 37 min       | 1.37                                 | 3.5                   | 0.7 GB      |
+  | 2                                                  | 200     | 0.712            | 7 h 32 min        | 2.86                                 | 4.0                   | 0.7 GB      |
+  | 4                                                  | 200     | 1.166            | 4 h 36 min        | 5.13                                 | 4.4                   | 1.2 GB      |
+  | 8                                                  | 200     | 1.523            | 3 h 31 min        | 6.96 (7.7 at peak)                   | 4.6                   | 1.9 GB      |
   - Every figure asked was drawn. One at a time a reaction took 2.3 s (median), a
     diagram 3.4 s and a selection 3.7 s; at 8 at once a reaction took 4.6 s and a
     selection 8.7 s. Medians and p90s are lower-rank quantiles.
@@ -486,8 +486,10 @@ is ignored, not a missing file.
     choosing a selection's ancestor differently from the book, gave 1.41 a second at 8;
     the numbers above replace it.)
   - **The limit is the machine's processors:** a figure costs 3.5–4.6 seconds of a core
-    (mean CPU ÷ figures a second), rising with concurrency, so all 8 cores would give
-    about 1.7–2.3 figures a second (inference), against the 7.3 needed.
+    in the render container alone (mean CPU ÷ figures a second), rising with concurrency;
+    the content service, the graph and the client share the host uncounted. So all 8
+    cores would give at most about 1.7–2.3 figures a second (inference), against the 7.3
+    needed. The runs' outputs are in `ci/measure/results/2026-11-02/`.
   - **Not run, and why:** the samples are 100–200 figures, not the 2,000 T005 set; the
     gap to the threshold is close to fivefold at the best setting, and the cost per
     figure rises rather than falls with concurrency, so a larger sample would not turn
