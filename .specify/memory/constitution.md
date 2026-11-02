@@ -44,8 +44,11 @@ to read the graph with that in mind.
 **One run-time exception:** the website's render service, which draws Reactome's
 figures in the website's look, loads FoamTree under a commercial licence. Using
 FoamTree is a project decision (2026-11-02), and the genome-wide overview cannot be
-drawn without it. So pdf-export may call that service, for what it draws, at run
-time, over HTTP. It installs, links and ships none of it, so FoamTree's terms do not
+drawn without it. So pdf-export may call that service, which loads FoamTree, for its
+figures, at run time, over HTTP. The exception covers FoamTree only: any other
+restrictive licence the service comes to load needs its own amendment. It does not
+narrow when a render bundle without FoamTree exists; pdf-export uses that bundle
+where it can, as its specs say. It installs, links and ships none of it, so FoamTree's terms do not
 reach pdf-export's own licence, and CI's licence check covers everything it does
 install and ship, with no exception added for this. The cost that remains: anyone
 reusing pdf-export's figures needs that service, and its FoamTree licence.

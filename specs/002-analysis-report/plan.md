@@ -135,6 +135,5 @@ else (constitution I).
 
 ## Complexity Tracking
 
-| Violation                                                                                         | Why Needed | Simpler Alternative Rejected Because |
-| ------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------ |
-| None since constitution 1.2.0: the render service's FoamTree is Principle II's run-time exception |            |                                      |
+None. The render service's FoamTree, which the genome-wide overview needs, is
+constitution Principle II's run-time exception (1.2.0), not a violation.
