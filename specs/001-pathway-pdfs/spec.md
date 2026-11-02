@@ -501,8 +501,8 @@ of pages with today's book.
   render service, with its content service, run on the release's graph and files beside
   the book's step (plan, research R3). That service loads FoamTree, under a commercial
   licence: pdf-export ships none of it, but cannot draw figures without the service
-  until WebsiteAngular's render bundle without FoamTree exists (plan, Complexity
-  Tracking). The release's owners agree both.
+  until WebsiteAngular's render bundle without FoamTree exists (research R10). That
+  run-time use is constitution Principle II's run-time exception (1.2.0).
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;
