@@ -96,7 +96,8 @@ fonts above), run by the release and beside the website's services.
     near 1 GB for the real book (inference). It is re-measured in the first tasks (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service (for `figures` and `serve`; `book`
-  reads the figures' folder) and the analysis service. Fonts are
+  reads the figures' folder), the content service's release (for `figures`) and the
+  analysis service. Fonts are
   local (R5). The website's address (`--site`) is written into links, never fetched.
 - **No names** in fixtures, logs or comparison output (FR-013).
 

@@ -8,15 +8,15 @@ environment variables named beside them. A password never goes on the command li
 Draws every figure the book needs, before the book, into a folder (SC-010, research R7,
 contracts/figures.md).
 
-| Flag                                 | Environment       | Meaning                                                                                                   |
-| ------------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `--graph`, `--database`, `--species` |                   | as for `book`                                                                                             |
-| `--files`                            |                   | as for `book`: the EHLD summary decides the illustrations                                                 |
-| `--render`                           | `RENDER_SERVICE`  | the render service's base URL (contracts/render.md)                                                       |
-| `--content`                          | `CONTENT_SERVICE` | the content service the render service draws from, asked only for its release                             |
-| `--out`                              |                   | the folder written (contracts/figures.md)                                                                 |
-| `--parallel`                         |                   | figures asked at once; default 2, the service's own default; set it to the service's `RENDER_CONCURRENCY` |
-| `--report`                           |                   | where its run report is written, as JSON                                                                  |
+| Flag                                 | Environment       | Meaning                                                                                                           |
+| ------------------------------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `--graph`, `--database`, `--species` |                   | as for `book`                                                                                                     |
+| `--files`                            |                   | as for `book`: the EHLD summary decides the illustrations                                                         |
+| `--render`                           | `RENDER_SERVICE`  | the render service's base URL (contracts/render.md)                                                               |
+| `--content`                          | `CONTENT_SERVICE` | the content service the render service draws from, asked only `GET /data/database/version` (contracts/figures.md) |
+| `--out`                              |                   | the folder written (contracts/figures.md)                                                                         |
+| `--parallel`                         |                   | figures asked at once; default 2, the service's own default; set it to the service's `RENDER_CONCURRENCY`         |
+| `--report`                           |                   | where its run report is written, as JSON                                                                          |
 
 - **Which figures:** the events' Figure rules (data-model.md), from the graph and the
   EHLD summary, the same code `book` uses, so the folder holds exactly what the book
@@ -25,8 +25,10 @@ contracts/figures.md).
   preflight, before anything is drawn, so a missing file or an uncovered character fails
   in minutes, not after hours of drawing; and the label check after each figure is drawn.
 - **The same release, checked first:** the content service behind the render service
-  must answer the graph's release, or the run is refused before anything is drawn
-  (exit 2).
+  must answer the graph's release (`GET /data/database/version`), the graph must carry a
+  `DBInfo` checksum, and the render service's health answer a `build` other than
+  `unknown` (contracts/render.md), or the run is refused before anything is drawn
+  (exit 2). What this cannot see is in contracts/figures.md.
 - **The manifest** (contracts/figures.md) records the folder's fingerprint and what each
   file draws, in the order that contract gives, so a stopped run resumes safely. A folder
   of another fingerprint is refused (exit 2).
@@ -34,7 +36,9 @@ contracts/figures.md).
   (`missing-file`, `uncovered-character`), a label fault after drawing, or a figure that
   could not be drawn, each named by stable identifier or file name. **Exit 2:** bad
   arguments; the render or content service unreachable at the start; another release
-  behind the render service; or a folder of another fingerprint.
+  behind the render service; no graph checksum or no render `build`; or a folder of
+  another fingerprint, when a new, empty `--out` is needed. A `build` or content release
+  that changed by the end of the run is exit 1.
 
 ## `pdf-export book`
 
@@ -59,7 +63,7 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
   illustrations from the summary, ignoring an entry for an event the graph does not
   hold) and the figures' files in `--figures`, and a file missing is a fault
   `missing-file <name>`. The folder's manifest must carry the graph's release number and
-  checksum, or the fault is `stale-folder <release>`; and for each figure, what the
+  checksum, or the fault is `stale-folder` naming both (contracts/figures.md); and for each figure, what the
   Figure rules choose now, or the fault is `stale-figure <stId>` (contracts/figures.md).
   Any of these ends the step with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault

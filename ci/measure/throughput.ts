@@ -22,7 +22,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseArgs, promisify } from 'node:util';
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
-import { diagramChoices } from '../../src/graph/queries.ts';
+import { diagramChoices, release } from '../../src/graph/queries.ts';
 import { nearestAncestor } from '../../src/model/build.ts';
 import { fetchFigure, type FigureRequest } from '../../src/figures/client.ts';
 
@@ -152,14 +152,30 @@ async function containerStats(name: string): Promise<{ cpu: number; memMb: numbe
     const memMb = /GiB/.test(mem) ? amount * 1024 : /KiB/.test(mem) ? amount / 1024 : amount;
     return { cpu: Number.parseFloat(cpu), memMb: Math.round(memMb) };
   } catch (error) {
+    // Logged each time, so a wrong --container is seen at once, not as nulls at the end.
     console.error(`docker stats ${name}: ${String(error)}`);
     return null;
   }
 }
 
+// Before anything is sampled: the host has the memory, and the service answers.
+const startFreeMb = freeMb();
+if (Number.isNaN(startFreeMb))
+  throw new Error('no MemAvailable in /proc/meminfo: the memory guard cannot run');
+if (startFreeMb < minFreeMb)
+  throw new Error(`host memory is ${String(startFreeMb)} MB, under --min-free-mb`);
+const health = await fetch(new URL('health', render.endsWith('/') ? render : `${render}/`)).catch(
+  (error: unknown) => {
+    throw new Error(`the render service does not answer at ${render}: ${String(error)}`);
+  }
+);
+if (!health.ok) throw new Error(`the render service's health answered ${String(health.status)}`);
+
 const graph = openGraph(graphSettings(process.env));
 let requests: FigureRequest[];
+let graphRelease: number;
 try {
+  graphRelease = await release(graph);
   requests = await sample(graph, values.species, total, seed);
 } finally {
   await graph.close();
@@ -168,11 +184,7 @@ try {
 type Done = { kind: FigureRequest['kind']; ms: number; ok: boolean; reason?: string };
 const done: Done[] = [];
 const stats: { cpu: number; memMb: number }[] = [];
-let lowestFreeMb = freeMb();
-if (Number.isNaN(lowestFreeMb))
-  throw new Error('no MemAvailable in /proc/meminfo: the memory guard cannot run');
-if (lowestFreeMb < minFreeMb)
-  throw new Error(`host memory is ${String(lowestFreeMb)} MB, under --min-free-mb`);
+let lowestFreeMb = Math.min(startFreeMb, freeMb());
 // Set inside the timer, which narrowing cannot see.
 let stoppedFor = null as string | null;
 let sampling = false;
@@ -238,6 +250,10 @@ console.log(
   JSON.stringify(
     {
       render,
+      release: graphRelease,
+      species: values.species,
+      seed,
+      figuresAsked: total,
       parallel,
       sampled: requests.length,
       asked: done.length,
@@ -265,4 +281,5 @@ console.log(
     2
   )
 );
-if (stoppedFor !== null) process.exitCode = 1;
+// A stopped run, or one with a figure missing, is no measurement of the book's figures.
+if (stoppedFor !== null || ok.length < done.length || ok.length === 0) process.exitCode = 1;

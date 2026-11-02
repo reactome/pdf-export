@@ -39,8 +39,8 @@ research R7.
 ## 2. CI's own runs
 
 - `npm test`: unit tests, each seen failing first.
-- The fixture: the placeholder graph in a Neo4j service, the render stub and the
-  analysis stub.
+- The fixture: the placeholder graph in a Neo4j service, the render stub (with its
+  health answer), a content stub answering only the release, and the analysis stub.
   - `pdf-export figures` draws the fixture's figures against the render stub, and
     `pdf-export book` writes the fixture's book from them.
   - `pdf-export check-book` passes on it.

@@ -607,6 +607,9 @@ packaging.
 - **The render service's limits as settings** for a batch run (R3).
 - **Many figures per page load,** an in-page API on the render page: R7's go/no-go was a
   no-go, and the figures moved to a step of their own; this would shorten that step.
+- **The render service's health answer naming what draws:** the build of the website's
+  page it loads, and its content service's release and `DBInfo` checksum, so the
+  figures' folder's fingerprint (contracts/figures.md) need not trust the operator.
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
   in its own process.

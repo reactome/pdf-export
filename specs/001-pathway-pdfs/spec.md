@@ -495,7 +495,7 @@ of pages with today's book.
 - **SC-010**: Every figure the book needs is drawn, in the new look, by a step of its own
   that runs before the book's, and the book reads them from that step's folder. The
   step's time on the machine the release gives it is measured and agreed with the
-  release's owners (research R7: about 3.5 hours on an 8-core host as the render service
+  release's owners (research R7: about 3.5 hours on an 8-core host at concurrency 8, as the render service
   is today).
 
 ## Assumptions
@@ -507,7 +507,7 @@ of pages with today's book.
   owners agree the name. The website's download page and the cover's excerpt note point
   at it.
 - **The figures' step:** drawing the figures before the book adds a step of its own,
-  about 3.5 hours on an 8-core host as the render service is today (research R7). Its
+  about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
   machine and time are open, to be agreed with the release's owners (SC-010).
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
