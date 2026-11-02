@@ -220,7 +220,8 @@ deliberately added restrictive one is seen to fail it.
 The release team runs the book's step as they run today's:
 
 - a container image;
-- the release's graph and files as inputs;
+- the release's graph and files as inputs, with the figures drawn into a folder by a step
+  before it (SC-010);
 - the book written to the release's output.
 
 A check then fails the step if the book's content is wrong.
@@ -371,7 +372,8 @@ of pages with today's book.
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
   files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder.
+  folder. Its figures are drawn before it, by a step of the same image with the render service and its content
+  service beside it, into a folder the book's step also takes as an input (SC-010).
 - **FR-011**: A check MUST fail the book's step on any of these:
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
@@ -466,8 +468,9 @@ of pages with today's book.
 - **SC-002**: Compared with `event-pdf`'s output for the same private graph by FR-012,
   the book and a sample of single-event PDFs agree. The only differences are those under
   Assumptions and others recorded with their reason.
-- **SC-003**: The book is made in no more time than `event-pdf` takes to make today's
-  book from the same private graph on the same machine, measured as the baseline.
+- **SC-003**: From its figures already drawn (SC-010), the book is made in no more time
+  than `event-pdf` takes to make today's book from the same private graph on the same
+  machine, measured as the baseline.
 - **SC-004**: The book opens, and its bookmarks and links work, in three readers:
   Chromium's built-in viewer, Firefox's built-in viewer, and a Poppler-based desktop
   viewer on Linux.
@@ -489,6 +492,11 @@ of pages with today's book.
   random, including a cover, a contents page and a pathway section with its figure, a
   majority of the judges (the release's owners and the curators they ask) prefer the new
   look to today's.
+- **SC-010**: Every figure the book needs is drawn, in the new look, by a step of its own
+  that runs before the book's, and the book reads them from that step's folder. The
+  step's time on the machine the release gives it is measured and agreed with the
+  release's owners (research R7: about 3.5 hours on an 8-core host at concurrency 8, as the render service
+  is today).
 
 ## Assumptions
 
@@ -498,15 +506,19 @@ of pages with today's book.
   is, without an archive around it (a PDF compresses its own content). The release's
   owners agree the name. The website's download page and the cover's excerpt note point
   at it.
+- **The figures' step:** drawing the figures before the book adds a step of its own,
+  about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
+  machine and time are open, to be agreed with the release's owners (SC-010).
 - **The release's check:** the check of FR-011 replaces the release's file-list check
   for the book. The release's owners agree the switch.
-- **The render service beside the book's step:** the figures come from the website's
+- **The render service beside the figures' step:** the figures come from the website's
   render service, with its content service, run on the release's graph and files beside
-  the book's step (plan, research R3). That service loads FoamTree, under a commercial
+  the step that draws the book's figures before the book (SC-010; plan, research R3,
+  R7); the book's own step reads them from that step's folder. That service loads FoamTree, under a commercial
   licence: pdf-export ships none of it, but cannot draw figures without the service
   until WebsiteAngular's render bundle without FoamTree exists (research R10). Its
   FoamTree is constitution Principle II's run-time exception (1.2.0). The release's
-  owners agree to run the render and content services beside the book's step.
+  owners agree to run the render and content services beside the figures' step.
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;

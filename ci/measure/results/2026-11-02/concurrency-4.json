@@ -1,0 +1,43 @@
+{
+  "render": "http://127.0.0.1:4311/",
+  "parallel": 4,
+  "sampled": 200,
+  "asked": 200,
+  "drawn": 200,
+  "missing": 0,
+  "missingReasons": {},
+  "stoppedFor": null,
+  "seconds": 172,
+  "figuresPerSecond": 1.166,
+  "byKind": {
+    "reaction": {
+      "drawn": 170,
+      "medianS": 2.988,
+      "p90S": 3.535
+    },
+    "diagram": {
+      "drawn": 12,
+      "medianS": 4.206,
+      "p90S": 5.984
+    },
+    "ehld": {
+      "drawn": 2,
+      "medianS": 2.701,
+      "p90S": 2.701
+    },
+    "ancestor": {
+      "drawn": 16,
+      "medianS": 5.357,
+      "p90S": 7.845
+    }
+  },
+  "bookMinutes": 276,
+  "budgetMinutes": 44,
+  "neededPerSecond": 7.32,
+  "container": {
+    "meanCpuPercent": 513,
+    "peakCpuPercent": 612.47,
+    "peakMemMb": 1206
+  },
+  "lowestHostFreeMb": 6718
+}

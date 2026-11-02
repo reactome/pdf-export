@@ -7,6 +7,8 @@ that apply to it.
 ## Release
 
 - `version`: from `(:DBInfo).releaseNumber` (`version` reads null on release 98).
+- `checksum`: from `(:DBInfo).checksum`, present on release 98; the figures' folder's
+  fingerprint (contracts/figures.md). Missing, it is a fault, never a match.
 - `counts`: the distinct pathways and reactions the PDF holds, for the introduction.
 - `files`: the release's folder (`--files`): its EHLD summary, read to choose figures,
   and the diagram and EHLD files the preflight expects (contracts/cli.md).
@@ -85,7 +87,8 @@ Where the chosen diagram is an EHLD and events would be selected, the render ser
 cannot draw it yet (research R10). The figure is the EHLD unselected, and the
 difference is recorded.
 
-**A figure that cannot be drawn:** in the book, the step fails (FR-011). In a
+**A figure that cannot be drawn:** for the book, the figures' step fails, and the book's
+preflight would fail on its missing file (contracts/figures.md). In a
 single-event PDF, the section is written without it and the absence is logged (Edge
 Cases).
 
@@ -145,10 +148,12 @@ From the analysis service's API (research R6).
 
 ## Run report
 
-What the book's step and the service log.
+What the book's step and the service log. The figures' step writes its own: figures by
+kind, each kind's times, the release, those it could not draw, by stable identifier and
+cause (`unanswered`, `failed`, `refused`, `invalid` or `label`, contracts/figures.md), and, if it stopped at once, why.
 
 - `release`, the time taken, the page count and the size.
-- Figures by kind, and those missing, by stable identifier.
+- Figures by kind, and those missing or stale in the figures' folder, by stable identifier.
 - Figures below the legibility floor, by stable identifier.
 - Release files missing, by name, from the preflight.
 - Characters FR-017's list replaced, by code point and count; characters off the list, by
