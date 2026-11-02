@@ -40,7 +40,7 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
     named in its report, so one run finds them all. Two things stop the run at once
     instead:
     - **after a figure missing for want of an answer** (cause `unanswered`: no
-      connection, a timeout, a body cut short, or a 502, 503 or 504 after the retry),
+      connection, a timeout, a body cut short, a 502, or a 503 or 504 after the retry),
       the same read of the render service's health and the content release, within
       `--timeout`: no answer, a 5xx, or a changed value, is a deployment changed or
       gone;
@@ -49,8 +49,7 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
       answer of any kind for `5 × --timeout`, counted from the start of drawing or the
       last answer, is a render service stuck while its health still answers.
 
-    The client names each missing figure's cause: `unanswered` (above), `failed` (a 500
-    or another 5xx: the page failed on that figure), `refused` (a 4xx) or `invalid` (a
+    The client names each missing figure's cause: `unanswered` (above), `failed` (a 500, or a 5xx other than 502, 503 or 504: the page failed on that figure), `refused` (a 4xx) or `invalid` (a
     200 that is not SVG); the step adds `label` for a figure failing its label check.
     Only `unanswered` triggers the read and counts towards the breaker, so figures that
     fail on their own, however many and in whatever order, never stop the run.
