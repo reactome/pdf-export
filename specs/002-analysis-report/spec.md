@@ -321,7 +321,11 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
     beyond that; a report's time budget (5 minutes by default) runs from when it starts
     being made, not from when it was queued;
   - at most a set number of the waiting reports from one client (two by default),
-    counted by the client the gateway names (contracts/service.md);
+    counted by the client the gateway names (contracts/service.md), a request naming
+    none counted as one client;
+  - the service's port is never published or routed from outside (nginx does not route
+    to it): only trusted internal callers, the analysis gateway and the content service,
+    can reach it, since it trusts the client the gateway names;
   - no request waits longer than the edge's 100 s allows; on the website's path the
     analysis gateway sends report requests on without queueing them, keeping its share
     per client, naming the client, and answering "unavailable" when the service cannot

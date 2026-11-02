@@ -267,14 +267,15 @@ pdf-export instead of the analysis service, and stops queueing it: today it make
 report at a time and holds each request until its answer ends, which with pdf-export's
 30 s wait would serialise every browser's polling, and three at once would exceed its
 60 s queue. pdf-export's own limits (FR-210) protect it instead. The gateway keeps,
-for the report path, what it adds to its other lanes besides the queue: a share per
-client (a client's report requests in flight counted, and refused past its share, never
-queued), its existing `PER_CLIENT` share (eight by default, counted across all its
-lanes), and the client named to pdf-export in a header it always overwrites,
+for the report path, what it adds to its other lanes besides the queue: its existing
+per-client share (`PER_CLIENT`, eight by default, counted across all its lanes; a
+client's report requests in flight counted, refused past it, never queued), and the
+client named to pdf-export in a header it always overwrites,
 `X-Reactome-Client`, set to its own `clientOf` (`X-Forwarded-For` would not do: nginx
 appends to what a client sends, so a client could choose its leftmost value).
 pdf-export uses it for its own share of the waiting reports, trusting it because only
-the gateway can reach pdf-export. So the gateway gains a second upstream for this path, pdf-export
+trusted internal callers can reach pdf-export (FR-210), and counting a request without
+it as one client. So the gateway gains a second upstream for this path, pdf-export
 beside the analysis service; and when pdf-export cannot be reached it answers 503 in
 the analysis service's form, as FR-203 asks, not its 502 for the analysis service.
 nginx's route to the gateway is unchanged. Both are a WebsiteAngular task, in its own specs (spec Assumptions).

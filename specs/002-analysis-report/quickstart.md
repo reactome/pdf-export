@@ -49,5 +49,8 @@ requests, and no ReactomeGSA runs.
 - **The look** (SC-204): spec 001's colour and font check on a sample report.
 - **The readers** (SC-207): the report opens, with its bookmarks and links working, in
   spec 001's three readers.
+- **Reachability** (FR-210): the service's port answers only from the internal network
+  (a request from outside the deployment's network is refused at the network, not by
+  the service).
 - **What is kept** (SC-205): after a sample of reports, some still kept in memory, the
   service's logs and working folder hold none of the submitted identifiers.
