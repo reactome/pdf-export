@@ -482,7 +482,13 @@ of pages with today's book.
   - **with an analysis, or for an event of another species,** its figures drawn on
     request, is made within 8 s plus 3 s per figure, cold, at the render service's website settings
     (research R7: drawing on request is slower than `event-pdf` for all but the
-    largest events, and cannot be avoided where the figure carries the analysis).
+    largest events, and cannot be avoided where the figure carries the analysis);
+  - **while the folder is missing, stale or incomplete,** a human event's PDF is drawn
+    on request and held to the same 8 s plus 3 s per figure.
+
+  "Cold" is T023's: the service's process already running, the render service with a
+  fresh cache key and its browser warmed on a figure no sampled event draws.
+
 - **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
   shipped asset is added to test it.
 - **SC-007**: The book's check fails on each fault in FR-011, each seen to fail once.

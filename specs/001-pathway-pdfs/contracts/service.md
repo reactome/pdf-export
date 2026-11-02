@@ -28,7 +28,9 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   They never carry a path, a host or a name.
 - **Where a figure comes from:** without a token, from the release's figures' folder
   (`--figures`, contracts/figures.md), if it passes `book`'s folder checks against the
-  graph's current release, read again at most once a minute; a folder of another
+  graph's current release: the full checks when the service starts and whenever the
+  folder's fingerprint or the graph's release and checksum change, which are read again
+  at most once a minute; a folder of another
   release, or incomplete, is not used, and every figure is drawn on request until one
   that passes is in place. A figure the folder lacks (another species' event) is drawn
   on request and logged. With a token, every figure is drawn on request, with the

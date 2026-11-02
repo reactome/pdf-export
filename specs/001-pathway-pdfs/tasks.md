@@ -286,7 +286,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
 
 - [ ] T022 [US2] The service, `src/serve.ts` (contracts/service.md).
   - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`.
-  - **Figures** (contracts/service.md): with `--figures`, and a folder that passes T024's folder checks against the graph's current release (read again at most once a minute), a PDF without a token takes its figures from it; with no folder, or one of another release or incomplete, every figure is drawn on request and `/health` says so; with a token, or for an event the folder has no figure for (another species), drawn on request. T022 ships before T024 and T046: until then it draws every figure on request, and the folder is wired in once T024's checks exist. Tests (after T024): a PDF without a token asks the render stub nothing; one with a token asks for each figure with the token; a folder of another release is not used, and `/health` reports it; a figure the folder lacks is drawn and logged.
+  - **Figures:** every figure drawn on request, with the token where there is one; a figure that cannot be drawn leaves its section without it, logged. Reading the figures' folder is T047's, after T024.
   - **Settings:** bind address (loopback by default), port, `--graph`, `--figures`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable where contracts/cli.md gives one.
   - **Answers:**
     - 200 with `Content-Disposition` naming the stable identifier;
@@ -305,7 +305,13 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
   - a bad identifier with a bad token gives the identifier's answer;
   - no reason carries a path, a host or a name.
 
-- [ ] T023 [US2] SC-005, measured, after T046. Run the service against a private copy for research R7's sample, the service's process already running (its first layout paid) and the render service cold (a fresh `RENDER_CACHE_KEY`, its browser warmed on a figure no sampled event draws): without a token, reading a figures' folder drawn by T046, against `event-pdf`'s warm times; with a token, against the 8 s plus 3 s per figure of SC-005, including an illustration and a reaction once their overlays exist (T042). Record both in research R7. If either is over, raise SC-005 with the user, with the numbers.
+- [ ] T047 [US2] The figures' folder in the service, after T024 (contracts/service.md, spec SC-005).
+  - With `--figures`, the folder is used for a PDF without a token while it passes T024's folder checks against the graph's current release: the full checks at start and whenever the folder's fingerprint or the graph's release and checksum change (those read again at most once a minute); otherwise every figure is drawn on request and `/health` says why (`stale`, `incomplete`, `none`).
+  - A figure the folder lacks (another species' event) is drawn on request and logged.
+
+  Tests: a PDF without a token asks the render stub nothing; one with a token asks for each figure with the token; a folder of another release is not used and `/health` reports it; a figure the folder lacks is drawn and logged; the full checks run once at start and again only when the fingerprint or the release changes (the graph stub counts its reads).
+
+- [ ] T023 [US2] SC-005, measured, after T046 and T047. Run the service against a private copy for research R7's sample, with one non-human reaction and one non-human pathway added, the service's process already running (its first layout paid) and the render service cold (a fresh `RENDER_CACHE_KEY`, its browser warmed on a figure no sampled event draws): without a token, reading a figures' folder drawn by T046, against `event-pdf`'s warm times; with a token, against the 8 s plus 3 s per figure of SC-005, a plain diagram's overlay now, and an illustration's and a reaction's in a later run once their overlays exist (T042, recorded then in research R7). Record both in research R7. If either is over, raise SC-005 with the user, with the numbers.
 
 **Checkpoint:** the website's PDF works on its own, and WebsiteAngular can route to it
 (T042).
@@ -523,7 +529,7 @@ passes.
     - T013 → T015 → T018 → T019.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
-- **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022, drawing every figure on request until T024's folder checks exist; T022's folder reading after T024; T023 after T046.
+- **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 (every figure drawn on request); T047 after T024; T023 after T046 and T047.
 - **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031, with T046 after T024 and before T031 (T029's tests write their own folder). T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
@@ -540,11 +546,11 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 beside US2; T024 once T022 is done, and T046 after it, then T023; the rest of US1 after T024 and T025.
+- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 beside US2; T024 once T022 is done, then T046 and T047, then T023; the rest of US1 after T024 and T025.
 
 ## Implementation strategy
 
 1. **Phase 1 and the measurements first.** T005's answer decides whether the book is built as planned.
-2. **US2 first.** The website's PDF is smaller, exercises every part except the parts and the join, and replaces `event-pdf` in the content service. It draws every figure on request until the book's figures' folder exists (T024, T046); SC-005's measurement (T023) waits for it.
+2. **US2 first.** The website's PDF is smaller and exercises every part except the parts and the join. It draws every figure on request until the book's figures' folder exists (T024, T046, T047), which R7 shows is 2–5 times slower than `event-pdf`, so the website is routed to it (T042) only once T023 has measured SC-005.
 3. **Then US1, the book,** with its check.
 4. **Then the remaining checks and the release's step:** the look's check, the figures' check, the fixture baseline, the image and the release's step, with the comparison against `event-pdf` as the proof.

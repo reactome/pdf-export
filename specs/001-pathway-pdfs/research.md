@@ -441,7 +441,11 @@ is ignored, not a missing file.
     `build`, the warm-up and the hit count added; `token.json`, the token runs, from a
     container of their own, likewise. An earlier run (`events-unwarmed.jsonl`), whose
     warm-up asked for a pathway as a reaction and was refused unchecked, gave totals
-    within 1.3 s of these.
+    within 2.2 s of these (R-HSA-68875, 15.99 s then, 18.14 s now; the warmed run was
+    the slower one on its three widest differences). The per-event containers, the
+    warm-up and its status check, and the hit counts were done by a wrapper outside the
+    repository; the outputs record the warm-up's event and the hit count, not its
+    status.
 
     | Event                                | Figures | Pages | Graph (s) | Figures (s) | Print (s) | Total (s) | `event-pdf` (s) |
     | ------------------------------------ | ------- | ----- | --------- | ----------- | --------- | --------- | --------------- |
@@ -465,21 +469,24 @@ is ignored, not a missing file.
       plain diagram, the only kind with an overlay today, T042): 4.6 s alone; 5.6 s for
       the slower of two at once; 9.3 s for the last of four; 18.7 s for the last of
       eight, each later pair waiting for the service's two slots. None was refused (the
-      queue is 8). A plain diagram took about 3.4 s alone without a token (T005).
+      queue is 8). A plain diagram took about 3.4 s alone without a token in T005, a
+      run that fetched its files from the public site: not like for like, so a token's
+      cost is not measured here; T023 measures it.
     - So SC-005 cannot be met as written by drawing figures on request; raised with the
       user, with these numbers (T007), who left the choice to us.
     - **Decided:** a PDF without an analysis, of an event the release's figures' folder
       holds (the human book's, SC-010), reads its figures from it and must keep
       `event-pdf`'s times. What is left without drawing (graph 0.1–0.2 s; layout, 0.0–0.1
-      s in a running service; print 0.3–5.2 s) is under `event-pdf`'s ranges in every
-      group, the small pathways closest (about 1.0–2.4 s in `one-process.json` against 1.3–3.8 s); per event,
-      to be measured in T023. A PDF with an analysis cannot use the folder, its figures
+      s in a running service; print 0.3–5.2 s) is under `event-pdf`'s ranges for the
+      larger groups and overlaps them for the small pathways (about 1.0–2.4 s in
+      `one-process.json` against 1.3–3.8 s), before reading and inlining the folder's
+      files; per event, to be measured in T023. A PDF with an analysis cannot use the folder, its figures
       carrying the analysis, nor can one of another species, whose figures the folder
       lacks: their figures are drawn on request, within 8 s plus 3 s per figure. Every
-      event above meets it with room (by margin the tightest is R-HSA-73857, 25.3 s
-      against 35 s), leaving room for run-to-run variation (up to 1.3 s on one event
-      between the two runs) and for a token's slower figure (4.6 s against 3.4 s alone),
-      which T023 measures.
+      event above meets it with room: the tightest by margin is R-HSA-68881 (8.3 s against
+      14 s, 5.7 s to spare), by share R-HSA-73857 (25.3 s against 35 s); against
+      run-to-run variation of up to 2.2 s between the two runs, and a token's cost, which
+      T023 measures.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages if four pages ran four times as fast, which they do not, still

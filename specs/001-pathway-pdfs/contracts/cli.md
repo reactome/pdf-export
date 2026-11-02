@@ -120,13 +120,13 @@ pathway; their covers' distinct names are counted across the folder.
 
 The single-event service (contracts/service.md).
 
-| Flag                           | Environment        | Meaning                                                                                                  |
-| ------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------- |
-| `--port`                       | `PORT`             | default 4370                                                                                             |
-| `--bind`                       | `BIND_ADDRESS`     | default `127.0.0.1`; in its own container, an address the content service can reach                      |
-| `--graph`, `--files`, `--site` |                    | as for `book`                                                                                            |
-| `--figures`                    |                    | as for `book`: the release's figures' folder, read for a PDF without an analysis (contracts/service.md)  |
-| `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                  |
-| `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                          |
-| `--retention`                  | `TOKEN_RETENTION`  | how long an analysis token is kept, in days; must match the analysis service's own setting (research R6) |
-| `--concurrency`                |                    | PDFs made at once; default 2                                                                             |
+| Flag                           | Environment        | Meaning                                                                                                                                                           |
+| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--port`                       | `PORT`             | default 4370                                                                                                                                                      |
+| `--bind`                       | `BIND_ADDRESS`     | default `127.0.0.1`; in its own container, an address the content service can reach                                                                               |
+| `--graph`, `--files`, `--site` |                    | as for `book`                                                                                                                                                     |
+| `--figures`                    |                    | as for `book`: the release's figures' folder, read for a PDF without an analysis while it passes `book`'s folder checks, ignored otherwise (contracts/service.md) |
+| `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                                                                           |
+| `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                                                                                   |
+| `--retention`                  | `TOKEN_RETENTION`  | how long an analysis token is kept, in days; must match the analysis service's own setting (research R6)                                                          |
+| `--concurrency`                |                    | PDFs made at once; default 2                                                                                                                                      |
