@@ -64,12 +64,14 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   - the render service's `build` hashes its own code, not the website's built page it
     loads, which is what draws;
   - a deployment changed and undone between two reads around one figure;
-  - `--content` is whatever the operator names, which nothing ties to the content
-    service the render service reads, and a graph rebuilt within a release behind it is
-    not caught.
+  - `--content` is whatever the operator names, which nothing ties to the content service the render service reads, and a graph rebuilt within a release behind it is
+    not caught;
+  - the render service's `files: local` says its files are local, not which release's:
+    its folder is tied to nothing in the fingerprint, which hashes `figures`' own
+    `--files` summary.
 
   So the website's page must not be redeployed during a run, and `--content` must be the
-  render service's own content service. Three things are asked of WebsiteAngular (T042):
+  render service's own content service. Four things are asked of WebsiteAngular (T042): its health answer naming the release (or the EHLD summary's hash) of its `RENDER_FILES` folder;
   the render service's health answer reporting the build of the page it loads;
   reporting its content service's release and graph checksum, which needs the content
   service to serve the checksum (a new endpoint) or the render service to read the

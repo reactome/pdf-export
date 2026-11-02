@@ -28,7 +28,7 @@ contracts/figures.md).
 - **The same release, checked first:** the content service named by `--content`
   must answer the graph's release (`GET /data/database/version`), the graph must carry a
   `DBInfo` checksum, and the render service's health answer a `build` other than
-  `unknown` (contracts/render.md), or the run is refused before anything is drawn
+  `unknown` and `files: local` (contracts/render.md), or the run is refused before anything is drawn
   (exit 2). What this cannot see is in contracts/figures.md.
 - **One run, one folder:** `--out` must be empty or absent (exit 2 otherwise); a
   stopped run is not resumed. The manifest (contracts/figures.md) records the folder's
@@ -37,7 +37,7 @@ contracts/figures.md).
   (`missing-file`, `uncovered-character`), a label fault after drawing, or a figure that
   could not be drawn, each named by stable identifier or file name. **Exit 2:** bad
   arguments; the render or content service unreachable at the start; another release
-  at `--content`; no graph checksum or no render `build`; or an `--out` that is not
+  at `--content`; no graph checksum, no render `build`, or a render service not reading local files; or an `--out` that is not
   empty. A `build` or content release that changes during the run, a render or content
   service that stops answering, or the breaker, is exit 1 (contracts/figures.md).
 
@@ -125,7 +125,8 @@ The single-event service (contracts/service.md).
 | `--port`                       | `PORT`             | default 4370                                                                                             |
 | `--bind`                       | `BIND_ADDRESS`     | default `127.0.0.1`; in its own container, an address the content service can reach                      |
 | `--graph`, `--files`, `--site` |                    | as for `book`                                                                                            |
-| `--render`                     | `RENDER_SERVICE`   | as for `figures`: the service draws a single-event PDF's figures as it is asked                          |
+| `--figures`                    |                    | as for `book`: the release's figures' folder, read for a PDF without an analysis (contracts/service.md)  |
+| `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                  |
 | `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                          |
 | `--retention`                  | `TOKEN_RETENTION`  | how long an analysis token is kept, in days; must match the analysis service's own setting (research R6) |
 | `--concurrency`                |                    | PDFs made at once; default 2                                                                             |

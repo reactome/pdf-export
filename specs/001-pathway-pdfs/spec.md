@@ -474,9 +474,14 @@ of pages with today's book.
 - **SC-004**: The book opens, and its bookmarks and links work, in three readers:
   Chromium's built-in viewer, Firefox's built-in viewer, and a Poppler-based desktop
   viewer on Linux.
-- **SC-005**: A single-event PDF at depth 1 is made in no more time than `event-pdf`
-  takes for the same event on the same private graph, for a sample of pathways and
-  reactions.
+- **SC-005**: A single-event PDF at depth 1, for a sample of pathways and reactions on
+  the same private graph:
+  - **without an analysis,** its figures read from the release's figures' folder
+    (SC-010), is made in no more time than `event-pdf` takes for the same event;
+  - **with an analysis,** its figures drawn on request with the analysis's overlay, is
+    made within 6 s plus 2 s per figure, cold, at the render service's website settings
+    (research R7: drawing on request is slower than `event-pdf` for all but the
+    largest events, and cannot be avoided where the figure carries the analysis).
 - **SC-006**: CI's licence check passes, and fails when a restrictive dependency or
   shipped asset is added to test it.
 - **SC-007**: The book's check fails on each fault in FR-011, each seen to fail once.
@@ -506,6 +511,9 @@ of pages with today's book.
   is, without an archive around it (a PDF compresses its own content). The release's
   owners agree the name. The website's download page and the cover's excerpt note point
   at it.
+- **The figures' folder in service:** the single-event service reads the release's
+  figures' folder, the one the book's figures step drew, so a PDF without an analysis
+  draws none on request. The release's step makes it available to the service.
 - **The figures' step:** drawing the figures before the book adds a step of its own,
   about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
   machine and time are open, to be agreed with the release's owners (SC-010).

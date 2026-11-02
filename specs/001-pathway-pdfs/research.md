@@ -430,9 +430,8 @@ is ignored, not a missing file.
     user, with the numbers.
   - **Measured (T007), 2 Nov 2026:** each event of the baseline's sample at depth 1, in
     a render service of its own (the website's image, at its website settings of two at
-    once, a fresh `RENDER_CACHE_KEY`, its browser warmed on one unrelated reaction, the
-    release's files read locally through `RENDER_FILES`), on this host. No figure came
-    from a cache and none was missing. Outputs in `ci/measure/results/2026-11-02/single/`.
+    once, a fresh `RENDER_CACHE_KEY`, its browser warmed on one pathway, R-HSA-69091, whose figure no sampled event draws, the
+    release's files read locally through `RENDER_FILES`), on this host. No figure came from a cache (the service's own hit count, read before and after each run, did not move) and none was missing. Outputs in `ci/measure/results/2026-11-02/single/`: `events.jsonl`, one line per event, each from its own run of the script with the render service's `build` added; `token.json`, the token runs, from a container of their own (fresh key, the same warm-up).
 
     | Event                                | Figures | Pages | Graph   | Figures (s) | Print   | Total (s) | `event-pdf` (s) |
     | ------------------------------------ | ------- | ----- | ------- | ----------- | ------- | --------- | --------------- |
@@ -441,17 +440,23 @@ is ignored, not a missing file.
     | Pathways, 143–1,150 beneath (4)      | 5–9     | 13–26 | 0.1–0.2 | 11.0–18.9   | 2.2–3.2 | 14.5–23.2 | 4.4–9.5         |
     | Signal Transduction (2,589 beneath)  | 18      | 36    | 0.2     | 26.3        | 5.2     | 32.9      | 46              |
     - The layout took about 1 s in each, the first layout of a process (its styles and
-      fonts compiled once); in one process over all sixteen it took 0.0–0.1 s after the
-      first, so a running service pays it once. The totals above include it.
+      fonts compiled once); in one process over all sixteen (`one-process.json`, an earlier run whose render cache served 5 of its 104 figures, which does not touch the layout) it took 0.0–0.1 s after the first, so a running service pays it once. The totals above include it.
     - **Figures alone exceed `event-pdf`'s whole time** for every reaction and every
       pathway but Signal Transduction, which is faster (32.9 s against 46 s). At two at
-      once a pathway's figures take about 1.5 s each on average.
+      once a pathway's figures take about 1.8 s each on average (1.4–2.6 s per pathway).
     - **One figure with an analysis token** (T005's (c), cold, at the website settings):
       4.5 s alone; 4.8 s for the slower of two at once; 9.1 s for four; 19.6 s for eight,
       each later pair waiting for the service's two slots. None was refused (the queue
-      is 8).
-    - So SC-005 cannot be met as written by drawing figures on request; raised with the
-      user, with these numbers (T007).
+      is 8). - So SC-005 cannot be met as written by drawing figures on request; raised with the
+      user, with these numbers (T007), who left the choice to us.
+    - **Decided:** a PDF without an analysis reads its figures from the release's
+      figures' folder, the book's (SC-010), and keeps `event-pdf`'s times: what is left
+      (graph 0.1–0.2 s, layout, print 0.3–5.2 s) is under them for every event but the
+      largest pathways' prints (inference, to measure in T023). A PDF with an analysis
+      cannot use the folder, its figures carrying the analysis, so it draws them on
+      request within 6 s plus 2 s per figure, which every event above meets without a
+      token (the tightest, R-HSA-73857, 23.2 s against 24 s; R-HSA-68882, 11.4 s
+      against 12 s), though a diagram with a token took 4.5 s alone against 3.4 s without one in T005, so a PDF with an analysis may run closer to the budget, which T023 measures.
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages if four pages ran four times as fast, which they do not, still

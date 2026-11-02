@@ -26,6 +26,11 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   `unknown-token`; the service's 404 is `unknown-token` and its 410 `gone-token`.
 - **The reasons** are for the content service, which writes WebsiteAngular's envelope.
   They never carry a path, a host or a name.
+- **Where a figure comes from:** without a token, from the release's figures' folder
+  (`--figures`, contracts/figures.md), checked complete and of the service's graph when
+  the service starts, as `book` checks it; a figure the folder lacks is drawn on
+  request and logged. With a token, every figure is drawn on request, with the
+  analysis's overlay (SC-005).
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's

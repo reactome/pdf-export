@@ -4,8 +4,11 @@
 // the figures drawn through the render service two at once (as the service's website
 // settings allow), the layout, and the print with the contents' second pass. Then T005's
 // (c): one figure with an analysis token, and how its time grows with requests at once.
-// The render service is the caller's to start: cold (RENDER_CACHE_MAX=0, so nothing is
-// cached), at its website settings, reading the release's files (RENDER_FILES).
+// The render service is the caller's to start, at its website settings, reading the
+// release's files (RENDER_FILES). The script does not make it cold: its cache cannot be
+// turned off, so T007 ran each event in a container of its own with a fresh
+// RENDER_CACHE_KEY, its browser warmed on one figure no sampled event draws, and read the
+// service's hit count before and after (research R7).
 //
 //   NEO4J_URI=bolt://127.0.0.1:7687 node ci/measure/single.ts \
 //     --render http://127.0.0.1:4311/ --files <release folder>/98 \
@@ -22,6 +25,7 @@ import { layoutSingle, pageStyles } from '../../src/layout/document.ts';
 import { figureKey } from '../../src/layout/figure.ts';
 import { buildSingle } from '../../src/model/build.ts';
 import type { Figure } from '../../src/model/types.ts';
+import { landed } from '../../src/print/contents.ts';
 import { Printer } from '../../src/print/print.ts';
 
 const { values, positionals } = parseArgs({
@@ -64,7 +68,8 @@ const seconds = (since: number) => Number(((performance.now() - since) / 1000).t
 
 /** Each request in turn, `n` at once, with each one's time. */
 async function drawAll(requests: FigureRequest[], n: number) {
-  const times: { kind: string; s: number; ok: boolean }[] = [];
+  // By request, not by finishing order, so a time is its figure's.
+  const times = new Array<{ kind: string; s: number; ok: boolean }>(requests.length);
   let next = 0;
   const svgs = new Map<number, string>();
   await Promise.all(
@@ -74,7 +79,7 @@ async function drawAll(requests: FigureRequest[], n: number) {
         const request = requests[i] as FigureRequest;
         const t = performance.now();
         const answer = await fetchFigure(render, request, { timeoutMs: 120_000 });
-        times.push({ kind: request.kind, s: seconds(t), ok: 'svg' in answer });
+        times[i] = { kind: request.kind, s: seconds(t), ok: 'svg' in answer };
         if ('svg' in answer) svgs.set(i, answer.svg);
       }
     })
@@ -119,11 +124,7 @@ try {
     const t3 = performance.now();
     const pdf = await printer.single(html);
     const printS = seconds(t3);
-    const pages = (
-      Buffer.from(pdf)
-        .toString('latin1')
-        .match(/\/Type\s*\/Page[^s]/g) ?? []
-    ).length;
+    const pages = (await landed(pdf, [])).pageCount;
 
     const reactionsBeneath = (
       await graph.read<{ n: number }>(
