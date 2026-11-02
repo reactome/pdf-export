@@ -65,5 +65,22 @@ One of the first `number` pathways of the report's species, in the service's ord
 - **Log line** (R7): token, species, number of pathways, stage times, size, characters
   replaced.
 
-**State:** none kept between requests. The report is made, sent once complete, and
-dropped.
+**State:** a report is made in the background (FR-210) and, finished, kept in memory
+for an hour (FR-211): see Job.
+
+## Job
+
+A report being made or kept, in the service's process (contracts/service.md).
+
+- **Key:** the token, the species' database id, `number` after clamping, `resource`
+  after defaulting, `importableOnly`.
+- **State:** `queued`, `making`, `ready`, `failed`; with the times it was queued and
+  started, its deadline (5 minutes from starting), and when it is dropped (an hour
+  after it ended).
+- **Result:** the PDF (ready), or the error that ended it (failed).
+- **Waiting:** the requests waiting on it; none is needed for it to go on.
+- **Dropped:** an hour after it ended; a failed one also once its error has been
+  answered; a kept one whose token the analysis service no longer knows; all when the
+  graph's release changes; the oldest first when the kept reports would pass their
+  total (512 MB by default). Nothing of it is written to disk but the printer's working
+  page, on memory-backed storage, while it prints (FR-211).

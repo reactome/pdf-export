@@ -101,7 +101,8 @@ the page, from the third page on, numbered from 2. There are no bookmarks.
 
 The website's analysis gateway (WebsiteAngular) queues these requests before the
 analysis service, one at a time by default, with a bounded queue, and answers
-"unavailable" with a time to retry beyond it.
+"unavailable" with a time to retry beyond it (FR-210 changes this for the new
+service).
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -171,8 +172,10 @@ the statuses, the file names and the reports.
 3. **Given** a number of pathways out of range, **Then** it is clamped to 1–50; **given**
    a resource the result lacks, **Then** the result's default is used, as today.
 4. **Given** more requests at once than the service makes, **When** they arrive, **Then**
-   they wait in a bounded queue, and beyond it, or past their time budget, are answered
-   "unavailable" with a time to retry, never left hanging.
+   they wait in a bounded queue, and beyond it, or past their time budget, are answered "unavailable" with a time to retry, never left hanging.
+5. **Given** a report not ready within a request's wait, **When** it is asked for,
+   **Then** the answer is "accepted" with a time to ask again (for a browser, a page
+   that asks again by itself), and the same address answers the PDF once it is ready.
 
 ---
 
@@ -196,19 +199,21 @@ installed, and fails when a restrictive one is planted.
 ### User Story 4 - What users submitted stays theirs (Priority: P2)
 
 A report holds the identifiers a user submitted. The service keeps nothing of them
-beyond the request, and logs only FR-211's fields: none of them a submitted identifier.
+beyond the request except the finished report, in its own memory, for at most an hour,
+and the printer's working page while it prints, in memory-backed storage (FR-211); it
+logs only FR-211's fields: none of them a submitted identifier.
 
 **Why this priority**: identifiers are not personal data, but they are the user's
 research data.
 
 **Independent Test**: make reports for a token, then search the service's logs and its
-working files for the submitted identifiers.
+disk, the printer's memory-backed folder included, for the submitted identifiers.
 
 **Acceptance Scenarios**:
 
-1. **Given** a report made and sent, **When** the service's logs and working files are
-   searched, **Then** no submitted identifier is found; the log holds only FR-211's
-   fields.
+1. **Given** reports made and sent, and some still kept, **When** the service's logs and
+   disk, the printer's memory-backed folder included, are searched, **Then** no submitted identifier is found; the log holds
+   only FR-211's fields; a kept report is in the service's memory, never on disk.
 
 ---
 
@@ -233,14 +238,16 @@ working files for the submitted identifiers.
 - **A species comparison:** the report shows what today's shows for it.
 - **A token from ReactomeGSA** (gene set analysis): the report shows what today's shows
   for it, its type explained with ReactomeGSA's guide.
-- **A request abandoned by the client:** the work stops, and nothing is kept.
+- **A request abandoned by the client:** only that request's wait ends; the report it
+  started or joined goes on to its end or its time budget, for the next request to
+  fetch, and is kept as FR-211 says.
 
 ## Requirements _(mandatory)_
 
 ### Functional Requirements
 
 - **FR-201**: The system MUST answer today's report address and parameters with a PDF
-  holding the Background's parts in order, handling each parameter as the Background
+  (or, while it is being made, "accepted", FR-210) holding the Background's parts in order, handling each parameter as the Background
   says (species looked up first, the number clamped, a missing resource replaced by the
   result's default, importable-only as a filter, the file name ignored and the download
   named `report.pdf`); the colour profiles are accepted and ignored.
@@ -296,18 +303,49 @@ working files for the submitted identifiers.
 - **FR-209**: The text that is not the analysis's data (introduction, captions, the
   explanations of each part) MUST be the website's current wording, or written anew;
   nothing is copied from `analysis-report`.
-- **FR-210**: The service MUST make at most a set number of reports at once (two by
-  default, as today), queue a bounded number more, and answer "unavailable" with a time
-  to retry beyond that; a report that takes longer than its time budget is abandoned
-  and answered "unavailable". On the website's path the analysis gateway's queue comes
-  first; the service's own limit protects it from callers that do not pass the gateway.
-  The PDF is sent only once it is complete, and the edge closes a request after 100 s,
-  so the budget is what is left of those 100 s after the longest wait in the gateway's
-  queue and the service's own.
-- **FR-211**: The service MUST log, for each report, the token, the species, the number
-  of pathways, its time, its size and any character FR-207 replaced, and no submitted
-  identifier and nothing about the client. It keeps no file of a report after sending
-  it.
+- **FR-210**: The service MUST make a report in the background, behind today's address
+  (contracts/service.md has the details):
+  - a request starts the report, or joins the one already queued, being made or kept
+    for the same token and parameters, and waits for it up to a set time (30 s by
+    default); a joining request is never counted against the queue;
+  - a report ready by then is sent as the PDF, only once it is complete; one that is
+    not is answered "accepted", with a time to ask again, and the same address answers
+    the PDF once it is ready; a browser is given a page that asks again by itself;
+  - a report ended by an error (any of FR-203's: 404 or 410 when the token goes while
+    it is made, 500, or "unavailable", past its time budget included) answers that
+    error to every request then waiting and to the next request, and is
+    then forgotten, so the request after starts it again; an error nobody asks for is
+    forgotten after an hour;
+  - at most a set number of reports are made at once (two by default, as today), and at
+    most a set number more wait (eight by default), "unavailable" with a time to retry
+    beyond that; a report's time budget (5 minutes by default) runs from when it starts
+    being made, not from when it was queued;
+  - at most a set number of the waiting reports from one client (two by default),
+    counted by the client the gateway names (contracts/service.md), a request naming
+    none counted as one client;
+  - the service's port is never published or routed from outside (nginx does not route
+    to it): only trusted internal callers, the analysis gateway and the content service,
+    can reach it, since it trusts the client the gateway names;
+  - no request waits longer than the edge's 100 s allows; on the website's path the
+    analysis gateway sends report requests on without queueing them, keeping its share
+    per client, naming the client, and answering "unavailable" when the service cannot
+    be reached (plan, step 8).
+- **FR-211**: The service MUST log one line for each report it makes (not for each
+  request): a hash of the token (a live token unlocks the user's identifiers), the
+  species, the number of pathways, its time, its size and any character FR-207
+  replaced, and no submitted identifier and nothing about the client.
+  - **What is kept:** a finished report, in the service's memory only, for its token
+    and parameters, for one hour, then dropped; at most a set total (512 MB by
+    default), the oldest dropped first when a new one would pass it. A dropped report
+    is made again by the next request for it.
+  - **Checked before it is sent:** each request already asks the analysis service
+    about the token (contracts/analysis-api.md, the check); a token it no longer knows
+    (404, 410) drops the kept report and that answer is given. Each request also reads
+    the graph's release, with the species; a change drops every kept report.
+  - **On disk:** nothing of a report, but the printer's working HTML, which holds the
+    submitted identifiers: written only to a folder private to the service on a
+    memory-backed filesystem (the container's `tmpfs`), removed when the print ends,
+    the folder emptied when the service starts.
 - **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009, SC-006).
 - **FR-213**: Fixtures and samples MUST use made-up identifiers and placeholder names
   for the authors and curators a report names (constitution Principle VII; spec 001
@@ -336,14 +374,16 @@ working files for the submitted identifiers.
   only listed or recorded differences.
 - **SC-202**: Every request in the replayed set of User Story 2 gets the same status and
   file name as today's, but where Assumptions lists a difference.
-- **SC-203**: A report of 25 pathways is made in no more time than today's for the same
-  token on the same private services, and one of 50 within a budget the plan sets from
-  that measurement and FR-210's limit (what is left of the edge's 100 s after the
-  queues); the time is measured with the render service's cache empty.
+- **SC-203**: A report of 25 pathways is ready (the PDF answered at its address) in no
+  more time than today's takes for the same token on the same private services, or
+  within 2 minutes if today's is faster, and one of 50 within 4 minutes; the time is
+  measured with the render service's cache empty, from the first request, with that
+  report the only one being made and no other render traffic.
 - **SC-204**: Every colour and typeface in the report's own text and layout is one spec
   001 SC-009 allows, as its check shows.
-- **SC-205**: No submitted identifier is found in the service's logs or working files
-  after a sample of reports (User Story 4).
+- **SC-205**: No submitted identifier is found in the service's logs or on its disk
+  after a sample of reports, some of them still kept in memory, and after one of them
+  is killed while it is printed and the service is started again (User Story 4).
 - **SC-206**: CI's licence check passes, and fails on a planted restrictive dependency.
 - **SC-207**: The report opens, and its bookmarks and links work, in the three readers of
   spec 001 SC-004.
@@ -376,13 +416,11 @@ working files for the submitted identifiers.
   (several samples, its own statistics) is a later spec.
 - **Measured privately:** against a private analysis service on a private copy of the
   graph, with made-up identifiers; no production requests, and no real ReactomeGSA runs.
-- **An open risk for the plan, to settle with the user:** the time FR-210 leaves is
-  about 40 s (the edge's 100 s less the gateway's wait of up to 60 s). The render
-  service's measured times (about 5–7 s for a diagram with a token, two at a time)
-  suggest a cold report of 50 pathways needs about 2 minutes. The plan measures it
-  (spec 001's T005 part c) and, if it is over, brings the user the choices: a shorter
-  wait on the gateway's report lane, more render concurrency, a lower SC-203 target, or
-  a report made in the background and fetched when ready.
+- **Made in the background (decided, research R4):** a report cannot be drawn within
+  the edge's 100 s: one figure with a token takes 4.6 s cold and the render service
+  draws two at once (spec 001 T007), so 26 figures take about a minute and 51 about two,
+  before the analysis calls and the print. The user left the choice to us; FR-210 makes
+  the report in the background behind the same address.
 - **The website's button** is labelled "PDF Result" today and is hidden for ReactomeGSA
   results; the address serves any token.
 - **Expected differences from today's report** (FR-208):
@@ -417,5 +455,10 @@ working files for the submitted identifiers.
     unmerged branch) (the Background);
   - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
+  - a report not ready within a request's wait answered "accepted" (202) and fetched
+    again from the same address, where today's answers in one request however long it
+    takes (FR-210); a script that saves whatever the address answers
+    (`curl -o report.pdf`, even with `-f`, which treats 202 as success) saves the 202's JSON
+    until it follows `Retry-After`;
   - today's service also sends each report's timing, with the client's address and
     browser, to a separate reporting service; the new one logs only what FR-211 lists.

@@ -37,8 +37,8 @@
   the feature's boundaries.
 - The two open questions carried from the request are settled by stated defaults rather
   than clarification markers: ReactomeGSA results are in scope as far as today's report
-  covers them (Assumptions), and the 50-pathway time budget is set by the plan from a
-  measurement of today's report (SC-203).
+  covers them (Assumptions), and the time budgets are SC-203's: today's time or 2
+  minutes for 25 pathways, 4 minutes for 50, to a ready report (research R4).
 - Requirement numbers start at FR-201 and SC-201, so they cannot be confused with spec
   001's when one refers to the other.
 - The constitution's Principle I is amended with this spec (1.1.0) to cover the website's

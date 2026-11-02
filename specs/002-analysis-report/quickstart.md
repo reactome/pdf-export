@@ -36,10 +36,21 @@ requests, and no ReactomeGSA runs.
 - **The overlays:** each figure in a sample of reports carries the analysis overlay for
   the result's default resource (FR-204), shown failing on a figure captured without
   it.
-- **The time** (SC-203): cold and warm, stage by stage, against the baseline and the
-  budget the user chose (research R4).
+- **The time** (SC-203): cold and warm, stage by stage, from the first request to the
+  PDF, against the baseline and SC-203's 2 and 4 minutes, one report alone.
+- **In the background** (FR-210), each shown failing first: a request past 30 s
+  answered 202 with `Retry-After`, and the page for `Accept: text/html`; two requests
+  for one key making one report (the stubs count their calls); the PDF from a kept
+  report, and none after the hour; a failed report's error given to each waiting
+  request and the next, then a fresh start; a report abandoned at its budget; a kept
+  report whose token the analysis stub then answers 410 dropped and 410 answered; kept
+  reports past the total cap dropped oldest first and made again when asked; a third
+  report waiting from one client refused while others' are taken.
 - **The look** (SC-204): spec 001's colour and font check on a sample report.
 - **The readers** (SC-207): the report opens, with its bookmarks and links working, in
   spec 001's three readers.
-- **What is kept** (SC-205): after a sample of reports, the service's logs and working
-  folder hold none of the submitted identifiers.
+- **Reachability** (FR-210): the service's port answers only from the internal network
+  (a request from outside the deployment's network is refused at the network, not by
+  the service).
+- **What is kept** (SC-205): after a sample of reports, some still kept in memory, the
+  service's logs and working folder hold none of the submitted identifiers.

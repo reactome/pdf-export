@@ -89,7 +89,7 @@ public API (contracts/analysis-api.md), in this order, whatever its number of pa
 **Rationale.** The fewest calls that give everything, in the order their answers depend
 on, and none of the analysis's sums moves out of the analysis service (FR-202). The
 calls go to the analysis service directly, not through the gateway, which queues only
-`/AnalysisService/report/…` and submissions.
+submissions (report requests it passes on, R6).
 
 **To measure** (Order of work, step 1): call 4's size and time for a large expression
 dataset. It repeats every identifier for each pathway holding it, top-level pathways
@@ -189,9 +189,11 @@ for the same default resource. With the website's defaults (`TOTAL`, all identif
 are the same; otherwise it is a listed difference (spec, Expected differences).
 
 **Render slots.** A report holding both of the render service's slots for minutes slows
-the website's own image downloads meanwhile; R4's choices weigh this.
+the website's own image downloads meanwhile. So the render requests of all reports
+together are capped (contracts/service.md), and SC-203 is measured with one report and
+no other render traffic.
 
-## R4. The time budget: likely over, to be measured first
+## R4. The time budget: over, so the report is made in the background
 
 **What bounds it.** The gateway's report lane runs one report at a time, queues up to 40,
 and answers "unavailable" to a request that has waited 60 s. The edge closes a request
@@ -206,23 +208,43 @@ analysis calls (R1's call 4 may be large), layout and printing (spec 001's print
 twice when there is a contents list, and a report always has one). That is well over
 40 s. A 25-pathway report, the website's default, is about half that, still over.
 
-**Decision.** Measure first, on a private stack (Order of work, step 1): a cold report of
-25 and of 50 pathways, stage by stage (the analysis calls, the figures, layout,
-printing), for a small and a large expression dataset. If it is over, bring the user
-the choices, with the numbers:
+**Measured (spec 001 T007, 2 Nov 2026):** one diagram with an analysis token, cold, at
+the render service's website settings: 4.6 s alone; 5.6 s for the slower of two at once;
+9.3 s for the last of four; 18.7 s for the last of eight, each pair waiting for the
+service's two slots. So a report's figures alone take about a minute for 25 pathways (26
+figures) and about two for 50, against the 40 s the edge leaves. More render concurrency
+does not change this: the service is limited by the host's processors (spec 001 T005).
 
-- a shorter wait on the gateway's report lane, so more of the 100 s is left;
-- more render concurrency for report figures (the host's memory sets the limit);
-- a lower SC-203 target, or a smaller default number of pathways;
-- the report made in the background and fetched when ready (a different contract:
-  a 202 with where to fetch it, and the website's button changed to poll);
-- sending the answer's status early and the PDF as it is made, as today's main build
-  does: the edge then waits only for the first byte (by its documented behaviour, not
-  tested here), but a failure part way could no longer be answered 500, which FR-203
-  asks for.
+**Decision (the user left it to us):** the report is made in the background, behind
+today's address (FR-210, contracts/service.md): a request starts or joins it and waits
+up to 30 s; then 200 with the PDF, or 202 with `Retry-After` and, for a browser, a page
+that asks again; a finished report is kept for an hour.
 
-**Rationale.** The numbers decide between these, and some (the background job) change
-what the website and people's scripts see.
+**Rationale.**
+
+- It keeps the address and its parameters, and the PDF is still sent only once
+  complete, so a failure can still be answered with its error (FR-203).
+- A browser sees a page, then its PDF; a script that follows `Retry-After` gets the
+  PDF. One that saves whatever the address answers, `curl -o report.pdf` even with
+  `-f`, saves the 202's JSON: a listed difference (spec).
+- A request no longer depends on the edge's limit or the gateway's wait, and nothing
+  changes in the analysis service. The time to a ready report still depends on the
+  host's processors and on what else the render service draws (R3).
+
+**Alternatives considered.**
+
+- _A shorter wait on the gateway's lane, more render concurrency, a smaller default:_
+  none brings 26 figures at about 4.6 s each, two at once, under 40 s.
+- _A lower SC-203 target alone:_ does not change the edge's 100 s.
+- _Sending the status early and the PDF as it is made:_ a failure part way could no
+  longer be answered with its error (FR-203).
+- _A new address for the finished report:_ changes what people's scripts call; the same
+  address answering 202 then 200 does not.
+
+**What it costs.** The service keeps a finished report in its memory for an hour (FR-211,
+amended): the analysis's results, under its token, as the analysis service itself keeps
+them, never on disk, checked against the analysis service before it is sent. The
+website's button opens the address in a tab rather than downloading it (plan, step 8).
 
 ## R5. Errors, and how they are compared
 
@@ -240,9 +262,23 @@ with that copy's.
 
 **Decision.** pdf-export's service (spec 001's `serve`) adds the route
 `GET /AnalysisService/report/{token}/{species}/{filename}.pdf` with today's parameters
-(contracts/service.md). WebsiteAngular's analysis gateway keeps queueing the report lane
-and sends it to pdf-export instead of the analysis service; nginx's route to the gateway
-is unchanged. Both are a WebsiteAngular task, in its own specs (spec Assumptions).
+(contracts/service.md). WebsiteAngular's analysis gateway sends the report lane to
+pdf-export instead of the analysis service, and stops queueing it: today it makes one
+report at a time and holds each request until its answer ends, which with pdf-export's
+30 s wait would serialise every browser's polling, and three at once would exceed its
+60 s queue. pdf-export's own limits (FR-210) protect it instead. The gateway keeps,
+for the report path, what it adds to its other lanes besides the queue: its existing
+per-client share (`PER_CLIENT`, eight by default, counted across all its lanes; a
+client's report requests in flight counted, refused past it, never queued), and the
+client named to pdf-export in a header it always overwrites,
+`X-Reactome-Client`, set to its own `clientOf` (`X-Forwarded-For` would not do: nginx
+appends to what a client sends, so a client could choose its leftmost value).
+pdf-export uses it for its own share of the waiting reports, trusting it because only
+trusted internal callers can reach pdf-export (FR-210), and counting a request without
+it as one client. So the gateway gains a second upstream for this path, pdf-export
+beside the analysis service; and when pdf-export cannot be reached it answers 503 in
+the analysis service's form, as FR-203 asks, not its 502 for the analysis service.
+nginx's route to the gateway is unchanged. Both are a WebsiteAngular task, in its own specs (spec Assumptions).
 
 **Alternatives considered.** A new address on the website: rejected, as people's scripts
 call today's (User Story 2).
@@ -251,16 +287,19 @@ call today's (User Story 2).
 
 **Decision.** One log line per report: the token, the species, the number of pathways,
 the time per stage, the size, and the code points FR-207 replaced (once each). No
-submitted identifier, and nothing about the client. The PDF is built in memory and
-streamed once complete; no file of it is written. Spec 001's printer writes its HTML to
-a temporary file and removes it; for a report, that HTML holds submitted identifiers, so
-the folder is private to the service's user, and the file is removed in a `finally`,
-which a test shows (SC-205).
+submitted identifier, and nothing about the client; one line per report made, not per
+request. The PDF is built in memory, kept there for at most an hour once finished
+(FR-211, data-model Job), at most 512 MB of them, and sent once complete; no file of
+it is written. Spec 001's printer writes its HTML to a temporary file and removes it;
+for a report, that HTML holds submitted identifiers and lives for the whole print,
+minutes long. So the folder is private to the service's user and on a memory-backed
+filesystem (the container's `tmpfs`), the file is removed in a `finally`, and the
+folder is emptied when the service starts, which a run killed while printing shows
+(SC-205). The log holds a hash of the token, not the token.
 
-**A request the client abandons** (the connection closes before the answer): the
-report's work is cancelled at its next stage (the remaining analysis calls and figure
-requests are aborted, printing is not started), its temporary files removed, and the
-request logged as abandoned.
+**A request the client abandons** (the connection closes before the answer): only its
+wait ends. The report goes on to its end or its time budget, for the next request to
+fetch: a reader who closes the waiting page and comes back finds it made.
 
 ## R8. Fixtures and tests
 
