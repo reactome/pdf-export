@@ -125,11 +125,12 @@ never ships the website's code.
 
 - **For the website's PDF:** the deployment's own render service, beside the content
   service that calls pdf-export, on the same graph.
-- **For the book:** the release step runs WebsiteAngular's render service (with its
-  content service) on the release's graph and files, as a neighbour of pdf-export's
-  container.
-- **The service's limits are settings,** for the book's run, rather than the website's
-  defaults: concurrency, queue and timeout. Its cache is turned off for the book's run.
+- **For the book:** the figures' step (`pdf-export figures`, R7's route) runs
+  WebsiteAngular's render service (with its content service) on the release's graph and
+  files, as a neighbour of pdf-export's container; the book's own step reads the folder
+  it writes and needs no render service.
+- **The service's limits are settings,** for the figures' run, rather than the website's
+  defaults: concurrency, queue and timeout. Its cache is turned off for that run.
   For the website's PDF, the website's own cache serves what it holds, a benefit in
   service outside SC-005, which is measured cold (R7).
 - **pdf-export prefixes every SVG id** before it inlines the figure.
@@ -142,9 +143,8 @@ never ships the website's code.
 - _The old Java exporters' figures:_ against constitution IV.
 
 **For the release's owners** (spec, Assumptions): the release step then needs
-WebsiteAngular's render and content services on the release's graph. The time measured
-in R7 decides whether the book is made beside the website's own release testing, or by
-its own step.
+WebsiteAngular's render and content services on the release's graph. R7's measurement
+decided it: the figures are drawn by a step of their own, before the book.
 
 **A limitation** (constitution II's run-time exception, 1.2.0): the render service loads
 FoamTree, under a commercial licence. pdf-export ships none of it, but cannot make
@@ -445,6 +445,9 @@ is ignored, not a missing file.
 
   The stages sum to 78 minutes, the whole of SC-003's budget, with no margin of their
   own; the figures gave a minute and printing a minute to `check-book`'s margin.
+  **Since T006** the figures are drawn before the book (SC-010), and the book's figures
+  stage is reading and inlining 19,313 files, which T031 measures; its 44 minutes are now
+  margin, not a drawing budget.
 
 - **Go or no-go, first:** the first task measures the render service's throughput at the
   book's scale, on the machine the release would use, with its concurrency raised and
@@ -459,7 +462,7 @@ is ignored, not a missing file.
   2. SC-003 amended with the release's owners, with the measurement.
 
   A shared figure cache is not a route for the book: at release time the website has not
-  yet drawn the new release, so it would hold little, and the book's run turns the cache
+  yet drawn the new release, so it would hold little, and the drawing run turns the cache
   off so every figure is drawn from the release's data (contracts/render.md). More render
   workers on the same machine compete with printing for its cores, so they are a lever
   only within the 44 minutes, not a way past them.
@@ -469,33 +472,41 @@ is ignored, not a missing file.
   private copy of release 98's graph, drawing a seeded sample in the book's mix through
   pdf-export's own client (`ci/measure/throughput.ts`):
 
-  | `RENDER_CONCURRENCY` | Figures | Figures a second | The book's 19,313 | Service CPU, mean (cores) | Peak memory |
-  | -------------------- | ------- | ---------------- | ----------------- | ------------------------- | ----------- |
-  | 1                    | 100     | 0.37             | 14 h 41 min       | 1.3                       | 0.8 GB      |
-  | 2                    | 200     | 0.72             | 7 h 29 min        | 2.4                       | 1.0 GB      |
-  | 4                    | 200     | 1.20             | 4 h 28 min        | 4.3                       | 1.3 GB      |
-  | 8                    | 200     | 1.41             | 3 h 48 min        | 6.3 (7.6 at peak)         | 2.5 GB      |
-  - Every figure asked was drawn. One at a time a reaction took 2.4 s (median), a
-    diagram 3.3 s and a selection 4.3 s; at 8 at once a reaction took 5.0 s.
-  - **The limit is the machine's processors:** a figure costs about 3 seconds of a core
-    (CPU × time ÷ figures, at every setting), so all 8 cores would give under 3 figures a
-    second (inference), against the 7.3 needed. At 8 the host's load average reached 14.
+  | `RENDER_CONCURRENCY` and the client's `--parallel` | Figures | Figures a second | The book's 19,313 | Service CPU, mean (cores) | Core-seconds a figure | Peak memory |
+  | -------------------------------------------------- | ------- | ---------------- | ----------------- | ------------------------- | --------------------- | ----------- |
+  | 1                                                  | 100     | 0.394            | 13 h 37 min       | 1.37                      | 3.5                   | 0.7 GB      |
+  | 2                                                  | 200     | 0.712            | 7 h 32 min        | 2.86                      | 4.0                   | 0.7 GB      |
+  | 4                                                  | 200     | 1.166            | 4 h 36 min        | 5.13                      | 4.4                   | 1.2 GB      |
+  | 8                                                  | 200     | 1.523            | 3 h 31 min        | 6.96 (7.7 at peak)        | 4.6                   | 1.9 GB      |
+  - Every figure asked was drawn. One at a time a reaction took 2.3 s (median), a
+    diagram 3.4 s and a selection 3.7 s; at 8 at once a reaction took 4.6 s and a
+    selection 8.7 s. Medians and p90s are lower-rank quantiles.
+  - The container's CPU is sampled every 5 s by `docker stats`, asynchronously, so the
+    sampling does not stall the client. (A first pilot, sampling synchronously and
+    choosing a selection's ancestor differently from the book, gave 1.41 a second at 8;
+    the numbers above replace it.)
+  - **The limit is the machine's processors:** a figure costs 3.5–4.6 seconds of a core
+    (mean CPU ÷ figures a second), rising with concurrency, so all 8 cores would give
+    about 1.7–2.3 figures a second (inference), against the 7.3 needed.
   - **Not run, and why:** the samples are 100–200 figures, not the 2,000 T005 set; the
-    gap to the threshold is fivefold and the cost per figure the same at every setting,
-    so a larger sample could not turn it into a go. Page reuse, (b), was not measured:
-    it saves page loads, not the drawing's CPU, and the route taken (below) takes the
-    figures out of the book's run. One figure on request, (c), is measured with T007.
+    gap to the threshold is close to fivefold at the best setting, and the cost per
+    figure rises rather than falls with concurrency, so a larger sample would not turn
+    it into a go (inference). Page reuse, (b), was not measured: how much of a figure's
+    CPU is the page's load, which reuse would save, is unknown, and the route taken
+    (below) takes the figures out of the book's run, where reuse or many figures per page
+    load would shorten the figures' own step instead. One figure on request, (c), is
+    measured with T007.
 
 - **The route taken (T006), the user's choice, 2 Nov 2026:** a third route, **the figures
   drawn in a step of their own, before the book.** `pdf-export figures` draws every figure
   the book needs, through the render service, into a folder; `book` reads them from it
   and needs no render service (contracts/cli.md, contracts/figures.md).
   - SC-003 is the book's time from figures already drawn; the figures' step has its own
-    criterion, SC-010. At the rate above the step takes about 3.8 hours on this host
+    criterion, SC-010. At the rate above the step takes about 3.5 hours on this host
     (inference), so it needs a larger machine, several machines each drawing a share, or
     many figures per page load (route 1, still wanted, T042) to come down.
   - This answers the shared cache's objection above: the step draws the new release
-    from its own data, before the website serves it, and what it writes could fill the
+    from its own data, before the website serves it, and what it writes could (inference) fill the
     website's cache for the release.
   - The release's own diagram images today are the old look, and only pathways' diagrams
     and illustrations (1,390 of the book's figures, none of its reactions or selections),
@@ -561,7 +572,9 @@ dependencies, though a person may use them to look.
 **Decision.**
 
 - **One TypeScript package, two entry points:**
-  - `pdf-export book`, the release's command line: graph, files, render service and
+  - `pdf-export figures`, the release's first command: graph, files and render service
+    in, the figures' folder out (R7's route, contracts/figures.md);
+  - `pdf-export book`, the release's command line: graph, files, the figures' folder and
     output path in, `TheReactomeBook.pdf` and a run report out;
   - `pdf-export serve`, an HTTP service for the website: `GET /event/{stId}.pdf` with
     depth and token, answering a PDF or the errors of Story 2's scenario 4. Its bind
@@ -590,8 +603,8 @@ packaging.
 - **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
   the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
-- **If R7's go/no-go needs it, as is likely:** an in-page API on the render page to draw
-  many figures per page load.
+- **Many figures per page load,** an in-page API on the render page: R7's go/no-go was a
+  no-go, and the figures moved to a step of their own; this would shorten that step.
 - **The single-event route** in the content service, nginx and the dev proxy (FR-014).
 - **Later:** a render bundle without FoamTree, which would let pdf-export draw figures
   in its own process.

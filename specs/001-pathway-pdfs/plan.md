@@ -81,7 +81,7 @@ fonts above), run by the release and beside the website's services.
   reused pages if four pages ran four times as fast, which they do not (inference), over
   SC-003's whole budget. R7 sets a budget per stage, with 44 minutes for the figures:
   about 7.3 figures a second. The first task measures the service's throughput against
-  it. **Measured (T005): a no-go,** about 1.4 figures a second at best on an 8-core host,
+  it. **Measured (T005): a no-go,** about 1.5 figures a second at best on an 8-core host,
   limited by its processors. **The route taken (T006):** the figures are drawn by a step
   of their own before the book (`pdf-export figures`, SC-010), and the book reads them
   from its folder (R7, contracts/figures.md). Many figures per page load (R10) is still
@@ -95,7 +95,8 @@ fonts above), run by the release and beside the website's services.
   - The join holds the whole book in memory: 120 MB in the synthetic test, and perhaps
     near 1 GB for the real book (inference). It is re-measured in the first tasks (R4).
   - A single-event PDF stays under 1 GB.
-- **No network** but the graph, the render service and the analysis service. Fonts are
+- **No network** but the graph, the render service (for `figures` and `serve`; `book`
+  reads the figures' folder) and the analysis service. Fonts are
   local (R5). The website's address (`--site`) is written into links, never fetched.
 - **No names** in fixtures, logs or comparison output (FR-013).
 
@@ -137,7 +138,8 @@ specs/001-pathway-pdfs/
 ├── data-model.md        # the document model, from the graph to the page
 ├── quickstart.md        # runs that prove it, and R7's baseline commands
 ├── contracts/
-│   ├── cli.md           # pdf-export book, check-book, compare
+│   ├── cli.md           # pdf-export figures, book, check-book, compare, serve
+│   ├── figures.md       # the figures' folder, between figures and book
 │   ├── service.md       # GET /event/{stId}.pdf, for the website
 │   └── render.md        # what pdf-export asks of the render service
 ├── checklists/
@@ -151,13 +153,13 @@ specs/001-pathway-pdfs/
 src/
 ├── graph/          # the Neo4j driver, the queries (R2), mapping rows to the model
 ├── model/          # Event, Section, Book, SingleEventPdf (data-model.md)
-├── figures/        # the render service's client, id prefixing, figure choice
+├── figures/        # the render service's client, id prefixing, figure choice, the figures step
 ├── analysis/       # the analysis service's client
 ├── layout/         # HTML templates for each part, the compiled theme, fonts
 ├── print/          # Chromium printing, parts, joining, links, outline, contents
 ├── check/          # check-book (FR-011), the SC-009 colour and font check
 ├── compare/        # compare (FR-012): both PDFs reduced to their meaning
-├── cli.ts          # pdf-export book | check-book | compare
+├── cli.ts          # pdf-export figures | book | check-book | compare | serve
 └── serve.ts        # pdf-export serve: the single-event service
 theme/
 └── pdf-theme.scss  # @use of the website's theme; compiled at build time
@@ -208,8 +210,9 @@ Dockerfile
 
    Each is shown failing.
 
-8. **The release's step** (Story 5): the container image, and its run beside the render
-   service. The time is measured against step 1's baseline.
+8. **The release's step** (Story 5): the container image; `figures` run beside the render
+   service, then `book` from its folder. `book`'s time is measured against step 1's
+   baseline (SC-003), and `figures`' recorded (SC-010).
 9. **The website's part:** in WebsiteAngular's specs (FR-014, R10). Its render changes
    (R10) are raised there.
 

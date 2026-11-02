@@ -41,7 +41,8 @@ research R7.
 - `npm test`: unit tests, each seen failing first.
 - The fixture: the placeholder graph in a Neo4j service, the render stub and the
   analysis stub.
-  - `pdf-export book` writes the fixture's book.
+  - `pdf-export figures` draws the fixture's figures against the render stub, and
+    `pdf-export book` writes the fixture's book from them.
   - `pdf-export check-book` passes on it.
   - It fails on each fault of FR-011, planted one at a time (SC-007).
 - `ci/licences.ts`: passes, and fails on a planted GPL package and on a planted package
@@ -76,12 +77,14 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 
 ## 4. The book (Story 1)
 
-`pdf-export book` against the private graph and a render service on the same release.
+`pdf-export figures` against the private graph and a render service on the same release,
+then `pdf-export book` from its folder.
 
 - `check-book` passes.
 - **SC-001:** every top-level pathway and every event, in the contents list and the
   bookmarks.
-- **SC-003:** the time against step 1's.
+- **SC-003:** `book`'s time against step 1's.
+- **SC-010:** `figures`' time, recorded for the release's owners.
 - **SC-004:** it opens in Chromium's viewer, Firefox's viewer and a Poppler-based viewer.
   A sample of bookmarks and links is followed in each.
 - **SC-002:** `compare` against `event-pdf`'s book shows only recorded differences.
@@ -97,8 +100,9 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 
 ## 6. The release's step (Story 5)
 
-- The image runs with the graph, the release's files, the render service and an output
-  folder, and writes one PDF.
+- The image runs twice: `figures`, with the graph, the release's files and the render
+  service, writing the figures' folder; then `book`, with the graph, the release's files
+  and that folder, writing one PDF.
 - A planted fault fails the step.
 - **Story 5, scenario 3:** a release file removed from the folder fails the preflight,
   naming the file, before anything is printed, and no book is written.

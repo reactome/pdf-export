@@ -116,7 +116,7 @@ for WebsiteAngular to ship it (T042).
   - **Go** if (a) fits 19,313 figures in 44 minutes. A go on (b) alone is conditional: page reuse must ship in WebsiteAngular's render service first (T042), and Phase 4 then waits for it.
   - **No-go** otherwise: record the numbers, raise research R7's routes with the user, and take T006.
 
-  **Done: a no-go** (research R7): at most 1.41 figures a second, at 8, limited by the host's processors, against 7.3 needed. (a) was run on samples of 100–200 figures, not 2,000, the gap being fivefold at every setting; (b) was not run, its saving being page loads, not drawing, and T006's route taking the figures out of the book's run; (c) moves to T007. The script is `ci/measure/throughput.ts`.
+  **Done: a no-go** (research R7): at most 1.52 figures a second, at 8, limited by the host's processors, against 7.3 needed. (a) was run on samples of 100–200 figures, not 2,000, the gap being close to fivefold and the cost per figure rising with concurrency; (b) was not run, T006's route taking the figures out of the book's run, where it would only shorten the figures' step; (c) moves to T007. The script is `ci/measure/throughput.ts`.
 
 - [x] T006 Only if T005 is a no-go: the route the user chooses (research R7).
   - **Many figures per page load:** an in-page API on the render page, raised in WebsiteAngular (T042, raised at once rather than waiting for Polish), and, once it ships, T014's client changed to send a batch per page.
@@ -317,14 +317,16 @@ top-level pathway and every event is in the contents and the bookmarks. `check-b
 passes.
 
 - [ ] T046 [US1] `pdf-export figures`, `src/figures/step.ts` and `src/cli.ts` (contracts/cli.md, contracts/figures.md, SC-010).
-  - Lists the book's figures by the Figure rules (T013's `diagramChoices`, the same code the book uses), and draws each through T014's client into `--out`, `{stId}.svg`, written beside its name and moved into place.
-  - Resumable: a file already there is not drawn again.
+  - Lists the book's figures by the Figure rules (T013's `diagramChoices` with `nearestAncestor` from `src/model/build.ts`, and the EHLD summary from `--files`: the same code the book uses), and draws each through T014's client into `--out`, `{stId}.svg`, written beside its name and moved into place.
+  - Runs T024's release-file and pre-drawing character checks first, and the label check after each figure is drawn.
+  - Writes the manifest, `figures.json` (contracts/figures.md); refuses a folder of another release (exit 2).
+  - Resumable: a file already there whose manifest entry matches is not drawn again; one that differs is drawn again.
   - Its run report: figures by kind, each kind's times, the missing ones by stable identifier.
 
-  Tests, on the fixture against the stub render service: exit 0 with one file per figure the fixture's book needs, by kind, seen failing with a selection keyed by its ancestor; a second run draws nothing (the stub counts requests); exit 1 on a figure the stub refuses, with no partial file left; exit 2 on the service unreachable.
+  Tests, on the fixture against the stub render service: exit 0 with one file per figure the fixture's book needs, by kind, seen failing with a selection keyed by its ancestor; a second run draws nothing (the stub counts requests); a second run after the fixture's selection changes draws only that figure; a folder whose manifest names another release is refused; a planted missing release file fails before any request; exit 1 on a figure the stub refuses, with no partial file left; exit 2 on the service unreachable.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir> --figures <dir>` (contracts/cli.md).
-  - **Figures:** each figure the Figure rules choose must be in `--figures` (contracts/figures.md); one missing is a fault `missing-file {stId}.svg`. Test: a planted missing figure file is caught before anything is printed.
+  - **Figures:** each figure the Figure rules choose must be in `--figures` (contracts/figures.md); one missing is a fault `missing-file {stId}.svg`, and one whose manifest entry differs from the rules' choice, or a manifest of another release, `stale-figure {stId}`. Tests: a planted missing figure file, a manifest entry with another source, and a folder of another release are each caught before anything is printed.
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
   - **Characters (FR-017):** first FR-017's substitutions, in T022's `src/layout/characters.ts` (with T017's detector), which T024 extends with the book's fault mode, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json` only, not `.graph.json`; the 220 illustrated pathways' files among them, a superset of what is drawn) (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (every physical entity a reaction's figure draws, inputs, outputs, catalysts and regulators, and their compartments, from the graph) and the labels of the diagram files the Figure rules choose to draw, read in `src/preflight/labels.ts`; and after drawing, before each part is printed, over each SVG's label text, in T022's `src/figures/labels.ts`, extended here with the book's fault mode, which also makes the substitutions there after T014's id prefixing. Only the substitutions made in what is printed are counted for the run report, not the preflight's own.
   - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
@@ -391,7 +393,7 @@ passes.
   `book` runs it, and exits 0 only when it passes. Tests: a fixture book with each fault planted one at a time fails with that fault's line (SC-007).
 
 - [ ] T031 [US1] The book on a private copy of release 98's graph.
-  - Time each stage against research R7's budget, check memory, and run `check-book`. Record the results in research R7.
+  - Run `figures` first and time it for SC-010; then time each of `book`'s stages against research R7's budget, check memory, and run `check-book`. Record the results in research R7.
   - Open the book in the three readers of SC-004, and follow a sample of bookmarks and links in each.
 
 **Checkpoint:** the book is made, and its check can fail.
@@ -433,7 +435,7 @@ passes.
 
 ## Phase 7: User Stories 5 and 4 — the release's step, and licences in the image (P2, P1)
 
-**Goal:** FR-009 in the image (US4, SC-006), and FR-010, FR-011, FR-012, SC-002, SC-003 and SC-007 (US5).
+**Goal:** FR-009 in the image (US4, SC-006), and FR-010, FR-011, FR-012, SC-002, SC-003, SC-007 and SC-010 (US5).
 
 - [ ] T035 [US5] FR-012's comparison, `src/compare/`: `pdf-export compare <today's folder> <new.pdf>` (contracts/cli.md).
   - Both sides are reduced to FR-012's parts:
@@ -484,7 +486,7 @@ passes.
 - [ ] T042 [P] In WebsiteAngular, an issue, and later a spec there, for its part (research R10, FR-014):
   - the single-event route, in the content service, nginx and the dev proxy;
   - a cache-off setting for the render service;
-  - page reuse, or many figures per page load (T005, T006);
+  - many figures per page load, to shorten the figures' step (T005, T006);
   - an overlay on a reaction's drawing;
   - the plain diagram on demand;
   - a render bundle without FoamTree.
@@ -513,7 +515,7 @@ passes.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 → T023.
-- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031. T024 and T027 also need T022, which creates the character modules they extend and use.
+- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T046 (after T013 and T014) → T024, and T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031. T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**
@@ -529,7 +531,7 @@ passes.
 - T002 and T003.
 - The measurements: T005, T007, T008 and T009; T011 after T005.
 - T014, T016 and T017, beside the graph reader and the model.
-- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 beside US2; T024 once T022 is done, beside T023; the rest of US1 after T024 and T025.
+- Once Phase 2 is done and T005 gives a go (one resting on page reuse alone also waits for T042 to ship it) or T006 a route: T025 and T046 beside US2; T024 once T022 and T046 are done, beside T023; the rest of US1 after T024 and T025.
 
 ## Implementation strategy
 

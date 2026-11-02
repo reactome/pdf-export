@@ -7,16 +7,17 @@
 // caller's: start it with them, then run this once per setting.
 //
 //   NEO4J_URI=bolt://127.0.0.1:7687 node ci/measure/throughput.ts \
-//     --render http://127.0.0.1:4311/RenderService --figures 2000 --parallel 4 \
+//     --render http://127.0.0.1:4311/ --figures 2000 --parallel 4 \
 //     [--container name] [--seed 98] [--min-free-mb 2500]
 //
 // The sample comes from the release graph, seeded, so every run draws the same
 // figures. The output is identifiers and numbers only: no names.
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { parseArgs } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
 import { diagramChoices } from '../../src/graph/queries.ts';
+import { nearestAncestor } from '../../src/model/build.ts';
 import { fetchFigure, type FigureRequest } from '../../src/figures/client.ts';
 
 /** The book's mix (research R7): 16,424 reactions, 1,170 + 220 diagrams, 1,499 selections. */
@@ -39,9 +40,17 @@ const { values } = parseArgs({
 });
 if (!values.render) throw new Error('--render is required: the render service to measure');
 const render = values.render;
-const total = Number(values.figures);
-const parallel = Number(values.parallel);
-const minFreeMb = Number(values['min-free-mb']);
+/** A whole number of at least `min`, or the run stops before it starts. */
+function whole(name: string, value: string, min = 1): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min)
+    throw new Error(`--${name} must be a whole number >= ${String(min)}`);
+  return n;
+}
+const total = whole('figures', values.figures);
+const parallel = whole('parallel', values.parallel);
+const seed = whole('seed', values.seed, 0);
+const minFreeMb = whole('min-free-mb', values['min-free-mb'], 0);
 
 /** A small seeded generator (mulberry32), so a sample can be drawn again. */
 function random(seed: number) {
@@ -67,13 +76,11 @@ function pick<T>(from: readonly T[], n: number, next: () => number): T[] {
 async function sample(graph: Graph, species: string, n: number, seed: number) {
   const next = random(seed);
   const ids = async (where: string) =>
-    (
-      await graph.read<{ stId: string; dbId: number }>(
-        `MATCH (e:Event {speciesName: $species}) WHERE ${where}
+    await graph.read<{ stId: string; dbId: number }>(
+      `MATCH (e:Event {speciesName: $species}) WHERE ${where}
          RETURN e.stId AS stId, e.dbId AS dbId ORDER BY e.dbId`,
-        { species }
-      )
-    ).map((row) => row);
+      { species }
+    );
   const reactions = await ids('e:ReactionLikeEvent');
   const diagrams = await ids(
     'e:Pathway AND coalesce(e.hasDiagram, false) AND NOT coalesce(e.hasEHLD, false)'
@@ -89,8 +96,16 @@ async function sample(graph: Graph, species: string, n: number, seed: number) {
     graph,
     chosenSelections.map((p) => p.dbId)
   );
+  // The book's own choice of ancestor (data-model, Figure rule 2): a top-level pathway last.
+  const selections = chosenSelections.flatMap((p): FigureRequest[] => {
+    const choice = choices.get(p.dbId);
+    if (!choice) return [];
+    const ancestor = nearestAncestor(choice.ancestors);
+    return ancestor ? [{ kind: 'ancestor', stId: ancestor.stId, highlight: choice.reactions }] : [];
+  });
   const requests: FigureRequest[] = [
-    ...pick(reactions, n - count(MIX.diagram) - count(MIX.ehld) - count(MIX.ancestor), next).map(
+    // Reactions fill what the other kinds leave, a selection with no ancestor included.
+    ...pick(reactions, n - count(MIX.diagram) - count(MIX.ehld) - selections.length, next).map(
       (r): FigureRequest => ({ kind: 'reaction', stId: r.stId })
     ),
     ...pick(diagrams, count(MIX.diagram), next).map((p): FigureRequest => ({
@@ -101,13 +116,7 @@ async function sample(graph: Graph, species: string, n: number, seed: number) {
       kind: 'ehld',
       stId: p.stId,
     })),
-    ...chosenSelections.flatMap((p): FigureRequest[] => {
-      const choice = choices.get(p.dbId);
-      const ancestor = choice?.ancestors[0];
-      return ancestor
-        ? [{ kind: 'ancestor', stId: ancestor.stId, highlight: choice.reactions }]
-        : [];
-    }),
+    ...selections,
   ];
   // Interleaved, as the book's sections are: kinds in a run are not drawn apart.
   return pick(requests, requests.length, next);
@@ -119,14 +128,20 @@ function freeMb(): number {
   return line ? Math.round(Number(line[1]) / 1024) : Number.NaN;
 }
 
-/** The container's CPU and memory now, as `docker stats` gives them. */
-function containerStats(name: string): { cpu: number; memMb: number } | null {
+/**
+ * The container's CPU and memory now, as `docker stats` gives them. Asynchronous: it takes
+ * a second or two, and a synchronous call would stall the client it is measuring.
+ */
+async function containerStats(name: string): Promise<{ cpu: number; memMb: number } | null> {
   try {
-    const out = execFileSync(
-      'docker',
-      ['stats', '--no-stream', '--format', '{{.CPUPerc}} {{.MemUsage}}', name],
-      { encoding: 'utf8' }
-    ).trim();
+    const { stdout } = await promisify(execFile)('docker', [
+      'stats',
+      '--no-stream',
+      '--format',
+      '{{.CPUPerc}} {{.MemUsage}}',
+      name,
+    ]);
+    const out = stdout.trim();
     const [cpu = '', mem = ''] = out.split(' ');
     const amount = Number.parseFloat(mem);
     const memMb = /GiB/.test(mem) ? amount * 1024 : /KiB/.test(mem) ? amount / 1024 : amount;
@@ -139,7 +154,7 @@ function containerStats(name: string): { cpu: number; memMb: number } | null {
 const graph = openGraph(graphSettings(process.env));
 let requests: FigureRequest[];
 try {
-  requests = await sample(graph, values.species, total, Number(values.seed));
+  requests = await sample(graph, values.species, total, seed);
 } finally {
   await graph.close();
 }
@@ -148,14 +163,20 @@ type Done = { kind: FigureRequest['kind']; ms: number; ok: boolean; reason?: str
 const done: Done[] = [];
 const stats: { cpu: number; memMb: number }[] = [];
 let lowestFreeMb = freeMb();
+if (Number.isNaN(lowestFreeMb))
+  throw new Error('no MemAvailable in /proc/meminfo: the memory guard cannot run');
 let stoppedFor: string | null = null;
+let sampling = false;
 
 const watch = setInterval(() => {
   lowestFreeMb = Math.min(lowestFreeMb, freeMb());
   if (lowestFreeMb < minFreeMb) stoppedFor ??= `host memory fell to ${String(lowestFreeMb)} MB`;
-  if (values.container) {
-    const s = containerStats(values.container);
-    if (s) stats.push(s);
+  if (values.container && !sampling) {
+    sampling = true;
+    void containerStats(values.container).then((s) => {
+      if (s) stats.push(s);
+      sampling = false;
+    });
   }
 }, 5_000);
 
@@ -179,6 +200,7 @@ clearInterval(watch);
 const seconds = (Date.now() - started) / 1000;
 
 const ok = done.filter((d) => d.ok);
+/** The lower-rank quantile: the sample at floor(q × (n − 1)), so a p90 reads slightly low. */
 const quantile = (ms: number[], q: number) =>
   ms.length ? ([...ms].sort((a, b) => a - b)[Math.floor(q * (ms.length - 1))] ?? 0) : 0;
 const byKind = Object.fromEntries(

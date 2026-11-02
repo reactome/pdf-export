@@ -22,14 +22,16 @@ What it cannot do yet is listed in research R10, and is asked of WebsiteAngular 
   attribute.
 - **A refusal** (any 4xx, a 5xx, or a timeout): the figure is missing. Retried once
   after a pause for a 503. Then:
-  - the book fails on it (FR-011);
+  - `figures` fails on it, and so the book's preflight would (contracts/figures.md);
   - a single-event PDF goes on without it.
 - **The text** is set in Roboto. pdf-export's page supplies the font, at weights 300 to
   600 (research R5).
 - **Node labels are 12 px** in the SVG (compartments' 80 px), and the smallest sets the figure's scale
   against the legibility floor (research R4).
 
-## Settings for the book's run (research R3)
+## Settings for the figures' run (research R3, R7)
+
+`pdf-export figures` is the only caller for the book; `book` itself asks no render service.
 
 - The service's concurrency, queue and timeout are raised for the run, by its own
   settings.

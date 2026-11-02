@@ -220,7 +220,8 @@ deliberately added restrictive one is seen to fail it.
 The release team runs the book's step as they run today's:
 
 - a container image;
-- the release's graph and files as inputs;
+- the release's graph and files as inputs, with the figures drawn into a folder by a step
+  before it (SC-010);
 - the book written to the release's output.
 
 A check then fails the step if the book's content is wrong.
@@ -371,7 +372,8 @@ of pages with today's book.
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
   files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder.
+  folder. Its figures are drawn before it, by a step of the same image with the render
+  service beside it, into a folder the book's step also takes as an input (SC-010).
 - **FR-011**: A check MUST fail the book's step on any of these:
   - a missing top-level pathway;
   - an event missing from the contents list or the bookmarks;
@@ -493,7 +495,7 @@ of pages with today's book.
 - **SC-010**: Every figure the book needs is drawn, in the new look, by a step of its own
   that runs before the book's, and the book reads them from that step's folder. The
   step's time on the machine the release gives it is measured and agreed with the
-  release's owners (research R7: about 3.8 hours on an 8-core host as the render service
+  release's owners (research R7: about 3.5 hours on an 8-core host as the render service
   is today).
 
 ## Assumptions
