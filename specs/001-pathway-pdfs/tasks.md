@@ -311,7 +311,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
 
   Tests: a PDF without a token asks the render stub nothing; one with a token asks for each figure with the token; a folder of another release is not used and `/health` reports it; a figure the folder lacks is drawn and logged; the full checks run once at start and again only when the fingerprint or the release changes (the graph stub counts its reads).
 
-- [ ] T023 [US2] SC-005, measured, after T046 and T047. Run the service against a private copy for research R7's sample, with one non-human reaction and one non-human pathway added, the service's process already running (its first layout paid) and the render service cold (a fresh `RENDER_CACHE_KEY`, its browser warmed on a figure no sampled event draws): without a token, reading a figures' folder drawn by T046, against `event-pdf`'s warm times; with a token, against the 8 s plus 3 s per figure of SC-005, a plain diagram's overlay now, and an illustration's and a reaction's in a later run once their overlays exist (T042, recorded then in research R7). Record both in research R7. If either is over, raise SC-005 with the user, with the numbers.
+- [ ] T023 [US2] SC-005, measured, after T046 and T047. Run the service against a private copy for research R7's sample, with one non-human reaction and one non-human pathway added, and the human sample once more with the folder taken away (SC-005's missing-folder clause), the service's process already running (its first layout paid) and the render service cold (a fresh `RENDER_CACHE_KEY`, its browser warmed on a figure no sampled event draws): without a token, reading a figures' folder drawn by T046, against `event-pdf`'s warm times; with a token, against the 8 s plus 3 s per figure of SC-005, a plain diagram's overlay now, and an illustration's and a reaction's in a later run once their overlays exist (T042, recorded then in research R7). Record both in research R7. If either is over, raise SC-005 with the user, with the numbers.
 
 **Checkpoint:** the website's PDF works on its own, and WebsiteAngular can route to it
 (T042).
@@ -551,6 +551,6 @@ passes.
 ## Implementation strategy
 
 1. **Phase 1 and the measurements first.** T005's answer decides whether the book is built as planned.
-2. **US2 first.** The website's PDF is smaller and exercises every part except the parts and the join. It draws every figure on request until the book's figures' folder exists (T024, T046, T047), which R7 shows is 2–5 times slower than `event-pdf`, so the website is routed to it (T042) only once T023 has measured SC-005.
+2. **US2 first.** The website's PDF is smaller and exercises every part except the parts and the join. It draws every figure on request until the book's figures' folder exists (T024, T046, T047), which R7 shows is several times slower than `event-pdf` for all but the largest events (reactions about 2–10 times, small pathways about 2–16), so the website is routed to it (T042) only once T023 has measured SC-005.
 3. **Then US1, the book,** with its check.
 4. **Then the remaining checks and the release's step:** the look's check, the figures' check, the fixture baseline, the image and the release's step, with the comparison against `event-pdf` as the proof.
