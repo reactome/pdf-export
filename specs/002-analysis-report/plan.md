@@ -39,9 +39,9 @@ and the render stub; the fixture graph (R8).
 
 **Project Type**: a route in spec 001's web service.
 
-**Performance Goals**: SC-203 against today's report on the same private services; the
-budget is what the edge's 100 s leaves after the gateway's wait (R4), likely too little
-for a cold report; the plan measures it first.
+**Performance Goals**: SC-203 against today's report on the same private services. A
+report is made in the background behind its address (FR-210, R4): the edge's 100 s
+bounds a request, not a report.
 
 **Constraints**: the analysis service's API only (FR-202); no submitted identifier logged
 or kept (FR-211); FR-017 for characters; constitution 1.2.0.
@@ -114,9 +114,8 @@ else (constitution I).
      its time and size (SC-203's baseline);
    - a cold report, stage by stage, on a private stack: the analysis calls (R1's call 4
      for a large expression dataset), the figures (spec 001's T005, part c), layout and
-     printing (twice, for the contents);
-   - **then the time budget's decision with the user** (R4), before the service is
-     built to one answer.
+     printing (twice, for the contents); - the time budget is decided (R4): the report is made in the background; these
+     measurements set SC-203's baseline and check its 2- and 4-minute targets.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
    not built yet: the analysis stub (its T010), the analysis client (T020, T021) and the
    service (T022), besides the layout and printing already merged. Its own work starts
@@ -131,7 +130,10 @@ else (constitution I).
    figure's overlay checked (quickstart §3), SC-203's timing,
    SC-205's search of logs and files; each shown failing.
 8. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
-   pdf-export, and the render service's `resource` (the overlay wait is step 0).
+   pdf-export, and the render service's `resource` (the overlay wait is step 0). The
+   "PDF Result" button opens the report's address in a new tab rather than downloading
+   it, so the page shown while it is made (202) is seen, not saved as `report.pdf`; the
+   gateway's lane passes a 202 and its `Retry-After` through unchanged.
 
 ## Complexity Tracking
 

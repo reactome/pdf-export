@@ -171,8 +171,10 @@ the statuses, the file names and the reports.
 3. **Given** a number of pathways out of range, **Then** it is clamped to 1–50; **given**
    a resource the result lacks, **Then** the result's default is used, as today.
 4. **Given** more requests at once than the service makes, **When** they arrive, **Then**
-   they wait in a bounded queue, and beyond it, or past their time budget, are answered
-   "unavailable" with a time to retry, never left hanging.
+   they wait in a bounded queue, and beyond it, or past their time budget, are answered "unavailable" with a time to retry, never left hanging.
+5. **Given** a report not ready within a request's wait, **When** it is asked for,
+   **Then** the answer is "accepted" with a time to ask again (for a browser, a page
+   that asks again by itself), and the same address answers the PDF once it is ready.
 
 ---
 
@@ -296,18 +298,23 @@ working files for the submitted identifiers.
 - **FR-209**: The text that is not the analysis's data (introduction, captions, the
   explanations of each part) MUST be the website's current wording, or written anew;
   nothing is copied from `analysis-report`.
-- **FR-210**: The service MUST make at most a set number of reports at once (two by
-  default, as today), queue a bounded number more, and answer "unavailable" with a time
-  to retry beyond that; a report that takes longer than its time budget is abandoned
-  and answered "unavailable". On the website's path the analysis gateway's queue comes
-  first; the service's own limit protects it from callers that do not pass the gateway.
-  The PDF is sent only once it is complete, and the edge closes a request after 100 s,
-  so the budget is what is left of those 100 s after the longest wait in the gateway's
-  queue and the service's own.
+- **FR-210**: The service MUST make a report in the background, behind today's address:
+  a request starts the report (or joins the one already being made for the same token
+  and parameters) and waits for it up to a set time (30 s by default); a report ready
+  by then is sent as the PDF; one that is not is answered "accepted", with a time to
+  ask again, and the same address then answers the PDF once it is ready, or the error
+  that ended it. A browser is given a page that asks again by itself. The service makes
+  at most a set number of reports at once (two by default, as today) and queues a
+  bounded number more, answering "unavailable" with a time to retry beyond that; a
+  report that takes longer than its time budget (5 minutes by default) is abandoned,
+  and asking for it again answers "unavailable". The PDF is sent only once it is
+  complete. On the website's path the analysis gateway's queue comes first; no request
+  waits longer than the edge's 100 s allows.
 - **FR-211**: The service MUST log, for each report, the token, the species, the number
   of pathways, its time, its size and any character FR-207 replaced, and no submitted
-  identifier and nothing about the client. It keeps no file of a report after sending
-  it.
+  identifier and nothing about the client. A finished report is kept, for its token and
+  parameters only, for one hour or until a release clears its token, whichever is
+  sooner, then deleted; nothing else of it is kept.
 - **FR-212**: Every dependency MUST pass spec 001's licence check (FR-009, SC-006).
 - **FR-213**: Fixtures and samples MUST use made-up identifiers and placeholder names
   for the authors and curators a report names (constitution Principle VII; spec 001
@@ -336,10 +343,10 @@ working files for the submitted identifiers.
   only listed or recorded differences.
 - **SC-202**: Every request in the replayed set of User Story 2 gets the same status and
   file name as today's, but where Assumptions lists a difference.
-- **SC-203**: A report of 25 pathways is made in no more time than today's for the same
-  token on the same private services, and one of 50 within a budget the plan sets from
-  that measurement and FR-210's limit (what is left of the edge's 100 s after the
-  queues); the time is measured with the render service's cache empty.
+- **SC-203**: A report of 25 pathways is ready (the PDF answered at its address) in no
+  more time than today's takes for the same token on the same private services, or
+  within 2 minutes if today's is faster, and one of 50 within 4 minutes; the time is
+  measured with the render service's cache empty, from the first request.
 - **SC-204**: Every colour and typeface in the report's own text and layout is one spec
   001 SC-009 allows, as its check shows.
 - **SC-205**: No submitted identifier is found in the service's logs or working files
@@ -376,13 +383,11 @@ working files for the submitted identifiers.
   (several samples, its own statistics) is a later spec.
 - **Measured privately:** against a private analysis service on a private copy of the
   graph, with made-up identifiers; no production requests, and no real ReactomeGSA runs.
-- **An open risk for the plan, to settle with the user:** the time FR-210 leaves is
-  about 40 s (the edge's 100 s less the gateway's wait of up to 60 s). The render
-  service's measured times (about 5–7 s for a diagram with a token, two at a time)
-  suggest a cold report of 50 pathways needs about 2 minutes. The plan measures it
-  (spec 001's T005 part c) and, if it is over, brings the user the choices: a shorter
-  wait on the gateway's report lane, more render concurrency, a lower SC-203 target, or
-  a report made in the background and fetched when ready.
+- **Made in the background (decided, research R4):** a report cannot be drawn within
+  the edge's 100 s: one figure with a token takes 4.5 s cold and the render service
+  draws two at once (spec 001 T007), so 26 figures take about a minute and 51 about two,
+  before the analysis calls and the print. The user left the choice to us; FR-210 makes
+  the report in the background behind the same address.
 - **The website's button** is labelled "PDF Result" today and is hidden for ReactomeGSA
   results; the address serves any token.
 - **Expected differences from today's report** (FR-208):
@@ -414,8 +419,10 @@ working files for the submitted identifiers.
   - a failure while making the PDF answered 500 in the analysis service's JSON form,
     before any of the PDF is sent, where today's ends the answer early (main) or, for
     a failure of the PDF library, answers 500 with the framework's default body (the
-    unmerged branch) (the Background);
-  - a request beyond the queue or past its time budget answered "unavailable", where
+    unmerged branch) (the Background); - a request beyond the queue or past its time budget answered "unavailable", where
     today's waits without limit;
+  - a report not ready within a request's wait answered "accepted" (202) and fetched
+    again from the same address, where today's answers in one request however long it
+    takes (FR-210);
   - today's service also sends each report's timing, with the client's address and
     browser, to a separate reporting service; the new one logs only what FR-211 lists.

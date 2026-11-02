@@ -191,7 +191,7 @@ are the same; otherwise it is a listed difference (spec, Expected differences).
 **Render slots.** A report holding both of the render service's slots for minutes slows
 the website's own image downloads meanwhile; R4's choices weigh this.
 
-## R4. The time budget: likely over, to be measured first
+## R4. The time budget: over, so the report is made in the background
 
 **What bounds it.** The gateway's report lane runs one report at a time, queues up to 40,
 and answers "unavailable" to a request that has waited 60 s. The edge closes a request
@@ -206,23 +206,40 @@ analysis calls (R1's call 4 may be large), layout and printing (spec 001's print
 twice when there is a contents list, and a report always has one). That is well over
 40 s. A 25-pathway report, the website's default, is about half that, still over.
 
-**Decision.** Measure first, on a private stack (Order of work, step 1): a cold report of
-25 and of 50 pathways, stage by stage (the analysis calls, the figures, layout,
-printing), for a small and a large expression dataset. If it is over, bring the user
-the choices, with the numbers:
+**Measured (spec 001 T007, 2 Nov 2026):** one diagram with an analysis token, cold, at
+the render service's website settings: 4.5 s alone; 4.8 s for the slower of two at once;
+9.1 s for the last of four; 19.6 s for the last of eight, each pair waiting for the
+service's two slots. So a report's figures alone take about a minute for 25 pathways (26
+figures) and about two for 50, against the 40 s the edge leaves. More render concurrency
+does not change this: the service is limited by the host's processors (spec 001 T005).
 
-- a shorter wait on the gateway's report lane, so more of the 100 s is left;
-- more render concurrency for report figures (the host's memory sets the limit);
-- a lower SC-203 target, or a smaller default number of pathways;
-- the report made in the background and fetched when ready (a different contract:
-  a 202 with where to fetch it, and the website's button changed to poll);
-- sending the answer's status early and the PDF as it is made, as today's main build
-  does: the edge then waits only for the first byte (by its documented behaviour, not
-  tested here), but a failure part way could no longer be answered 500, which FR-203
-  asks for.
+**Decision (the user left it to us):** the report is made in the background, behind
+today's address (FR-210, contracts/service.md): a request starts or joins it and waits
+up to 30 s; then 200 with the PDF, or 202 with `Retry-After` and, for a browser, a page
+that asks again; a finished report is kept for an hour.
 
-**Rationale.** The numbers decide between these, and some (the background job) change
-what the website and people's scripts see.
+**Rationale.**
+
+- It keeps the address and its parameters, and the PDF is still sent only once
+  complete, so a failure can still be answered with its error (FR-203).
+- A browser sees a page, then its PDF; a script that follows `Retry-After` gets the
+  PDF; one that does not gets a 202 it can tell from an error.
+- It does not depend on the edge's limit, the gateway's wait, or the host's processors,
+  and needs no change to the analysis service.
+
+**Alternatives considered.**
+
+- _A shorter wait on the gateway's lane, more render concurrency, a smaller default:_
+  none brings 26 figures at 4.5 s each, two at once, under 40 s.
+- _A lower SC-203 target alone:_ does not change the edge's 100 s.
+- _Sending the status early and the PDF as it is made:_ a failure part way could no
+  longer be answered with its error (FR-203).
+- _A new address for the finished report:_ changes what people's scripts call; the same
+  address answering 202 then 200 does not.
+
+**What it costs.** The service keeps a report for an hour (FR-211, amended): the
+analysis's results, under its token, as the analysis service itself keeps them. The
+website's button opens the address in a tab rather than downloading it (plan, step 8).
 
 ## R5. Errors, and how they are compared
 
