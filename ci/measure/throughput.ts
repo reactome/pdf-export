@@ -272,6 +272,7 @@ console.log(
       neededPerSecond: Number((BOOK / BUDGET_S).toFixed(2)),
       container: values.container
         ? {
+            samples: stats.length,
             meanCpuPercent: mean((s) => s.cpu),
             peakCpuPercent: peak((s) => s.cpu),
             peakMemMb: peak((s) => s.memMb),

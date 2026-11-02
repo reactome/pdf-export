@@ -38,7 +38,7 @@ contracts/figures.md).
   arguments; the render or content service unreachable at the start; another release
   at `--content`; no graph checksum or no render `build`; or a folder of
   another fingerprint, when a new, empty `--out` is needed. A `build` or content release
-  that changed by the end of the run is exit 1.
+  that differs from the fingerprint before any figure is exit 1 (contracts/figures.md).
 
 ## `pdf-export book`
 
@@ -79,7 +79,7 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
     a diagram file the pathway whose diagram it is. A character in several places is one
     fault per place;
   - **on reading each figure, before its part is printed** (and by `figures`, after
-    each is drawn), in the text of its SVG's labels, a fault naming the figure's event: the backstop for anything the first
+    each is drawn; in `book` a backstop for a folder changed by hand), in the text of its SVG's labels, a fault naming the figure's event: the backstop for anything the first
     check's sources did not hold. The book is printed in parts (research R4), so a fault
     here can come after earlier parts are printed; the step still ends with exit 1 and
     no book written, the file being moved into place only at the end.
