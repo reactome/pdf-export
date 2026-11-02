@@ -34,15 +34,20 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
     `build` and the content release, read again after the file is in place, still equal
     the fingerprint's (a service that does not answer that read counts as changed);
     otherwise its file is removed and the run stops at once (below).
-  - **A figure's own fault** (refused after the client's retry, timed out, or failing its
-    label check) leaves it with no file and no line, and the run goes on with the rest:
-    it ends with exit 1, no `complete` line, and every such figure named in its report,
-    so one run finds them all.
+  - **A figure's own fault** (any figure the client returns as missing after its retry,
+    or one failing its label check) leaves it with no file and no line, and the run goes
+    on with the rest: it ends with exit 1, no `complete` line, and every such figure
+    named in its report, so one run finds them all. But a figure missing for want of an
+    answer (no connection, a timeout, a 5xx) is first followed by the same read of the
+    render service's health and the content release: no answer to it, or a changed
+    value, stops the run at once, as a changed deployment, so a service that hangs or
+    dies is not waited out figure by figure.
   - **Its last line, when every figure has its line:** `complete`, whose fingerprint
     fields equal the first line's.
-- **A deployment changed during a run** is seen at the next figure to finish, which stops
-  the run at once with exit 1 and no `complete` line. Figures still being drawn when it
-  stops get no line.
+- **A deployment changed, or a service gone, during a run** is seen at the next figure to
+  finish or fail, which stops the run at once with exit 1 and no `complete` line.
+  Figures still being drawn when it stops get no line. The report is written either way,
+  naming the reason it stopped and each figure's own fault so far.
 - **What the fingerprint cannot see** (research R10):
   - the render service's `build` hashes its own code, not the website's built page it
     loads, which is what draws;
@@ -62,7 +67,8 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
 - **What `book` checks,** against its own graph and EHLD summary (contracts/cli.md),
   before anything is printed:
   - the manifest's last line is a whole `complete` line whose fingerprint fields equal
-    the first line's, and every line is whole JSON, or the fault is `incomplete-folder`;
+    the first line's, every line is whole JSON, and no stable identifier has two lines, or
+    the fault is `incomplete-folder`;
   - its graph has a `DBInfo` checksum, or the fault is `no-checksum`;
   - the fingerprint's release number and checksum are its graph's, or the fault is
     `stale-folder <folder's release>/<checksum> <graph's release>/<checksum>`;
