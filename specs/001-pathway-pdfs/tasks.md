@@ -101,7 +101,7 @@ budgets, which decide whether the design stands; then the parts both outputs sha
 stop and take T006's route before any of Phase 4. A go that rests on page reuse alone waits
 for WebsiteAngular to ship it (T042).
 
-- [x] T005 Measure the figures' throughput at the book's scale (research R3, R7). The run conditions:
+- [x] T005 Measure the figures' throughput at the book's scale (research R3, R7). — #95. The run conditions:
   - a private copy of the release's graph, with the release's diagram and EHLD files;
   - the machine the release would use, or this host, with `event-pdf`'s baseline run again if the machine differs;
   - cold, with an empty `RENDER_CACHE` directory, or a fresh `RENDER_CACHE_KEY`, for each run;
@@ -118,7 +118,7 @@ for WebsiteAngular to ship it (T042).
 
   **Done: a no-go** (research R7): at most 1.52 figures a second, at 8, limited by the host's processors, against 7.3 needed. (a) was run on samples of 100–200 figures, not 2,000, the gap being close to fivefold and the cost per figure rising with concurrency; (b) was not run, T006's route taking the figures out of the book's run, where it would only shorten the figures' step; (c) moves to T007. The script is `ci/measure/throughput.ts`.
 
-- [x] T006 Only if T005 is a no-go: the route the user chooses (research R7).
+- [x] T006 Only if T005 is a no-go: the route the user chooses (research R7). — #95.
   - **Many figures per page load:** an in-page API on the render page, raised in WebsiteAngular (T042, raised at once rather than waiting for Polish), and, once it ships, T014's client changed to send a batch per page.
   - **Or:** SC-003 amended with the release's owners, with T005's numbers.
 
@@ -126,7 +126,10 @@ for WebsiteAngular to ship it (T042).
 
   **Taken: neither, a third route, the user's choice (research R7).** The figures are drawn by a step of their own before the book, `pdf-export figures` (T046), into a folder the book reads (contracts/figures.md); SC-003 is the book's time from figures already drawn, and SC-010 the figures' step. Many figures per page load stays in T042, to shorten that step.
 
-- [ ] T007 [P] Measure a single-event PDF's stages, cold (SC-005, research R7). With T005's (c): one figure with an analysis token, cold, at the service's website settings, and how it grows with requests at once. The render service runs with an empty cache directory. Use research R7's sample: five reactions, pathways of five sizes, and Signal Transduction. Time each figure, two at once. Record the times against `event-pdf`'s warm times in research R7. If figures alone exceed `event-pdf`'s whole time, raise SC-005 with the user, with the numbers.
+- [x] T007 [P] Measure a single-event PDF's stages, cold (SC-005, research R7). With T005's (c): one figure with an analysis token, cold, at the service's website settings, and how it grows with requests at once. The render service runs with an empty cache directory. Use research R7's sample: five reactions, pathways of five sizes, and Signal Transduction. Time each figure, two at once. Record the times against `event-pdf`'s warm times in research R7. If figures alone exceed `event-pdf`'s whole time, raise SC-005 with the user, with the numbers.
+
+  **Done** (research R7): figures alone exceed `event-pdf`'s whole time for every reaction and every pathway in the sample but Signal Transduction; one figure with a token takes 4.5 s, and 19.6 s at eight at once. SC-005 raised with the user. The script is `ci/measure/single.ts`.
+
 - [ ] T008 [P] Measure the diagrams' widths (FR-016's floor, research R4). From the release's diagram files, take each diagram's width in SVG pixels at the website's 12 px node labels. Count how many fit at 5 pt in portrait (about 1,155 px), in landscape (about 1,750 px), and in neither. Record the counts in research R4. If more than 5% fit neither, raise FR-016's floor with the user. Measure the illustrations' lettering too (their text is outlines, so the layout cannot read it and reports them as unmeasured, T018): the smallest letter height in a sample of release 98's EHLDs, rasterised, and the scale that keeps it at 5 pt; then give `place()` a rule for them.
 - [ ] T009 [P] Measure the analysis service's answers (research R6), on a private instance with a submitted analysis, never production. For each case, record the status and body in research R6:
   - a good token;
@@ -336,7 +339,7 @@ passes.
 - [ ] T046 [US1] `pdf-export figures`, `src/figures/step.ts` and `src/cli.ts` (contracts/cli.md, contracts/figures.md, SC-010).
   - Lists the book's figures by the Figure rules (T013's `diagramChoices` with `nearestAncestor` from `src/model/build.ts`, and the EHLD summary from `--files`: the same code the book uses), and draws each through T014's client into `--out`, `{stId}.svg`, written beside its name and moved into place.
   - After T024: runs its release-file and pre-drawing character checks first (`src/preflight/`), and the label check after each figure is drawn.
-  - Asks the content service named by `--content` for its release, and refuses another (exit 2).
+  - Asks the content service named by `--content` for its release, and refuses another (exit 2); refuses a render service whose health answer does not say `files: local` (exit 2; contracts/render.md).
   - Refuses an `--out` that is not empty (exit 2): no resuming (contracts/figures.md).
   - Changes T014's client: a missing figure carries its cause (`unanswered`, `failed`, `refused`, `invalid`; contracts/figures.md); its timeout is a setting (`--timeout`); and when `figures` asks, a 504 or a timeout (the body's included) is retried once, as a 503 is; `serve` keeps one try (contracts/render.md). Its header comment says so.
   - Writes the manifest, `figures.jsonl`, one writer appending: the fingerprint first (the graph's `DBInfo` release number and checksum, the EHLD summary's hash, the content service's release, the render service's `build`); refuses a graph with no checksum or a `build` of `unknown` (exit 2); then each figure's line once its file is written, synced and moved into place and the `build` and content release, read again, still equal the fingerprint's (otherwise its file is removed and the run stops at once, exit 1); after a figure missing as `unanswered`, the same read within `--timeout`, no answer or a change stopping the run at once; the breaker (`2 × --parallel` `unanswered` figures with no other answer between them, or no answer of any kind for `5 × --timeout`, counted from the start of drawing or the last answer; contracts/figures.md) stopping it too; a figure's own fault (missing after the retry, or failing its label check, its file never moved into place) gets no line while the run draws the rest, then exits 1 naming them all; the report written however the run ends; `complete` once every figure has its line.
@@ -490,6 +493,7 @@ passes.
   - the single-event route, in the content service, nginx and the dev proxy;
   - a cache-off setting for the render service;
   - many figures per page load, to shorten the figures' step (T005, T006);
+  - the release's diagram and EHLD files read from a local folder, never the download site: `RENDER_FILES`, #777 in WebsiteAngular;
   - the render service's health answer naming its page's build and its content service's release and checksum, and a header on each drawing naming both (contracts/figures.md);
   - an overlay on a reaction's drawing;
   - the plain diagram on demand;

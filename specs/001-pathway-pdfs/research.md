@@ -428,6 +428,30 @@ is ignored, not a missing file.
     in service, but SC-005 is measured cold, so it is no answer to the criterion.
   - If the measurement still exceeds `event-pdf`'s times, SC-005 is amended with the
     user, with the numbers.
+  - **Measured (T007), 2 Nov 2026:** each event of the baseline's sample at depth 1, in
+    a render service of its own (the website's image, at its website settings of two at
+    once, a fresh `RENDER_CACHE_KEY`, its browser warmed on one unrelated reaction, the
+    release's files read locally through `RENDER_FILES`), on this host. No figure came
+    from a cache and none was missing. Outputs in `ci/measure/results/2026-11-02/single/`.
+
+    | Event                                | Figures | Pages | Graph   | Figures (s) | Print   | Total (s) | `event-pdf` (s) |
+    | ------------------------------------ | ------- | ----- | ------- | ----------- | ------- | --------- | --------------- |
+    | Five reactions                       | 1 each  | 3–6   | 0.1–0.2 | 2.6–2.7     | 0.3–0.5 | 4.0–4.9   | 0.5–1.7         |
+    | Pathways, 1–34 reactions beneath (6) | 2–13    | 6–28  | 0.1–0.2 | 4.0–19.8    | 1.0–2.2 | 6.5–22.6  | 1.3–3.8         |
+    | Pathways, 143–1,150 beneath (4)      | 5–9     | 13–26 | 0.1–0.2 | 11.0–18.9   | 2.2–3.2 | 14.5–23.2 | 4.4–9.5         |
+    | Signal Transduction (2,589 beneath)  | 18      | 36    | 0.2     | 26.3        | 5.2     | 32.9      | 46              |
+    - The layout took about 1 s in each, the first layout of a process (its styles and
+      fonts compiled once); in one process over all sixteen it took 0.0–0.1 s after the
+      first, so a running service pays it once. The totals above include it.
+    - **Figures alone exceed `event-pdf`'s whole time** for every reaction and every
+      pathway but Signal Transduction, which is faster (32.9 s against 46 s). At two at
+      once a pathway's figures take about 1.5 s each on average.
+    - **One figure with an analysis token** (T005's (c), cold, at the website settings):
+      4.5 s alone; 4.8 s for the slower of two at once; 9.1 s for four; 19.6 s for eight,
+      each later pair waiting for the service's two slots. None was refused (the queue
+      is 8).
+    - So SC-005 cannot be met as written by drawing figures on request; raised with the
+      user, with these numbers (T007).
 - **Figures:** 19,313 for the book. From R3's times (inference): about 7.4–7.7 hours
   through the render service as it is, at its concurrency of 2, and about 1.3–1.5 hours
   with four reused pages if four pages ran four times as fast, which they do not, still
@@ -478,6 +502,11 @@ is ignored, not a missing file.
   | 2                                                  | 200     | 0.712            | 7 h 32 min        | 2.86                                 | 4.0                   | 0.7 GB      |
   | 4                                                  | 200     | 1.166            | 4 h 36 min        | 5.13                                 | 4.4                   | 1.2 GB      |
   | 8                                                  | 200     | 1.523            | 3 h 31 min        | 6.96 (7.7 at peak)                   | 4.6                   | 1.9 GB      |
+  - **The diagrams' files came from the public download site:** before WebsiteAngular
+    #777, the render page fetched a diagram's and an illustration's files there, so
+    these runs did too (about 430 requests, up to 8 at once) and their pathway times
+    include those fetches. Reactions fetch no such files. From T007 on, every run reads
+    the release's files from a local folder (`RENDER_FILES`).
   - Every figure asked was drawn. One at a time a reaction took 2.3 s (median), a
     diagram 3.4 s and a selection 3.7 s; at 8 at once a reaction took 4.6 s and a
     selection 8.7 s. Medians and p90s are lower-rank quantiles.
@@ -607,6 +636,9 @@ packaging.
 - **An overlay on a reaction's drawing:** `event-pdf` overlays reactions today (R7), so
   the website's PDF with an analysis needs it.
 - **The render service's limits as settings** for a batch run (R3).
+- **The release's files from a local folder** (`RENDER_FILES`, WebsiteAngular #777): the
+  render page otherwise fetches diagram and EHLD files from the public download site,
+  which holds a release's files only once it is published.
 - **Many figures per page load,** an in-page API on the render page: R7's go/no-go was a
   no-go, and the figures moved to a step of their own; this would shorten that step.
 - **The render service's health answer naming what draws:** the build of the website's

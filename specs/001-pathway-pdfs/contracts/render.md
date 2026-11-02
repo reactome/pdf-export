@@ -52,7 +52,10 @@ of WebsiteAngular (research R10).
   so `figures` cannot check it.
 - Its cache is not used for the run, so every figure is drawn from the release's data.
 - It reads the release's graph, through its content service, and the release's diagram
-  and EHLD files.
+  and EHLD files from a local folder laid out as the download site (`RENDER_FILES`,
+  WebsiteAngular #777): never from the download site, which does not hold a release's
+  files before it is published, and which a bulk run must not load. Its health answer
+  says `files: local`; `figures` refuses a service that does not (exit 2).
 
 ## Tests
 
