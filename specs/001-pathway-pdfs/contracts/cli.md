@@ -1,18 +1,40 @@
 # Contract: the command line
 
-One executable, `pdf-export`, with four commands. Settings come from flags or from the
+One executable, `pdf-export`, with five commands. Settings come from flags or from the
 environment variables named beside them. A password never goes on the command line.
+
+## `pdf-export figures`
+
+Draws every figure the book needs, before the book, into a folder (SC-010, research R7,
+contracts/figures.md).
+
+| Flag                                 | Environment      | Meaning                                             |
+| ------------------------------------ | ---------------- | --------------------------------------------------- |
+| `--graph`, `--database`, `--species` |                  | as for `book`                                       |
+| `--render`                           | `RENDER_SERVICE` | the render service's base URL (contracts/render.md) |
+| `--out`                              |                  | the folder written (contracts/figures.md)           |
+| `--parallel`                         |                  | figures asked at once; default the service's limit  |
+| `--report`                           |                  | where its run report is written, as JSON            |
+
+- **Which figures:** the events' Figure rules (data-model.md), from the graph, the same
+  code `book` uses, so the folder holds exactly what the book reads.
+- **Resumable:** a figure whose file is already in the folder is not drawn again; each
+  file is written beside its name and moved into place, so a stopped run leaves only
+  whole files.
+- **Exit 0:** every figure is in the folder. **Exit 1:** a figure could not be drawn
+  (named by stable identifier). **Exit 2:** bad arguments, or the service unreachable at
+  the start.
 
 ## `pdf-export book`
 
-Writes the release's book (Story 1).
+Writes the release's book (Story 1), from the figures already drawn by `figures`.
 
 | Flag         | Environment                    | Meaning                                                                                              |
 | ------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `--graph`    | `NEO4J_URI`                    | Bolt address of the release's graph                                                                  |
 |              | `NEO4J_USER`, `NEO4J_PASSWORD` | its credentials                                                                                      |
 | `--database` | `NEO4J_DATABASE`               | default `graph.db`                                                                                   |
-| `--render`   | `RENDER_SERVICE`               | the render service's base URL (contracts/render.md)                                                  |
+| `--figures`  |                                | the folder `figures` wrote (contracts/figures.md); the book asks no render service                   |
 | `--files`    |                                | the release's folder: `diagram/`, `ehld/` and the EHLD summary, as the render service reads them too |
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                                         |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                                      |
@@ -24,7 +46,7 @@ Writes the release's book (Story 1).
   after drawing, below): from the graph and the EHLD summary it
   lists the release's files the figures need (the events from the graph; which are
   illustrations from the summary, ignoring an entry for an event the graph does not
-  hold), and a file missing is a fault
+  hold) and the figures' files in `--figures`, and a file missing is a fault
   `missing-file <name>`, the step ending with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault
   `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4), checked

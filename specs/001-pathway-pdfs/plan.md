@@ -81,8 +81,11 @@ fonts above), run by the release and beside the website's services.
   reused pages if four pages ran four times as fast, which they do not (inference), over
   SC-003's whole budget. R7 sets a budget per stage, with 44 minutes for the figures:
   about 7.3 figures a second. The first task measures the service's throughput against
-  it. On the plan's own data a no-go is likely, and the realistic route is many figures
-  per page load (R10), a WebsiteAngular change.
+  it. **Measured (T005): a no-go,** about 1.4 figures a second at best on an 8-core host,
+  limited by its processors. **The route taken (T006):** the figures are drawn by a step
+  of their own before the book (`pdf-export figures`, SC-010), and the book reads them
+  from its folder (R7, contracts/figures.md). Many figures per page load (R10) is still
+  wanted, to shorten that step.
 
 **Constraints**:
 

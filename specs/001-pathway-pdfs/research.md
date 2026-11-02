@@ -464,6 +464,43 @@ is ignored, not a missing file.
   workers on the same machine compete with printing for its cores, so they are a lever
   only within the 44 minutes, not a way past them.
 
+- **Measured (T005), 2 Nov 2026:** a no-go. On this host (8 cores), a private render
+  service per run (the website's image, cold, with a fresh `RENDER_CACHE_KEY`), on a
+  private copy of release 98's graph, drawing a seeded sample in the book's mix through
+  pdf-export's own client (`ci/measure/throughput.ts`):
+
+  | `RENDER_CONCURRENCY` | Figures | Figures a second | The book's 19,313 | Service CPU, mean (cores) | Peak memory |
+  | -------------------- | ------- | ---------------- | ----------------- | ------------------------- | ----------- |
+  | 1                    | 100     | 0.37             | 14 h 41 min       | 1.3                       | 0.8 GB      |
+  | 2                    | 200     | 0.72             | 7 h 29 min        | 2.4                       | 1.0 GB      |
+  | 4                    | 200     | 1.20             | 4 h 28 min        | 4.3                       | 1.3 GB      |
+  | 8                    | 200     | 1.41             | 3 h 48 min        | 6.3 (7.6 at peak)         | 2.5 GB      |
+  - Every figure asked was drawn. One at a time a reaction took 2.4 s (median), a
+    diagram 3.3 s and a selection 4.3 s; at 8 at once a reaction took 5.0 s.
+  - **The limit is the machine's processors:** a figure costs about 3 seconds of a core
+    (CPU × time ÷ figures, at every setting), so all 8 cores would give under 3 figures a
+    second (inference), against the 7.3 needed. At 8 the host's load average reached 14.
+  - **Not run, and why:** the samples are 100–200 figures, not the 2,000 T005 set; the
+    gap to the threshold is fivefold and the cost per figure the same at every setting,
+    so a larger sample could not turn it into a go. Page reuse, (b), was not measured:
+    it saves page loads, not the drawing's CPU, and the route taken (below) takes the
+    figures out of the book's run. One figure on request, (c), is measured with T007.
+
+- **The route taken (T006), the user's choice, 2 Nov 2026:** a third route, **the figures
+  drawn in a step of their own, before the book.** `pdf-export figures` draws every figure
+  the book needs, through the render service, into a folder; `book` reads them from it
+  and needs no render service (contracts/cli.md, contracts/figures.md).
+  - SC-003 is the book's time from figures already drawn; the figures' step has its own
+    criterion, SC-010. At the rate above the step takes about 3.8 hours on this host
+    (inference), so it needs a larger machine, several machines each drawing a share, or
+    many figures per page load (route 1, still wanted, T042) to come down.
+  - This answers the shared cache's objection above: the step draws the new release
+    from its own data, before the website serves it, and what it writes could fill the
+    website's cache for the release.
+  - The release's own diagram images today are the old look, and only pathways' diagrams
+    and illustrations (1,390 of the book's figures, none of its reactions or selections),
+    so they are no source for the new book.
+
 - **To measure in the first tasks:** the render service's throughput (above); the
   diagrams' widths, from the release's diagram files, for FR-016's floor (R4); what the
   analysis service answers for an expired and a malformed token, and its retention
