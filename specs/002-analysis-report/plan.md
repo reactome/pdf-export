@@ -20,8 +20,8 @@ pdf-export makes the website's analysis report on request, in place of
   parts are new templates beside spec 001's (R2).
 - **The address:** today's, served by pdf-export's service behind WebsiteAngular's
   analysis gateway (R6).
-- **The time a cold report takes** is likely over what the edge allows (R4): measured
-  first, and brought to the user with the choices.
+- **The time a cold report takes** is over what the edge allows (R4), so the report is
+  made in the background behind its address and fetched when ready.
 
 ## Technical Context
 
@@ -29,8 +29,8 @@ pdf-export makes the website's analysis report on request, in place of
 
 **Primary Dependencies**: spec 001's (its plan's table); nothing new.
 
-**Storage**: none. It reads the analysis service's API, the graph and the render
-service, and keeps nothing after sending (R7).
+**Storage**: no disk. Jobs and finished reports live in the service's memory, a report
+for at most an hour (FR-211, R7).
 
 **Testing**: Node's test runner, with a stub analysis service (spec 001's T010, extended)
 and the render stub; the fixture graph (R8).
@@ -43,8 +43,8 @@ and the render stub; the fixture graph (R8).
 report is made in the background behind its address (FR-210, R4): the edge's 100 s
 bounds a request, not a report.
 
-**Constraints**: the analysis service's API only (FR-202); no submitted identifier logged
-or kept (FR-211); FR-017 for characters; constitution 1.2.0.
+**Constraints**: the analysis service's API only (FR-202); no submitted identifier logged,
+nor kept beyond the finished report in memory for an hour (FR-211); FR-017 for characters; constitution 1.2.0.
 
 **Scale/Scope**: up to 50 pathways and 51 figures a report; one report at a time behind
 the gateway's lane, two in the service by default.
@@ -114,7 +114,8 @@ else (constitution I).
      its time and size (SC-203's baseline);
    - a cold report, stage by stage, on a private stack: the analysis calls (R1's call 4
      for a large expression dataset), the figures (spec 001's T005, part c), layout and
-     printing (twice, for the contents); - the time budget is decided (R4): the report is made in the background; these
+     printing (twice, for the contents);
+   - the time budget is decided (R4): the report is made in the background; these
      measurements set SC-203's baseline and check its 2- and 4-minute targets.
 2. **Spec 001's foundations first:** this spec builds on modules spec 001's tasks have
    not built yet: the analysis stub (its T010), the analysis client (T020, T021) and the
@@ -125,15 +126,21 @@ else (constitution I).
    found gathered as today's report gathers them.
 5. **Layout:** the report's parts, in spec 001's theme; the genome-wide overview.
 6. **The service:** the route, its parameters, its errors in the analysis service's
-   form, its limits, and stopping the work when the client abandons the request (R7).
+   form; the job (data-model Job): starting and joining, the 30 s wait, 202 with
+   `Retry-After` and the browser's page, the PDF once ready, an error answered then
+   forgotten, the queue and the 5-minute budget, the hour's keeping in memory and its
+   check of the token, the render requests' shared cap; a request abandoned ending only
+   its wait (R7).
 7. **The checks:** the replay (User Story 2), the comparison by FR-208 with each
    figure's overlay checked (quickstart §3), SC-203's timing,
    SC-205's search of logs and files; each shown failing.
 8. **The website's part** (WebsiteAngular's specs): the gateway's report lane sent to
    pdf-export, and the render service's `resource` (the overlay wait is step 0). The
    "PDF Result" button opens the report's address in a new tab rather than downloading
-   it, so the page shown while it is made (202) is seen, not saved as `report.pdf`; the
-   gateway's lane passes a 202 and its `Retry-After` through unchanged.
+   it, so the page shown while it is made (202) is seen, not saved as `report.pdf`. The
+   gateway's report lane passes report requests straight through to pdf-export rather
+   than queueing them one at a time: with pdf-export holding a request up to 30 s, a
+   lane of one would turn every browser's polling into a wait for the others (R6).
 
 ## Complexity Tracking
 
