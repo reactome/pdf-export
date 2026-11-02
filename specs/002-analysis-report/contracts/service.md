@@ -45,7 +45,11 @@ already call. The address and parameters are today's.
   every kept report.
 - **Limits** (FR-210): two reports made at once by default and eight more waiting (503
   beyond that; a joining request is never counted), and at most two of the eight from
-  one client, as the gateway tells it (`X-Forwarded-For`, set by the gateway); a time budget of 5 minutes from
+  one client, as the gateway names it in `X-Reactome-Client`, a header the gateway always
+  sets to its own `clientOf` (the client's address, IPv6 counted by its /64) and
+  overwrites whatever a client sent; pdf-export trusts it because only the gateway can
+  reach it (loopback or the internal network); `X-Forwarded-For` is not used, as nginx
+  appends to what a client sends; a time budget of 5 minutes from
   when a report starts being made. The render requests of all reports together are
   capped (two at once by default), so reports never take every one of the render
   service's slots from the website's own images.

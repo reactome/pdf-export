@@ -142,7 +142,8 @@ else (constitution I).
    gateway's report lane sends report requests to pdf-export, a second upstream, without
    queueing them one at a time: with pdf-export holding a request up to 30 s, a lane of
    one would turn every browser's polling into a wait for the others. It keeps its share
-   per client, passes the client's address on, and answers 503 when pdf-export cannot be
+   per client (`PER_CLIENT`), names the client in `X-Reactome-Client` (always overwritten
+   with its `clientOf`), and answers 503 when pdf-export cannot be
    reached (R6). The service's image mounts a `tmpfs` for the printer's working folder.
 
 ## Complexity Tracking

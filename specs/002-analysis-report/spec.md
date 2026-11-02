@@ -207,12 +207,12 @@ logs only FR-211's fields: none of them a submitted identifier.
 research data.
 
 **Independent Test**: make reports for a token, then search the service's logs and its
-working files for the submitted identifiers.
+disk, the printer's memory-backed folder included, for the submitted identifiers.
 
 **Acceptance Scenarios**:
 
 1. **Given** reports made and sent, and some still kept, **When** the service's logs and
-   working files are searched, **Then** no submitted identifier is found; the log holds
+   disk, the printer's memory-backed folder included, are searched, **Then** no submitted identifier is found; the log holds
    only FR-211's fields; a kept report is in the service's memory, never on disk.
 
 ---
@@ -320,9 +320,12 @@ working files for the submitted identifiers.
     most a set number more wait (eight by default), "unavailable" with a time to retry
     beyond that; a report's time budget (5 minutes by default) runs from when it starts
     being made, not from when it was queued;
+  - at most a set number of the waiting reports from one client (two by default),
+    counted by the client the gateway names (contracts/service.md);
   - no request waits longer than the edge's 100 s allows; on the website's path the
-    analysis gateway passes report requests straight through, pdf-export's own limits
-    protecting it (plan, step 8).
+    analysis gateway sends report requests on without queueing them, keeping its share
+    per client, naming the client, and answering "unavailable" when the service cannot
+    be reached (plan, step 8).
 - **FR-211**: The service MUST log one line for each report it makes (not for each
   request): a hash of the token (a live token unlocks the user's identifiers), the
   species, the number of pathways, its time, its size and any character FR-207
