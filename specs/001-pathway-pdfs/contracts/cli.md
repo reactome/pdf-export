@@ -40,6 +40,9 @@ contracts/figures.md).
   at `--content`; no graph checksum, no render `build`, or a render service not reading local files; or an `--out` that is not
   empty. A `build` or content release that changes during the run, a render or content
   service that stops answering, or the breaker, is exit 1 (contracts/figures.md).
+  Any other error (the graph failing during the checks, a file that cannot be written) is
+  exit 2, its error on stderr, the run stopped and its report written. The output's lines
+  and the report are in contracts/figures.md.
 
 ## `pdf-export book`
 

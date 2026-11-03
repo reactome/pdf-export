@@ -102,6 +102,15 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   holding no names, only stable identifiers, kinds, times and counts. Any other file
   is ignored, so a folder drawn for a release can be read again by a book made from the
   same graph.
+- **The run report** (`--report`, JSON; T046), written however the run ends: `release`
+  (the fingerprint, as far as it was read), `refused` (why the run was refused before
+  drawing, exit 2), `preflight` (its faults, exit 1), `figures` (for each kind: `needed`,
+  `drawn` by the render service, with `totalMs` and `maxMs`, retries included, and
+  `written`, in the folder with its line), `missing` (each figure's own fault, by `stId`,
+  `cause` and `detail`), `stopped` (`reason`: `deployment-changed`,
+  `deployment-unanswered`, `breaker-unanswered`, `breaker-silent` or `error`, and its
+  `detail`), `complete` and `elapsedMs`. On standard output, one `fault <fault>` line for
+  each preflight fault and `fault missing-figure <stId> <cause>` for each figure's own.
 - **A figure that could not be drawn** has no file and no line: `figures` draws the rest
   (unless the run stops at once, above),
   exits 1 with no `complete` line, and the book refuses the folder.

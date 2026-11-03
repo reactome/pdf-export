@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, test } from 'node:test';
 
 import { fetchFigure, type FigureRequest } from '../../src/figures/client.ts';
-import { startRenderStub, type RenderStub } from '../stubs/render.ts';
+import { startRenderStub, type Refusal, type RenderStub } from '../stubs/render.ts';
 
 const ALPHA = 'R-HSA-90000200';
 const REACTION = 'R-HSA-90000211';
@@ -81,6 +81,45 @@ describe('the figures client', () => {
     assert.ok('missing' in json);
     assert.match(json.missing, /not an SVG/);
   });
+
+  test("names each missing figure's cause (contracts/figures.md)", async () => {
+    const cause = async (how: Refusal | null, stId = ALPHA): Promise<string> => {
+      stub.reset();
+      if (how !== null) stub.refuse(stId, how);
+      const answer = await ask({ kind: 'diagram', stId });
+      return 'missing' in answer ? answer.cause : 'drawn';
+    };
+    assert.equal(await cause(404), 'refused');
+    assert.equal(await cause(null, 'R-HSA-90000999'), 'refused');
+    assert.equal(await cause(500), 'failed');
+    assert.equal(await cause(503), 'unanswered');
+    assert.equal(await cause(504), 'unanswered');
+    assert.equal(await cause('timeout'), 'unanswered');
+    assert.equal(await cause('stall-body'), 'unanswered');
+    assert.equal(await cause('not-svg'), 'invalid');
+    assert.equal(await cause(null), 'drawn');
+  });
+
+  test('serve keeps one try of a 504 or a timeout; figures retries each once', async () => {
+    const tries = async (how: Refusal, retryUnanswered: boolean, times = -1) => {
+      stub.reset();
+      stub.refuse(ALPHA, how, times);
+      const answer = await fetchFigure(
+        stub.url,
+        { kind: 'diagram', stId: ALPHA },
+        { timeoutMs: 300, retryPauseMs: 10, retryUnanswered }
+      );
+      return { drawn: 'svg' in answer, requests: stub.requests.length };
+    };
+    for (const how of [504, 'timeout', 'stall-body'] as const) {
+      assert.deepEqual(await tries(how, false), { drawn: false, requests: 1 }, String(how));
+      assert.deepEqual(await tries(how, true), { drawn: false, requests: 2 }, String(how));
+      assert.deepEqual(await tries(how, true, 1), { drawn: true, requests: 2 }, String(how));
+    }
+    // a 500 or a 404 is the figure's own: never retried
+    assert.deepEqual(await tries(500, true), { drawn: false, requests: 1 });
+    assert.deepEqual(await tries(404, true), { drawn: false, requests: 1 });
+  });
 });
 
 test('a render service that is not there is a missing figure that says why', async () => {
@@ -90,4 +129,12 @@ test('a render service that is not there is a missing figure that says why', asy
   const answer = await fetchFigure(url, { kind: 'diagram', stId: ALPHA }, { timeoutMs: 500 });
   assert.ok('missing' in answer);
   assert.match(answer.missing, /ECONNREFUSED/);
+  assert.equal(answer.cause, 'unanswered');
+  // no connection is not retried, even by figures: the service is gone, not slow
+  const again = await fetchFigure(
+    url,
+    { kind: 'diagram', stId: ALPHA },
+    { timeoutMs: 500, retryPauseMs: 2000, retryUnanswered: true }
+  );
+  assert.ok('missing' in again);
 });
