@@ -13,7 +13,7 @@
 //   systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 --quiet \
 //     node ci/measure/join.ts --figures <folder of T005's SVGs> --out <scratch folder> \
 //     [--pdfs 1] [--pages 3760 | --sections n] [--part-pages 200] [--parallel 4] [--seed 98]
-//     [--together [n]] [--no-object-streams] [--verify]
+//     [--together n] [--no-object-streams] [--verify]
 //
 // The run refuses to start outside a memory cap with swap off. `TMPDIR` should be inside `--out`: the
 // printer writes its pages there. The output is numbers only; the sections are made up.
