@@ -196,8 +196,10 @@ synthetic documents, on this host under load.
   with every release; FR-001):
   - each PDF printed in parts at section boundaries, about 200 pages a part, so a small
     pathway's PDF is one part and the largest today (3,760 pages) about 19;
-  - printed untagged, a few parts at a time across the PDFs, then each PDF's parts
-    joined, the PDFs' joins independent of one another;
+  - printed untagged, a few parts at a time, the largest PDFs first and each PDF's parts
+    before the next's, then each PDF's parts joined, the PDFs' joins independent of one
+    another and one at a time by default, raised by T029 only if two real joins fit
+    (T011, below);
   - links rewritten, and the outline written by pdf-export, which it needs anyway: an
     event's later places in a PDF point at its one section (FR-004), which Chromium's
     headings would not do. An event held only by another of the book's PDFs is, as
@@ -215,10 +217,120 @@ synthetic documents, on this host under load.
   - the contents list numbered by the second pass, its front part only;
   - **the join's memory** re-measured at the largest PDF's size (pdf-lib holds the whole
     file): 120 MB for 4,930 synthetic pages, and today's 3,760-page file is 383 MB from
-    another producer, so perhaps near 400 MB (inference). A join takes one of
-    `--parallel`'s slots, as a part's print does, so printing and joining together stay
-    within that bound. Joining in groups is kept only as a fallback, if T011 finds even
-    one PDF's join does not fit.
+    another producer, so perhaps near 400 MB (inference). Joining in groups is kept only
+    as a fallback, if T029 finds one real PDF's join does not fit beside printing. T011 measured it
+    (below): about 0.5 GiB a join on synthetic files, more on real ones, and several of
+    the largest at once do not fit in 4 GiB, so joins have a limit of their own;
+  - **Measured (T011), 3 Nov 2026: one PDF's join fits; several of the largest at once
+    do not, so joins get a limit of their own (below).** On this host (8 cores, 31 GiB,
+    under the load of its other work), each run capped at 4 GiB with no swap (a systemd
+    scope), by `ci/measure/join.ts`. Synthetic sections in the book's figure mix, from
+    T005's recorded SVGs (85% reactions, one SVG; 6% diagrams, three; 1% illustrations,
+    four; 8% selections, one), laid out by `layoutBookPart` and printed by
+    `Printer.part`, untagged, in one Chromium, in parts of about 200 pages (99 sections,
+    109–195 pages). Each PDF's parts were joined with `@cantoo/pdf-lib` 2.11.1 in a
+    worker thread of its own; its placeholders rewritten to `/XYZ` destinations at their
+    probes, and the probes removed; a nested outline written; each page stamped with "n
+    of N" and the PDF's pathway in an embedded subset of Roboto (400, from
+    `@fontsource/roboto`) in the theme's on-surface-variant colour; and the file saved.
+    Memory is the scope's anonymous memory (Node, its workers and Chromium together),
+    sampled four times a second and at each stage's start and end. Outputs in
+    `ci/measure/results/2026-11-03/join/`.
+    - **The synthetic files are light, and every memory figure below rests on them.**
+      The reaction's SVG, 85% of the figures, is 12 KB with about 25 elements; every
+      selection is the same 649 KB SVG; the diagrams are three (one, `small.svg`, 5,976 ×
+      3,350 px). The joined PDFs were 85 MiB (3,756 pages) and 140 MiB (6,203 pages), and
+      what pdf-lib holds grows with the file. A real all-vector PDF of 300–400 MB (today's
+      largest is 383 MB from `event-pdf`, whose figures are rasters) would need more:
+      scaled by these runs' 510–670 MiB for 85–140 MiB of file, roughly 1.7–2.1 GiB for
+      today's 383 MB (inference; the scaling itself is untested at that size).
+    - **A section took 2.0 pages here, not today's 1.22** (23,541 pages for 19,313
+      events). `place()` (T008) puts a figure on a landscape page of its own only where
+      that prints it larger, never above its natural size (0.75 pt a pixel): a figure up
+      to about 642 px wide and 971 px tall prints at natural size in portrait and stays
+      there. T005's one reaction SVG is 1,098 px wide, so every synthetic reaction went
+      landscape. So 3,760 pages held 1,868 sections, and 3,085 sections (the events of
+      today's largest file at the book's density, inference) took 6,203 pages; both were
+      measured. That page count rests on one wide figure standing for every reaction:
+      real reactions' widths, and so the book's size, are for T029 and T031 to measure.
+    - **With pdf-lib's object streams off** (`useObjectStreams: false`), times in
+      seconds, peaks in MiB of anonymous memory (with page cache in brackets where it
+      neared the cap). "Together" orders the parts so those PDFs' joins run at once;
+      "PDF by PDF" prints one PDF's parts before the next's, so each join overlaps the
+      next PDF's printing:
+
+      | Run                                                                            | Pages  | Print             | Join     | Links   | Outline   | Stamp   | Save     | Join's stages | Peak printing | Peak joining  |
+      | ------------------------------------------------------------------------------ | ------ | ----------------- | -------- | ------- | --------- | ------- | -------- | ------------- | ------------- | ------------- |
+      | One PDF of 3,760 pages, 4 at once                                              | 3,756  | 24.7 (7 ms/page)  | 4.2      | 0.13    | 0.03      | 2.8     | 4.9      | 12.1          | 1,414         | 1,221         |
+      | One PDF of 3,085 sections, 4 at once                                           | 6,203  | 43.5 (7 ms/page)  | 6.1      | 0.15    | 0.06      | 2.8     | 7.6      | 16.8          | 1,476         | 1,414         |
+      | Three of 3,760, PDF by PDF, 4 at once                                          | 11,268 | 72.0 (6 ms/page)  | 3.0–4.2  | 0.1     | 0.03–0.04 | 1.8–3.5 | 4.0–6.6  | 8.8–14.5      | 1,896         | 1,896         |
+      | Three of 3,760, together, 4 at once                                            | 11,268 | 55.5 (5 ms/page)  | 3.7–3.9  | 0.1     | 0.03–0.05 | 2.2–2.5 | 4.7–5.0  | 10.8–11.5     | 1,462         | 3,051         |
+      | Four of 3,760, together, 4 at once                                             | 15,024 | 90.9 (6 ms/page)  | 4.7–5.2  | 0.1–0.2 | 0.03–0.08 | 2.6–2.9 | 4.6–5.0  | 12.3–13.4     | 1,509         | 3,473 (3,816) |
+      | Three of 3,085 sections, together, 4 at once                                   | 18,609 | 93.7 (5 ms/page)  | 9.1–10.2 | 0.2–0.3 | 0.06      | 3.8–4.3 | 7.8–8.6  | 21.0–23.4     | 1,572         | 3,360 (3,735) |
+      | Three of 3,085 sections: two joined together while the third prints, 3 at once | 18,609 | 152.5 (8 ms/page) | 6.7–8.9  | 0.2     | 0.04–0.1  | 3.3–4.3 | 7.9–10.7 | 18.1–24.0     | —             | 2,597 (3,070) |
+      | Four of 3,085 sections, together, 4 at once                                    | —      | —                 | —        | —       | —         | —       | —        | —             | —             | over the cap  |
+      - Four PDFs of 6,203 pages joined at once were killed by the cap (the kernel's OOM
+        killer, 155 s in, when the joins would have been running, inference). That run
+        wrote no output: its record is the console's exit and the user journal's
+        `oom-kill`, not a file.
+      - Two of them joining while a third PDF printed (the run's peak, printing and
+        joining at once) took 2,597 MiB (3,070 with page cache), a GiB under the cap.
+        Three joining at once with a print beside them, which a join taking one of four
+        `--parallel` slots allows, was not run: three alone took 3,360 MiB (3,735), and a
+        print adds Chromium's share, at most about 680 MiB (inference: 1,414 MiB printing
+        four at once against Node's 731, so less for one print), which would bring it to
+        the cap or over it with page cache.
+      - Print's times include laying out each part (5–10 s in all for one PDF, in
+        Node's main thread, between prints).
+      - Node held about 750 MiB while printing (the layout's strings and the parts read
+        back), so one 3,760-page join adds about 510 MiB to Node's own (the run's peak
+        while joining, 1,221 MiB, was below its peak while printing, 1,414) and a
+        6,203-page one about 670 MiB; each further join at once took 420–970 MiB.
+      - Each PDF's join in a worker thread of its own ran beside the others without
+        slowing much (12–13 s each, four together, against 12 s alone).
+
+    - **Object streams, time against memory.** With them on (pdf-lib's default) the save
+      dominates: 33.6 s for 3,756 pages and 60.2 s for 6,203, against 4.9 and 7.6 s off,
+      for files 6% smaller (80 and 132 MiB against 85 and 140). But memory is what binds,
+      and it was lower with them on: three 3,760-page joins together peaked at 2,331 MiB
+      against 3,051 off, and the single joins at 1,162 and 1,308 MiB against 1,221 and
+      1,414. One run each cannot tell whether the lower peak comes from the streams or
+      from saves that, taking 24–35 s against 5, overlapped one another less.
+      (`one-3760-os.json` was written before the script recorded the setting, so it has
+      no `objectStreams` field; it is the default, on.)
+    - **Checked:** every placeholder resolved (7,814 links in 3,756 pages; 12,950 in
+      6,203), every probe removed, and every section in the outline (1,868 and 3,085). In
+      the single-PDF runs pdf.js read each saved file back (not in the budget, 37–73 s):
+      every link's destination resolves to a page (not checked to land on its heading,
+      which T026's tests do), none is left as a placeholder or probe, the outline has
+      every entry, and the first, middle and last pages carry their number and the
+      pathway's name.
+    - **Against R7's budget** (inference, scaled by pages): printing four at once ran at
+      5–7 ms a page, so 23,541 pages in 2.0–2.7 minutes against 13; T005's SVGs are
+      repeated, and the real figures vary. The join's stages took about 3.2 ms a page one
+      PDF at a time (2.7 ms for the larger), so 1.1–1.3 minutes for 23,541 pages against
+      6, before they overlap printing; with object streams on, 4.1–4.4 minutes.
+  - **Decided from T011, for T025 and T029:**
+    - **Joins have a limit of their own** inside `--parallel`: 1 at a time by default,
+      a setting with a flag (T029). A join still takes one of `--parallel`'s slots. On
+      these light files two of the largest joining beside one print (`--parallel` 3)
+      peaked at 2,597 MiB (3,070 with page cache), three alone took 3,360 MiB, and four
+      were killed. But a real join's increment (roughly 1.7–2.1 GiB, inference) means two
+      real joins would need about 4.1–4.9 GiB with Node's own, over a 4 GiB cap, so the
+      default is 1. T029 measures the real book and raises it to 2 only if two fit.
+    - **The largest PDFs are printed first,** by their estimated pages (T025's parts estimate), each
+      PDF's parts before the next's, so their joins arrive one at a time, each
+      overlapping the smaller PDFs' printing. An interleaved order ("a few parts at a
+      time across the PDFs") finishes the largest together, which is the together case
+      above.
+    - **Object streams: off unless memory binds,** to be settled on real files in T029:
+      off saves five to eight times faster for 6% more file, but may cost memory.
+    - **Joining in groups (T012) stays the fallback:** one PDF's join adds about 0.5
+      GiB on these files, but a real one (roughly 1.7–2.1 GiB, inference) beside
+      printing (1.4–1.5 GiB at four prints alone, before page cache) comes to about 3.1–3.6
+      GiB, up to about 3.9 with page cache (inference): under 4 GiB, but the scaling is
+      untested at that size, so it may not fit. If T029 finds that one real join does not fit beside
+      printing, T012 is done; otherwise it is not needed.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
   from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
   are numbered as the book's are: a first print with placeholders, its anchors' pages
@@ -717,6 +829,12 @@ is ignored, not a missing file.
   **Since T006** the figures are drawn before the book (SC-010), and the book's figures
   stage is reading and inlining 19,313 files, which T031 measures; its 44 minutes are now
   margin, not a drawing budget.
+  **Measured (T011, R4):** printing at 5–7 ms a page four at once, and the join, links,
+  outline, stamping and save at about 3 ms a page with pdf-lib's object streams off
+  (about 10 with them on), scale to about 2–3 and 1–1.5 minutes for the book's 23,541
+  pages, within 13 and 6 (inference: light synthetic files, T005's SVGs). How many pages
+  the new layout prints, which depends on how many reactions are wide enough for a
+  landscape page, is for T029 and T031 to measure (R4).
 
 - **Go or no-go, first:** the first task measures the render service's throughput at the
   book's scale, on the machine the release would use, with its concurrency raised and
@@ -797,7 +915,8 @@ is ignored, not a missing file.
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), its PDF is split at section boundaries and joined; the 29 PDFs are made
-  several at a time, so the joins overlap the printing.
+  several at a time, the largest first, so the joins overlap the printing, one at a time
+  by default (T011, R4; T029 raises it only if two real joins fit).
 
 ## R8. The checks: by meaning, with tools under loose licences
 

@@ -1,0 +1,114 @@
+{
+  "machine": {
+    "cpus": 8,
+    "memoryGb": 31
+  },
+  "cap": "4294967296",
+  "objectStreams": false,
+  "pdfs": 1,
+  "parallel": 4,
+  "seed": 98,
+  "perSection": 2.013,
+  "sectionsPerPart": 99,
+  "sectionsPerPdf": 3085,
+  "pages": 6203,
+  "partPages": {
+    "min": 109,
+    "max": 195
+  },
+  "partSeconds": {
+    "min": 2.88,
+    "max": 7.99
+  },
+  "layoutSeconds": 10.3,
+  "wallS": 134.75,
+  "printWallS": 43.45,
+  "printMsPerPage": 7,
+  "joins": [
+    {
+      "pdf": 0,
+      "joinS": 6.07,
+      "joinHeapMb": 303,
+      "pages": 6203,
+      "links": 12950,
+      "unresolved": 0,
+      "probes": 3085,
+      "linksS": 0.15,
+      "linksHeapMb": 319,
+      "outline": 3085,
+      "outlineMissing": 0,
+      "outlineS": 0.06,
+      "outlineHeapMb": 296,
+      "stampS": 2.83,
+      "stampHeapMb": 405,
+      "mb": 140,
+      "saveS": 7.64,
+      "saveHeapMb": 309,
+      "verifiedStamps": "3 of 3",
+      "verifiedPages": 6203,
+      "verifiedLinks": 12950,
+      "verifiedBadDests": 0,
+      "verifiedLeftover": 0,
+      "verifiedOutline": 3085,
+      "verifyS": 72.81,
+      "verifyHeapMb": 484
+    }
+  ],
+  "joinStagesSPerPdf": [16.8],
+  "perStage": {
+    "print": {
+      "secondsPerPdf": [43.29],
+      "peakAnonMb": 1476,
+      "peakCgroupMb": 1635,
+      "peakNodeRssMb": 792
+    },
+    "join": {
+      "secondsPerPdf": [6.07],
+      "peakAnonMb": 1075,
+      "peakCgroupMb": 1244,
+      "peakNodeRssMb": 1114
+    },
+    "links": {
+      "secondsPerPdf": [0.15],
+      "peakAnonMb": 1084,
+      "peakCgroupMb": 1253,
+      "peakNodeRssMb": 1123
+    },
+    "outline": {
+      "secondsPerPdf": [0.06],
+      "peakAnonMb": 1090,
+      "peakCgroupMb": 1259,
+      "peakNodeRssMb": 1129
+    },
+    "stamp": {
+      "secondsPerPdf": [2.83],
+      "peakAnonMb": 1162,
+      "peakCgroupMb": 1335,
+      "peakNodeRssMb": 1207
+    },
+    "save": {
+      "secondsPerPdf": [7.64],
+      "peakAnonMb": 1414,
+      "peakCgroupMb": 1691,
+      "peakNodeRssMb": 1459
+    },
+    "verify": {
+      "secondsPerPdf": [72.81],
+      "peakAnonMb": 1762,
+      "peakCgroupMb": 1947,
+      "peakNodeRssMb": 1807
+    }
+  },
+  "peak": {
+    "anonMb": 1762,
+    "cgroupMb": 1947,
+    "nodeRssMb": 1807,
+    "cgroupPeakMb": 1971
+  },
+  "bookScaled": {
+    "printMin": 2.7,
+    "printBudgetMin": 13,
+    "joinMin": 1.1,
+    "joinBudgetMin": 6
+  }
+}
