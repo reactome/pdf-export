@@ -450,8 +450,9 @@ own source, and the answers agree with them.
   defaults (all resources, not importable-only) the pathways hit are `pathwaysFound` with
   `includeDisease=true` and no species (229 here, both ways): the service's filter
   skips a pathway with no p-value as the book's does, and differs only in dropping a
-  p-value above 1, which the book would keep. Spec 002's research (R1) reads it the same
-  way. `identifiersNotFound` is the stored not-found set's size, as today's book's.
+  p-value above 1, which the book would keep, and which analysis-core's own p-values
+  never are (only imported statistics could be): so in practice they select the same
+  pathways, as spec 002's research (R1) says. `identifiersNotFound` is the stored not-found set's size, as today's book's.
 - **`/download/{token}/result.json`** has no such count either: its keys are `summary`,
   `pathways`, `notFound`, `expressionSummary` and `warnings`, and it was 468 KB for this
   four-identifier analysis.
@@ -483,9 +484,12 @@ own source, and the answers agree with them.
     formed and the service fails on it; and without the bound, a token with a
     7,000-digit counter is answered by the servlet container's HTML 400. The service's
     tokens never hold `+` or `/`, and this instance writes their dates in ASCII digits
-    (as its JVM's locale does; one that wrote other digits would issue tokens this rule
-    refuses), so the rule refuses none it issues. The token is sent percent-encoded as
-    one path segment.
+    in the Gregorian calendar (as its JVM's locale does; one with other digits or another
+    calendar would issue tokens this rule refuses, or the service misdates), so the rule
+    refuses none it issues. **What is sent is the canonical token,** never the input as
+    given: the decoded Base64, padded, with `=` encoded as `%3D`, as one path segment.
+    The bound is on the decoded form, so a token wrapped in thousands of `%25` layers
+    passes the rule; sent as given, it too would reach the servlet container's HTML 400.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
@@ -501,7 +505,8 @@ own source, and the answers agree with them.
   without disease pathways is counted as today's book counts it, and with no species, as
   it counts every species. The identifiers found may differ from the book's where a
   pathway the filter leaves out holds an identifier no kept pathway does; the comparison
-  (FR-012) records any such difference. The exact count would be spec 002's (`POST
+  (FR-012) records any such difference. The CSV's file name is a constant, never taken
+  from the request (the service writes a file under it). The exact count would be spec 002's (`POST
 /token/{token}/found/all` over every kept pathway, its research R1), at the cost of
   sending the whole pathway list; the CSV is one small request, and its edge is rare.
 - **A 404 from `found/…` is read as none found,** as today's book reads it, though it
