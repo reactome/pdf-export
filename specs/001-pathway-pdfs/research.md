@@ -449,8 +449,8 @@ own source, and the answers agree with them.
   `/token/{token}` gives `identifiersNotFound` (a count), `pathwaysFound`, `pathways` (a
   page of them), `resourceSummary`, `speciesSummary`, `expression` and `warnings`. **None
   of them is a count of identifiers found,** nor of identifiers submitted. These are this
-  analysis's fields: the service leaves out empty ones, and the summary may also hold
-  `species`, `fileName`, `server`, `gsaToken` and `gsaMethod`, with `type` one of six
+  analysis's fields: the service leaves out null ones, and the summary may also hold
+  `species`, `fileName`, `gsaToken` and `gsaMethod` (its `server` is never written), with `type` one of six
   values (the ReactomeGSA ones among them), so the client's types stay open to them.
 - **`pathwaysFound` follows `includeDisease`:** the answer is filtered by the stored
   analysis's own setting unless the request names one, and the summary it returns then
