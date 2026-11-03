@@ -265,7 +265,10 @@ synthetic documents, on this host under load.
     unmeasured. The viewport writes its scale twice, by attribute and by style to six
     figures; the two must agree. Only the pathways' labels (`PATHWAY TEXT`) are read: the
     illustrations' other lettering (`LABEL_TEXT`, and paths in groups named `TEXT`) is
-    about the same size at release 98, as #107's review measured. Release 98's 221 illustrations, every one with labels, none
+    about the same size at release 98, as #107's review measured. Markup the render service
+    does not write is read only as far as it fails safe: malformed markup, a title or
+    metadata leaves a label unread; a style element's rules or `display="none"` are not
+    looked for (`src/layout/lettering.ts` lists them). Release 98's 221 illustrations, every one with labels, none
     transformed:
     - every label's cap height is 8.49–8.94 of the file's units, a font of about 12 px,
       as the diagrams' labels are;
