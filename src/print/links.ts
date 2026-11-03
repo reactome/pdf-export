@@ -55,6 +55,32 @@ export function destination(pdf: PDFDocument, target: Target): PDFArray {
 }
 
 /**
+ * Where each anchor's probe is in a PDF, read without changing anything: T028 numbers the
+ * contents from them before `rewriteLinks` runs. Throws naming every anchor probed twice.
+ */
+export function probeTargets(pdf: PDFDocument): Map<string, Target> {
+  const targets = new Map<string, Target>();
+  const twice = new Set<string>();
+  pdf.getPages().forEach((page, index) => {
+    const annots = page.node.Annots();
+    for (let i = 0; i < (annots?.size() ?? 0); i++) {
+      const annot = pdf.context.lookup(annots?.get(i));
+      const uri = annot instanceof PDFDict ? uriOf(annot) : null;
+      if (!(annot instanceof PDFDict) || !uri?.startsWith(PROBE)) continue;
+      const anchor = decodeURIComponent(uri.slice(PROBE.length));
+      if (targets.has(anchor)) twice.add(anchor);
+      targets.set(anchor, { page: page.ref, index, y: topOf(annot) });
+    }
+  });
+  if (twice.size > 0) {
+    throw new Error(
+      `The PDF's probes: ${[...twice].map((a) => `${a} is probed twice`).join('; ')}`
+    );
+  }
+  return targets;
+}
+
+/**
  * Each placeholder link in a joined PDF made a destination at its anchor's probe, and the
  * probes removed. Returns each anchor's target, for the outline. Throws, changing nothing,
  * naming every anchor at fault: a placeholder with no probe, or an anchor probed twice.

@@ -215,13 +215,15 @@ async function join(job: JoinJob, report: (m: JoinMessage) => void): Promise<voi
     result['outlineMissing'] = missing;
   });
 
-  // Each page's number and the PDF's pathway, in an embedded subset of Roboto.
+  // Each page's number and the PDF's pathway, in an embedded subset of Roboto. From its
+  // WOFF file, as src/print/stamp.ts embeds it: fontkit's subset of the WOFF2 file has no
+  // outlines (T027, #147's review), so the runs before this embedded glyphs never drawn.
   await stage('stamp', async () => {
     doc.registerFontkit(fontkit);
     const file = path.join(
       path.dirname(new URL(import.meta.resolve('@fontsource/roboto/package.json')).pathname),
       'files',
-      'roboto-latin-400-normal.woff2'
+      'roboto-latin-400-normal.woff'
     );
     const font = await doc.embedFont(readFileSync(file), { subset: true });
     const hex = themeVariables().get('--mat-sys-on-surface-variant') ?? '';

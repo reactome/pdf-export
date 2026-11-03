@@ -17,8 +17,8 @@ import {
 } from '../../src/layout/document.ts';
 import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
 import { PAGE } from '../../src/layout/figure.ts';
-import { contentsTargets } from '../../src/print/contents.ts';
-import { Printer, movedPages } from '../../src/print/print.ts';
+import { contentsTargets, movedPages } from '../../src/print/contents.ts';
+import { Printer } from '../../src/print/print.ts';
 import {
   bookPdf,
   buildFixture,

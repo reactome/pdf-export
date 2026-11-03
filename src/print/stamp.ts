@@ -8,8 +8,8 @@
 // where the box puts it. The cover has neither. A top-level pathway's name is stamped,
 // not laid out, so FR-017's substitutions are made here; they are not counted in the run
 // report, which counts the name where its section prints it. White space is collapsed and
-// characters never drawn are left out, as a margin box does, so a stray tab or variation
-// selector that prints in a section does not refuse the PDF here.
+// characters never drawn are left out, close to a margin box, so a stray tab or variation
+// selector that prints in a section does not refuse the PDF here (`marginText`).
 //
 // Each face is embedded from its WOFF file, not the WOFF2 the pages load: fontkit's
 // subsetter copies a WOFF2 file's `glyf` bytes as they are, transformed, and the subset's
@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { ColorTypes, type PDFDocument, type PDFFont, type RGB } from '@cantoo/pdf-lib';
 import * as fontkit from 'fontkit';
 
-import { NEVER_DRAWN, substituted } from '../layout/characters.ts';
+import { substituted } from '../layout/characters.ts';
 import { MARGIN_FAMILIES, pageStyles } from '../layout/document.ts';
 import { PAGE } from '../layout/figure.ts';
 import { codePointName, fontFaces, type FontFace } from '../layout/fonts.ts';
@@ -42,15 +42,36 @@ export interface FrontTarget {
 }
 
 /**
- * A text as a margin box draws it: each run of white space one space, characters never
- * drawn (controls, variation selectors, joiners; FR-017's) left out, and trimmed.
+ * What a margin box leaves out: FR-017's characters never drawn (`NEVER_DRAWN`) but its
+ * white space, which is collapsed or kept (below), so controls and default-ignorable
+ * characters (variation selectors, joiners, a soft hyphen).
+ */
+const LEFT_OUT = /[\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
+
+/**
+ * A text close to how a margin box draws it: each run of CSS's collapsible white space
+ * (space, tab, line feed, carriage return; not JavaScript's `\s`) one space, `LEFT_OUT`'s
+ * characters left out (a form feed among them, a control CSS does not collapse), and a
+ * space at either end trimmed. Any other space is kept, as Chromium keeps it: as itself
+ * where a stamp face draws it (a no-break or thin space), and otherwise as U+0020, which
+ * Chromium's box draws in its place where it has no face for it (an ideographic space, a
+ * line separator, an Ogham space mark), not refused as a character no face draws.
+ *
+ * Gaps against Chromium, known: Hangul fillers (U+3164, U+115F) are default-ignorable and
+ * left out here, where Chromium may draw them as blanks; a kept space is as wide as
+ * U+0020, not its own width; and nothing here is shaped (above).
  */
 export function marginText(text: string): string {
   let out = '';
-  for (const char of text.replace(/\s+/g, ' ')) {
-    if (char === ' ' || !NEVER_DRAWN.test(char)) out += char;
+  for (const char of text.replace(/[ \t\n\r]+/g, ' ')) {
+    if (char === ' ' || !LEFT_OUT.test(char)) out += char;
   }
-  return out.replace(/ {2,}/g, ' ').trim();
+  out = out.replace(/ {2,}/g, ' ').replace(/^ | $/g, '');
+  let drawn = '';
+  for (const char of out) {
+    drawn += /\s/u.test(char) && !faceFor(char.codePointAt(0) ?? 0) ? ' ' : char;
+  }
+  return drawn;
 }
 
 /**
@@ -82,6 +103,9 @@ export function pageStamps(
     throw new Error(`Front parts outside the front part's pages 2–${String(frontPages)}: ${named}`);
   }
   const header = marginText(substituted(name));
+  if (/^\s*$/u.test(header)) {
+    throw new Error(`The pathway's name ${JSON.stringify(name)} leaves no header to stamp`);
+  }
   const stamps: (PageStamp | null)[] = [];
   for (let i = 0; i < pages; i++) {
     const number = String(i + 1);
@@ -158,10 +182,12 @@ export function stampFile(face: FontFace): string {
   return path;
 }
 
-function load(face: FontFace): Loaded {
-  let file = loaded.get(face.path);
+/** A face's file read, once a path; its path is found each time, so a missing file is refused. */
+function load(face: FontFace, fileOf: (face: FontFace) => string): Loaded {
+  const path = fileOf(face);
+  let file = loaded.get(path);
   if (!file) {
-    const bytes = new Uint8Array(readFileSync(stampFile(face)));
+    const bytes = new Uint8Array(readFileSync(path));
     const font = fontkit.create(Buffer.from(bytes));
     if (!('postscriptName' in font)) throw new Error(`${face.path} is a collection, not a font`);
     file = {
@@ -172,7 +198,7 @@ function load(face: FontFace): Loaded {
       lineGap: font.lineGap,
       unitsPerEm: font.unitsPerEm,
     };
-    loaded.set(face.path, file);
+    loaded.set(path, file);
   }
   return file;
 }
@@ -217,12 +243,16 @@ const stamped = new WeakSet<PDFDocument>();
  * front part is the PDF's first part; `targets` are where its headings landed, as
  * `rewriteLinks` gives them, so it runs after that. Throws, stamping nothing, when the
  * PDF is stamped already, the parts' pages are not the PDF's, a front part's heading is
- * not in the front part, or a character of a stamp is one no font draws.
+ * not in the front part, the name leaves no header, a character of a stamp is one no font
+ * draws, or a face's file cannot be read; a PDF refused is not held as stamped.
+ *
+ * @param fileOf each face's file (`stampFile`); the tests give one that is missing
  */
 export async function stampPages(
   joined: Pick<Joined, 'doc' | 'pdf' | 'parts'>,
   targets: ReadonlyMap<string, FrontTarget>,
-  look: Look = stampLook()
+  look: Look = stampLook(),
+  fileOf: (face: FontFace) => string = stampFile
 ): Promise<void> {
   const { doc, pdf, parts } = joined;
   if (stamped.has(pdf)) throw new Error('The joined PDF is stamped already');
@@ -253,18 +283,23 @@ export async function stampPages(
       used.set(run.face, chars);
     }
   }
-  pdf.registerFontkit(fontkit);
-  const fonts = new Map<FontFace, PDFFont>();
-  for (const [face, chars] of used) {
-    const file = load(face);
-    const customName = `${subsetTag(face, chars)}+${file.postscriptName}`;
-    fonts.set(face, await pdf.embedFont(file.bytes, { subset: true, customName }));
-  }
+  // every face's file read, and the space's face found, before the PDF is held: a refusal
+  // leaves it unmarked
+  const files = new Map([...used.keys()].map((face) => [face, load(face, fileOf)]));
   // a margin box's line is the first face's `normal` line (the one drawing a space,
   // Roboto's), centred in the box: the margin's height at the top or bottom of the page
   const space = faceFor(0x20);
   if (!space) throw new Error('No face draws a space');
-  const metrics = load(space);
+  const metrics = load(space, fileOf);
+  // held before the first await, so two stampings of the PDF at once cannot both pass
+  stamped.add(pdf);
+  pdf.registerFontkit(fontkit);
+  const fonts = new Map<FontFace, PDFFont>();
+  for (const [face, chars] of used) {
+    const file = files.get(face) ?? load(face, fileOf);
+    const customName = `${subsetTag(face, chars)}+${file.postscriptName}`;
+    fonts.set(face, await pdf.embedFont(file.bytes, { subset: true, customName }));
+  }
   const em = look.size / metrics.unitsPerEm;
   const line = (metrics.ascent - metrics.descent + metrics.lineGap) * em;
   // the baseline's distance from the page's top edge in the top box, and from its bottom
@@ -272,7 +307,6 @@ export async function stampPages(
   const top = (PAGE.margin - line) / 2 + metrics.ascent * em;
   const bottom = PAGE.margin - top;
   const { size, colour: color } = look;
-  stamped.add(pdf);
   pages.forEach((page, i) => {
     const stamp = laid[i];
     if (!stamp) return;

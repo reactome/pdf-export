@@ -400,7 +400,7 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     assert.ok(Math.abs((left + right) / 2 - read.width / 2) < 1, 'off centre');
   });
 
-  test('white space and characters never drawn in a name are as a margin box draws them', async () => {
+  test('white space and characters never drawn in a name are close to a margin box', async () => {
     const alpha = stamped.get('Alpha pathway');
     assert.ok(alpha);
     // a tab, a newline, a variation selector, a zero-width joiner and a control character,
@@ -417,6 +417,23 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     assert.deepEqual(headers, new Set(['Alpha pathway one']));
   });
 
+  test('a space no face draws is stamped as a space, as a margin box draws it', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    // an ideographic space, a line separator and an Ogham space mark, which print in a
+    // section and which Chromium's margin box draws as spaces; none in a stamp face
+    const planted: Document = {
+      ...alpha.doc,
+      cover: { ...alpha.doc.cover, title: 'Alpha\u3000pathway\u2028one\u1680two' },
+    };
+    const pdf = await PDFDocument.load(alpha.before);
+    await stampPages({ doc: planted, pdf, parts: alpha.parts }, alpha.targets);
+    const pages = await pagesOf(await pdf.save({ useObjectStreams: false }));
+    const front = alpha.parts[0]?.pages ?? 0;
+    const headers = new Set(pages.slice(front).map((page) => joinedText(page.header)));
+    assert.deepEqual(headers, new Set(['Alpha pathway one two']));
+  });
+
   test('a PDF is stamped once: a second stamping is refused, changing nothing', async () => {
     const alpha = stamped.get('Alpha pathway');
     assert.ok(alpha);
@@ -427,6 +444,45 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     await assert.rejects(stampPages(joined, alpha.targets), /stamped already/);
     assert.deepEqual(await pagesOf(await pdf.save({ useObjectStreams: false })), once);
     assert.deepEqual(once, await pagesOf(alpha.after));
+  });
+
+  test("a stamping refused for a face's file leaves the PDF to be stamped", async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    const pdf = await PDFDocument.load(alpha.before);
+    const joined = { doc: alpha.doc, pdf, parts: alpha.parts };
+    await assert.rejects(
+      stampPages(joined, alpha.targets, stampLook(), (face) => {
+        throw new Error(`No WOFF file beside ${face.path} to stamp with`);
+      }),
+      /No WOFF file beside .*roboto/
+    );
+    await stampPages(joined, alpha.targets);
+    assert.deepEqual(
+      await pagesOf(await pdf.save({ useObjectStreams: false })),
+      await pagesOf(alpha.after)
+    );
+  });
+
+  test('two stampings of a PDF at once: one stamps, the other is refused', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    const pdf = await PDFDocument.load(alpha.before);
+    const joined = { doc: alpha.doc, pdf, parts: alpha.parts };
+    const results = await Promise.allSettled([
+      stampPages(joined, alpha.targets),
+      stampPages(joined, alpha.targets),
+    ]);
+    assert.deepEqual(
+      results.map((r) => r.status),
+      ['fulfilled', 'rejected']
+    );
+    const [, second] = results;
+    assert.match(second.status === 'rejected' ? String(second.reason) : '', /stamped already/);
+    assert.deepEqual(
+      await pagesOf(await pdf.save({ useObjectStreams: false })),
+      await pagesOf(alpha.after)
+    );
   });
 
   test('a character no font draws, or parts that are not the PDF, are refused', async () => {
@@ -440,6 +496,18 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     await assert.rejects(
       stampPages({ doc: planted, pdf, parts: alpha.parts }, alpha.targets),
       /U\+E000, which no font draws/
+    );
+    // a name with nothing to draw once a margin box's white space and controls are out
+    await assert.rejects(
+      stampPages(
+        {
+          doc: { ...alpha.doc, cover: { ...alpha.doc.cover, title: ' \t\uFE0F\n ' } },
+          pdf,
+          parts: alpha.parts,
+        },
+        alpha.targets
+      ),
+      /leaves no header to stamp/
     );
     const short = alpha.parts.slice(0, -1);
     await assert.rejects(
@@ -586,12 +654,23 @@ describe('pageStamps', () => {
     );
   });
 
-  test('a margin box collapses white space and leaves out what is never drawn', () => {
+  test("a margin box's white space collapsed, other spaces kept, and what is never drawn out", () => {
     for (const [given, drawn] of [
       ['a\tb', 'a b'],
       ['a\nb', 'a b'],
       ['a\r\n  b', 'a b'],
+      // a form feed is a control, not CSS's white space: left out, not collapsed
+      ['a\fb', 'ab'],
       [' a b ', 'a b'],
+      // a no-break or thin space, which a stamp face draws, is kept as it is, not collapsed
+      ['a\u00A0b', 'a\u00A0b'],
+      ['a\u2009\u2009b', 'a\u2009\u2009b'],
+      [' \u00A0a\u00A0 ', '\u00A0a\u00A0'],
+      // one no face draws is kept as a space, each its own
+      ['a\u3000b', 'a b'],
+      ['a\u2028b', 'a b'],
+      ['a\u1680b', 'a b'],
+      ['a\u3000 b', 'a  b'],
       ['a\uFE0Fb', 'ab'],
       ['a \uFE0F b', 'a b'],
       ['a\u200Db', 'ab'],
@@ -601,7 +680,15 @@ describe('pageStamps', () => {
     ] as const) {
       assert.equal(marginText(given), drawn, JSON.stringify(given));
     }
-    // after the substitutions, in pageStamps
+    // after the substitutions, in pageStamps, which refuses a name left empty
+    assert.throws(
+      () => pageStamps(' \t\uFE0F\u200D ', [2, 1], new Map([['introduction', { index: 1 }]])),
+      /The pathway's name " \\t.*" leaves no header to stamp/
+    );
+    assert.throws(
+      () => pageStamps('\u3000\u00A0', [2, 1], new Map([['introduction', { index: 1 }]])),
+      /leaves no header to stamp/
+    );
     assert.equal(
       pageStamps('P\u2011Q\t', [2, 1], new Map([['introduction', { index: 1 }]]))[2]?.header,
       'P-Q'
