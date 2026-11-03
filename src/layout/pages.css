@@ -176,9 +176,19 @@ h6 {
   margin: 10pt 0;
   text-align: center;
 }
+/*
+ * Blocks, not inline: an inline SVG sits on a line box whose descent, under a figure as
+ * tall as the text area, overflows the page and prints a page more (T025's review). The
+ * link is as wide as its figure, as Chromium writes its annotation from the link's box,
+ * and a link the text's width would open the website from beside a narrow figure.
+ */
 .figure svg,
 .figure-link {
-  display: inline-block;
+  display: block;
+}
+.figure-link {
+  width: fit-content;
+  margin: 0 auto;
 }
 .figure.landscape {
   page: wide;
