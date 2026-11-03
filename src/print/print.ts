@@ -35,7 +35,15 @@ export class Printer {
     };
     process.once('exit', onExit);
     try {
-      return new Printer(await chromium.launch(), folder, onExit);
+      // the browser launcher's own signal handlers off: on SIGINT it closes every browser
+      // and exits (130) itself, racing the command's own handler, which must remove its
+      // folder and write its report first (`book`, T029), or close its service (`serve`);
+      // both end the browser through the launcher's exit handler, which stays
+      return new Printer(
+        await chromium.launch({ handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false }),
+        folder,
+        onExit
+      );
     } catch (error) {
       process.off('exit', onExit);
       onExit();

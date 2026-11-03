@@ -14,6 +14,7 @@ import {
   accessSync,
   constants as fsConstants,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -23,7 +24,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { constants as osConstants } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 
 import { graphSettings, openGraph, type Graph, type GraphSettings } from '../graph/connection.ts';
 import { releaseInfo, type ReleaseInfo } from '../graph/queries.ts';
@@ -143,14 +144,26 @@ export function outProblem(
   } catch {
     return `--out ${out}: its folder ${parent} cannot be written`;
   }
-  if (!existsSync(target)) return null;
-  const folder = stat(target);
-  if (!folder.isDirectory()) return `--out ${out} is not a folder`;
-  if (folder.dev !== stat(parent).dev) {
-    return `--out ${out} is a mount point, which the finished book cannot be moved onto`;
+  // a symbolic link, even one to an empty folder or to nothing, cannot be renamed onto
+  let link: boolean;
+  try {
+    link = lstatSync(target).isSymbolicLink();
+  } catch {
+    return null;
   }
-  if (readdirSync(target).length > 0) {
-    return `--out ${out} is not empty: an old book is never replaced in place`;
+  if (link) return `--out ${out} is a symbolic link, which the finished book cannot replace`;
+  try {
+    const folder = stat(target);
+    if (!folder.isDirectory()) return `--out ${out} is not a folder`;
+    if (folder.dev !== stat(parent).dev) {
+      return `--out ${out} is on another device than its folder, or a mount point, which the finished book cannot be moved onto`;
+    }
+    if (readdirSync(target).length > 0) {
+      return `--out ${out} is not empty: an old book is never replaced in place`;
+    }
+  } catch (error) {
+    // one that cannot be read (its mode 000, say) cannot be known to be empty
+    return `--out ${out} cannot be read: ${message(error)}`;
   }
   return null;
 }
@@ -158,9 +171,15 @@ export function outProblem(
 /**
  * Why `--report` cannot be written, or null, its folder made if need be: an earlier run's
  * report is never replaced, as `figures` refuses one (T046), and a report whose folder
- * cannot be made is found before the book is made, not after.
+ * cannot be made is found before the book is made, not after. One inside `--out` is
+ * refused before its folder is made: `--out` would then not be empty, nor after a failure.
  */
-export function reportProblem(report: string): string | null {
+export function reportProblem(report: string, out: string): string | null {
+  const path = resolve(report);
+  const book = resolve(out);
+  if (path === book || path.startsWith(`${book}${sep}`)) {
+    return `--report ${report} is inside --out ${out}`;
+  }
   if (existsSync(report)) return `--report must not exist: ${report}`;
   const folder = dirname(resolve(report));
   try {
@@ -249,12 +268,6 @@ export async function bookCommand(
     err(`${error.message}\n`);
     return 2;
   }
-  // an earlier run's report is never replaced, and no report is written for the refusal
-  const unreportable = settings.report === null ? null : reportProblem(settings.report);
-  if (unreportable) {
-    err(`${unreportable}\n`);
-    return 2;
-  }
   const started = performance.now();
   const report = emptyReport(settings);
   const writeReport = (): boolean => {
@@ -300,11 +313,26 @@ export async function bookCommand(
     process.exit(128 + osConstants.signals[signal]);
   };
   const onSignal = (signal: NodeJS.Signals): void => {
-    if (signals.signalled !== null) return;
+    // a second signal stops the run at once, held or not: a launch that hangs would
+    // otherwise hold every signal until it times out
+    if (signals.signalled !== null || !signals.held) {
+      stop(signals.signalled ?? signal);
+      return;
+    }
     signals.signalled = signal;
-    if (!signals.held) stop(signal);
   };
   for (const signal of SIGNALS) process.on(signal, onSignal);
+
+  // an earlier run's report is never replaced, and no report is written for the refusal;
+  // checked, and its folder made, once the handlers are set, so a signal from the moment
+  // its folder exists finds them
+  const unreportable =
+    settings.report === null ? null : reportProblem(settings.report, settings.out);
+  if (unreportable) {
+    for (const signal of SIGNALS) process.off(signal, onSignal);
+    err(`${unreportable}\n`);
+    return 2;
+  }
 
   const problem = outProblem(settings.out);
   if (problem) return end(2, problem);

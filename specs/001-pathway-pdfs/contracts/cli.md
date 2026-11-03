@@ -104,9 +104,10 @@ the figures already drawn by `figures`.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
 - **Exit 2:** bad arguments; a `--report` that exists already (left untouched, and no
-  report written) or whose folder cannot be made; an `--out` that is not absent or empty,
-  as for `figures` (an old book is never replaced in place), whose folder cannot be
-  written, or that is a mount point (the finished book cannot be moved onto it); the
+  report written), whose folder cannot be made, or that is inside `--out`; an `--out` that
+  is not absent or empty, as for `figures` (an old book is never replaced in place), that
+  cannot be read, whose folder cannot be written, or that is a symbolic link, on another
+  device than its folder or a mount point (the finished book cannot be moved onto it); the
   graph cannot be reached at the start; any other error during the preflight, as
   `preflight` exits on one (below); or any other error while the book is printed (a
   print or a join that fails, or a PDF refused at its contents, links, outline or
@@ -116,7 +117,9 @@ the figures already drawn by `figures`.
   or temporary folder is left, the report is written naming the signal, and the exit is
   128 and the signal's number. It exits rather than raising the signal again, as the
   exit handlers that end the browser and remove its folders run only on an exit. A
-  signal while the browser is starting is acted on once it has started.
+  signal while the browser is starting is acted on once it has started, and a second
+  signal then stops the run at once. The browser launcher's own signal handling is off,
+  in `book` and `serve` alike, so the command's handlers decide.
 
 ## `pdf-export preflight`
 

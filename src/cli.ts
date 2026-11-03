@@ -37,13 +37,17 @@ export async function serve(args: readonly string[]): Promise<number> {
     return 2;
   }
   const service = await startService(settings);
-  process.stderr.write(`serving at ${service.url}\n`);
-  await new Promise<void>((resolve) => {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const)
+  // the handlers set before the service says it serves: one who signals it on reading that
+  // line would otherwise find none, and the process die by the signal, the service unclosed.
+  // SIGHUP too: the browser launcher no longer handles it (src/print/print.ts)
+  const stopped = new Promise<void>((resolve) => {
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const)
       process.once(signal, () => {
         resolve();
       });
   });
+  process.stderr.write(`serving at ${service.url}\n`);
+  await stopped;
   await service.close();
   return 0;
 }

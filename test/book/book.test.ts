@@ -13,12 +13,14 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants as osConstants, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, test } from 'node:test';
@@ -218,7 +220,10 @@ describe('pdf-export book', { skip }, () => {
    * `book` run as a child process, sent SIGTERM once `ready` holds (polled without pause, so it is sent within a moment):
    * how it exited, and its folders, which should be empty.
    */
-  const signalled = async (ready: (run: { parent: string; temporary: string }) => boolean) => {
+  const signalled = async (
+    ready: (run: { parent: string; temporary: string; pid: number }) => boolean,
+    signals: readonly NodeJS.Signals[] = ['SIGTERM']
+  ) => {
     const { parent, report, args } = place();
     const temporary = scratch();
     const child = spawn(process.execPath, [CLI, 'book', ...args, '--parallel', '1'], {
@@ -232,12 +237,12 @@ describe('pdf-export book', { skip }, () => {
     );
     try {
       const deadline = Date.now() + 60_000;
-      while (!ready({ parent, temporary })) {
+      while (!ready({ parent, temporary, pid: child.pid ?? 0 })) {
         assert.ok(child.exitCode === null, 'the run ended before it was signalled');
         assert.ok(Date.now() < deadline, 'never ready to be signalled');
         await new Promise((resolve) => setImmediate(resolve));
       }
-      child.kill('SIGTERM');
+      for (const signal of signals) child.kill(signal);
       const kill = setTimeout(() => child.kill('SIGKILL'), 30_000);
       await ended;
       clearTimeout(kill);
@@ -421,7 +426,37 @@ describe('pdf-export book', { skip }, () => {
       const stat = statSync(path);
       return path === out ? { dev: stat.dev + 1, isDirectory: () => stat.isDirectory() } : stat;
     };
-    assert.match(outProblem(out, mounted) ?? '', /is a mount point/);
+    assert.match(
+      outProblem(out, mounted) ?? '',
+      /is on another device than its folder, or a mount point/
+    );
+  });
+
+  test('exit 2 on an --out that cannot be read, or is a symbolic link, each left as it was', async () => {
+    // mode 000: whether it is empty cannot be read
+    const unreadable = place();
+    mkdirSync(unreadable.out, { mode: 0o000 });
+    let run;
+    try {
+      run = await book(unreadable.args);
+    } finally {
+      chmodSync(unreadable.out, 0o755);
+    }
+    assert.equal(run.code, 2, run.err);
+    assert.match(run.err, /cannot be read/);
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.deepEqual(readdirSync(unreadable.parent), ['TheReactomeBook']);
+    // a link to an empty folder, and one to nothing: neither can be renamed onto
+    for (const to of [scratch(), join(scratch(), 'nothing')]) {
+      const linked = place();
+      symlinkSync(to, linked.out);
+      const refused = await book(linked.args);
+      assert.equal(refused.code, 2, refused.err);
+      assert.match(refused.err, /is a symbolic link/);
+      assert.deepEqual(refused.left, [], 'left in its temporary folder');
+      assert.deepEqual(readdirSync(linked.parent), ['TheReactomeBook']);
+      assert.equal(readlinkSync(linked.out), to);
+    }
   });
 
   test('--report: an existing one refused untouched, its folder made, or refused before the run if it cannot be', async () => {
@@ -437,6 +472,15 @@ describe('pdf-export book', { skip }, () => {
     assert.equal(refused.code, 2);
     assert.match(refused.err, /--report must not exist/);
     assert.equal(readFileSync(existing.report, 'utf8'), 'an earlier report');
+    assert.deepEqual(refused.left, [], 'left in its temporary folder');
+    // one inside --out: refused before its folder (--out itself) is made
+    const inside = place();
+    const within = join(inside.out, 'reports', 'report.json');
+    const insideRun = await book([...inside.args.slice(0, -1), within], { open: counting });
+    assert.equal(insideRun.code, 2);
+    assert.match(insideRun.err, /is inside --out/);
+    assert.deepEqual(insideRun.left, [], 'left in its temporary folder');
+    assert.deepEqual(readdirSync(inside.parent), []);
     // a folder that cannot be made (a file in its way): refused before the graph is read
     const blocked = place();
     const file = join(scratch(), 'a file');
@@ -445,6 +489,7 @@ describe('pdf-export book', { skip }, () => {
     const unmade = await book(args, { open: counting });
     assert.equal(unmade.code, 2);
     assert.match(unmade.err, /its folder cannot be written/);
+    assert.deepEqual(unmade.left, [], 'left in its temporary folder');
     assert.equal(opened, 0);
     assert.deepEqual(readdirSync(blocked.parent), []);
     // a folder not there yet is made, and the report written in it
@@ -454,6 +499,7 @@ describe('pdf-export book', { skip }, () => {
     writeFileSync(join(nested.out, 'old.pdf'), '');
     const made = await book([...nested.args.slice(0, -1), report]);
     assert.equal(made.code, 2);
+    assert.deepEqual(made.left, [], 'left in its temporary folder');
     assert.equal(readReport(report).outcome, 'error');
   });
 
@@ -573,10 +619,30 @@ describe('pdf-export book', { skip }, () => {
     assert.equal(readReport(report).outcome, 'error');
     assert.ok(!existsSync(join(parent, 'TheReactomeBook')));
   });
-  test('a run stopped by SIGTERM, as the browser launches and after a part has printed: exit 143, its report written, nothing left', async () => {
+  test('a run stopped by a signal, as the browser launches and after a part has printed: exit 128 and its number, its report written, nothing left', async () => {
     const begun = (dir: string, prefix: string) =>
       readdirSync(dir).some((name) => name.startsWith(prefix));
-    const moments: Record<string, (run: { parent: string; temporary: string }) => boolean> = {
+    /** Whether the run's browser has been spawned: a child of its process (Linux's /proc). */
+    const spawned = ({ pid }: { pid: number }) => {
+      let children: string[];
+      try {
+        children = readFileSync(`/proc/${String(pid)}/task/${String(pid)}/children`, 'utf8')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+      } catch {
+        return false;
+      }
+      return children.some((child) => {
+        try {
+          return /chrom|headless/i.test(readFileSync(`/proc/${child}/comm`, 'utf8'));
+        } catch {
+          return false;
+        }
+      });
+    };
+    type Moment = (run: { parent: string; temporary: string; pid: number }) => boolean;
+    const moments: Record<string, Moment> = {
       // the printer's pages' folder, made just before the browser is launched
       'as the launch begins': ({ temporary }) => begun(temporary, 'pdf-export-'),
       // the launcher's folders, made before it has registered them for removal
@@ -591,14 +657,98 @@ describe('pdf-export book', { skip }, () => {
             readdirSync(join(parent, name)).some((file) => file.endsWith('.pdf'))
         ),
     };
-    for (const [moment, ready] of Object.entries(moments)) {
-      const run = await signalled(ready);
-      assert.deepEqual([run.code, run.signal], [143, null], moment);
+    const cases: [string, Moment, NodeJS.Signals[]][] = [
+      ...Object.entries(moments).map(([moment, ready]): [string, Moment, NodeJS.Signals[]] => [
+        moment,
+        ready,
+        ['SIGTERM'],
+      ]),
+      // SIGINT once the browser is spawned, which the browser launcher's own handler would
+      // take, closing the browser and exiting itself (130) before the run's handler, and
+      // two at once, the second stopping the run while the launch is held
+      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+        `as the browser is spawned (${String(n)})`,
+        spawned,
+        ['SIGINT'],
+      ]),
+      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+        `twice as the browser is spawned (${String(n)})`,
+        spawned,
+        ['SIGINT', 'SIGINT'],
+      ]),
+    ];
+    for (const [moment, ready, sent] of cases) {
+      const run = await signalled(ready, sent);
+      const [first = 'SIGTERM'] = sent;
+      const code = 128 + osConstants.signals[first];
+      assert.deepEqual([run.code, run.signal], [code, null], moment);
       assert.deepEqual(run.parent, [], moment);
       assert.deepEqual(run.temporary, [], moment);
       assert.equal(run.report?.outcome, 'error', moment);
-      assert.equal(run.report.error, 'stopped by SIGTERM', moment);
+      assert.equal(run.report.error, `stopped by ${first}`, moment);
     }
+  });
+
+  test('a second signal stops a run whose browser never finishes launching', async () => {
+    // a child that runs `book` with a printer whose launch never ends, as a hung browser's
+    // would: the first signal is held for the launch, the second stops the run at once
+    const { parent, report, args } = place();
+    const dir = scratch();
+    const marker = join(dir, 'launching');
+    const script = join(dir, 'hung.ts');
+    writeFileSync(
+      script,
+      [
+        `import { writeFileSync } from 'node:fs';`,
+        `import { bookCommand } from ${JSON.stringify(new URL('../../src/book/command.ts', import.meta.url).href)};`,
+        `process.exitCode = await bookCommand(${JSON.stringify(args)}, process.env, {`,
+        `  out: (text) => process.stdout.write(text),`,
+        `  err: (text) => process.stderr.write(text),`,
+        `  startPrinter: () => {`,
+        `    writeFileSync(${JSON.stringify(marker)}, '');`,
+        `    return new Promise(() => { setInterval(() => undefined, 1000); });`,
+        `  },`,
+        `});`,
+      ].join('\n')
+    );
+    const child = spawn(process.execPath, [script], {
+      env: { ...process.env, TMPDIR: scratch() },
+      stdio: 'ignore',
+    });
+    const ended = new Promise<void>((resolve) =>
+      child.once('exit', () => {
+        resolve();
+      })
+    );
+    const kill = setTimeout(() => child.kill('SIGKILL'), 60_000);
+    try {
+      while (!existsSync(marker)) {
+        assert.ok(child.exitCode === null, 'the run ended before it launched');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      child.kill('SIGINT');
+      // held: the run goes on waiting for its launch
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      assert.equal(child.exitCode, null, 'the first signal was not held');
+      const sent = Date.now();
+      child.kill('SIGINT');
+      const stopped = await Promise.race([
+        ended.then(() => true),
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => {
+            resolve(false);
+          }, 10_000)
+        ),
+      ]);
+      assert.ok(stopped, 'the second signal did not stop the run');
+      assert.ok(Date.now() - sent < 10_000);
+    } finally {
+      clearTimeout(kill);
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }
+    assert.deepEqual([child.exitCode, child.signalCode], [130, null]);
+    assert.deepEqual(readdirSync(parent), []);
+    assert.equal(readReport(report).error, 'stopped by SIGINT');
   });
 
   test('a run stopped by SIGTERM before its preflight ends writes its report too', async () => {
@@ -643,6 +793,11 @@ describe('pdf-export book', { skip }, () => {
       ['placeholder infectious disease', 'placeholder infectious\u05F3disease'],
       ['nucleoplasm', 'nucleo\u05F3plasm'],
       ['Placeholder08', 'Placeholder\u05F308'],
+      // a reaction's type, and a reference's title, journal and chapter
+      ['transition', 'trans\u05F3ition'],
+      ['Placeholder web page', 'Placeholder web\u05F3page'],
+      ['Placeholder Journal', 'Placeholder\u05F3Journal'],
+      ['Placeholder chapter', 'Placeholder\u05F3chapter'],
     ];
     let label = '';
     const figures = folder((stId, svg) =>
@@ -671,6 +826,8 @@ describe('pdf-export book', { skip }, () => {
       'Inferred from',
       'Diseases',
       'Compartments',
+      'Type',
+      'Literature references',
     ]) {
       assert.ok(all.includes(printed), printed);
     }
@@ -681,6 +838,10 @@ describe('pdf-export book', { skip }, () => {
       'infectious\u2032disease',
       'nucleo\u2032plasm',
       'Placeholder\u203208',
+      'trans\u2032ition',
+      'Placeholder web\u2032page',
+      'Placeholder\u2032Journal',
+      'Placeholder\u2032chapter',
       `\u2022${label}`,
     ]) {
       assert.ok(all.includes(printed), printed);

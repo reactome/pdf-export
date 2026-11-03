@@ -5,7 +5,10 @@
 // done past it, a hanging graph, figure or print among them), a browser that dies, the
 // health answer, and FR-017's characters in the texts and the labels, logged once per PDF.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, describe, test } from 'node:test';
@@ -1137,3 +1140,58 @@ describe('a print stopped by its signal', () => {
     }
   });
 });
+
+test(
+  'pdf-export serve stops on SIGINT, SIGTERM and SIGHUP: exit 0, its browser and folders gone',
+  { skip: skipWithoutGraph },
+  async () => {
+    // the browser launcher's own handlers are off (src/print/print.ts), so the command's own
+    // close the service, and the browser ends with it
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const root = mkdtempSync(join(tmpdir(), 'pdfx-serve-'));
+    try {
+      for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+        const temporary = mkdtempSync(join(root, 'tmp-'));
+        const port = await closedPort();
+        const child = spawn(
+          process.execPath,
+          [
+            fileURLToPath(new URL('../src/cli.ts', import.meta.url)),
+            'serve',
+            ...['--port', String(port), '--files', FILES, '--site', 'https://site.example'],
+            ...['--render', render.url, '--analysis', analysis.url],
+          ],
+          { env: { ...process.env, TMPDIR: temporary }, stdio: ['ignore', 'ignore', 'pipe'] }
+        );
+        const ended = new Promise<void>((resolve) =>
+          child.once('exit', () => {
+            resolve();
+          })
+        );
+        let stderr = '';
+        const serving = new Promise<void>((resolve) => {
+          child.stderr.on('data', (chunk: Buffer) => {
+            stderr += chunk.toString();
+            if (stderr.includes('serving at')) resolve();
+          });
+        });
+        const kill = setTimeout(() => child.kill('SIGKILL'), 60_000);
+        try {
+          await Promise.race([serving, ended]);
+          assert.match(stderr, /serving at/, signal);
+          child.kill(signal);
+          await ended;
+        } finally {
+          clearTimeout(kill);
+        }
+        assert.deepEqual([child.exitCode, child.signalCode], [0, null], `${signal}: ${stderr}`);
+        assert.deepEqual(readdirSync(temporary), [], signal);
+      }
+    } finally {
+      await render.close();
+      await analysis.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+);
