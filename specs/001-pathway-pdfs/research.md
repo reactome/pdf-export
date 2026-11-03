@@ -513,12 +513,15 @@ own source, and the answers agree with them.
   the others `Accept: application/json`. The CSV endpoint produces only `text/csv`: asked
   with `Accept: application/json` alone it answers the framework's own 406, not the
   service's JSON, and `/token/{token}` asked for `text/csv` answers an empty 406. With
-  both types listed, an error comes back in the service's JSON (ran).
+  `text/csv` listed (alone, or with JSON), or no `Accept` at all, an error comes back in
+  the service's JSON (ran).
 - **`/token/{token}` is paged to one pathway** (`pageSize=1&page=1`): the counts and the
   summary are the same, and the answer was 1 KB rather than 94 KB unpaged for 229
   pathways (ran).
 - **A 404 from `found/…` is read as none found,** as today's book reads it, though it
-  may mean the result went between `/token/{token}` and that call. The analysis's own `includeDisease`, if shown, is read from an answer
+  may mean the result went between `/token/{token}` and that call. **A later 410** (from
+  `found/…` or the CSV), or a 404 from the CSV, means the result went while the PDF was
+  being made: `gone-token` and `unknown-token` as for the first call, and no PDF. The analysis's own `includeDisease`, if shown, is read from an answer
   asked for without the parameter.
 - pdf-export reads the analysis through the analysis service's API, at an address that
   is a setting. It is the same service, reading the same files by the same rules, and

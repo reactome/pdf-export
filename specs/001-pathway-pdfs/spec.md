@@ -564,7 +564,10 @@ of pages with today's book.
     (and so which five references are shown), summations, diseases and the events
     before and after in the database's order; the new ones in the curators' order
     (plan, research R2);
-  - top-level pathways by name, not by database identifier (FR-002).
+  - top-level pathways by name, not by database identifier (FR-002);
+  - with an analysis, the identifiers found where a pathway today's filter leaves out
+    (one with no p-value, say) holds an identifier no kept pathway does: counted now,
+    not today (research R6).
 - **Departures in the endpoint's answers** (FR-014): an unknown or gone analysis token
   is answered as such, where today's endpoint answers an empty response for both; and
   the analysis options FR-006 drops are ignored if sent.
