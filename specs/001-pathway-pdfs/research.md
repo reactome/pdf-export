@@ -45,7 +45,7 @@ deployment pins; built here against graph-core 2.0.9, which its pom names).
   shown), summations, diseases and the events before and after. Only the root's own
   `hasEvent` and `compartment` are sorted. `inferredFrom` is a hash set.
 - **The top-level pathways** are written in database-id order today. FR-002 asks for
-  name order, ignoring case.
+  name order, ignoring case, for making, checking and reporting the book's PDFs.
 - **The cover's names** are written with U+2060 between every character and no-break
   spaces between words, presumably to stop the reader breaking them. A text comparison
   must normalise both.
@@ -200,8 +200,10 @@ synthetic documents, on this host under load.
     joined, the PDFs' joins independent of one another;
   - links rewritten, and the outline written by pdf-export, which it needs anyway: an
     event's later places in a PDF point at its one section (FR-004), which Chromium's
-    headings would not do. An event in another of the book's PDFs is reached by its page
-    on the website, or is plain text where FR-003 says so, as today;
+    headings would not do. An event held only by another of the book's PDFs is, as
+    FR-003 has it for any event a PDF does not hold: plain text in a location, a link to
+    its page on the website for what an event was inferred from, and left out of a
+    reaction's events before and after;
   - **page numbers and running headers stamped after the join,** not printed: the parts
     are printed without them, and pdf-lib writes each page's number ("12 of 3,760") and
     its top-level pathway's name, which the model knows from where each part landed,
@@ -212,9 +214,11 @@ synthetic documents, on this host under load.
     doubles the printing time. Stamping is to be measured in the first tasks;
   - the contents list numbered by the second pass, its front part only;
   - **the join's memory** re-measured at the largest PDF's size (pdf-lib holds the whole
-    file): 120 MB for 4,930 synthetic pages, and today's 3,760-page file is 383 MB, so
-    perhaps near 400 MB for real, with a few joins at once. Joining in groups, needed
-    only for one file of the whole book, is no longer planned.
+    file): 120 MB for 4,930 synthetic pages, and today's 3,760-page file is 383 MB from
+    another producer, so perhaps near 400 MB (inference). A join takes one of
+    `--parallel`'s slots, as a part's print does, so printing and joining together stay
+    within that bound. Joining in groups is kept only as a fallback, if T011 finds even
+    one PDF's join does not fit.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
   from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
   are numbered as the book's are: a first print with placeholders, its anchors' pages

@@ -56,7 +56,7 @@ the figures already drawn by `figures`.
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                       |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                    |
 | `--out`      |                                | the folder written; default `TheReactomeBook`                                      |
-| `--parallel` |                                | parts printed at once, across the PDFs; default 4                                  |
+| `--parallel` |                                | parts printed and PDFs joined at once, across the PDFs; default 4                  |
 | `--report`   |                                | where the run report (data-model.md) is written, as JSON                           |
 
 - **The preflight,** before anything is printed (and the character check's second half,
@@ -66,7 +66,8 @@ the figures already drawn by `figures`.
   hold) and the figures' files in `--figures`, and a file missing is a fault
   `missing-file <name>`. The folder must pass the checks contracts/figures.md lists under
   "What `book` checks": `incomplete-folder`, `no-checksum`, `stale-folder`,
-  `stale-summary` and `stale-figure <stId>`.
+  `stale-summary` and `stale-figure <stId>`. A top-level pathway's name a file cannot
+  hold, or two equal ignoring case, is a fault `bad-file-name <stId>` (data-model Book).
   Any of these ends the step with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault
   `uncovered-character <code point> <stId>` (research R5, Story 5 scenario 4), checked
@@ -86,7 +87,10 @@ the figures already drawn by `figures`.
     here can come after earlier parts or PDFs are printed; the step still ends with exit
     1 and no book written, the folder being moved into place only at the end.
 - **Exit 0:** the book is written, and `check-book` passed on it. The folder is written
-  beside its name and moved into place, so a failed run never leaves a partial book.
+  beside its name and moved into place, so a failed run never leaves a partial book. A
+  run is whole: a failure in any PDF writes none, and the step is run again.
+- **`--out`** must be absent or empty (exit 2 otherwise), as for `figures`: an old book
+  is never replaced in place.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
 - **Exit 2:** bad arguments, or the graph cannot be reached at the start.
@@ -101,18 +105,23 @@ FR-011's check, alone. Also run by `book`.
 | `--files`              | the release's folder, for which events have a figure's source (FR-011)                   |
 
 - **Exit 0:** every check passed.
-- **Exit 1:** at least one fault. Each is printed as `fault <kind> <stId>`. The kinds:
-  `missing-pathway`, `extra-file <name>`, `not-in-contents`, `not-in-outline`,
-  `no-name`, `no-stable-id`, `missing-figure` and `broken-link`, each within the PDF of
-  the top-level pathway it concerns. The PDFs are untagged, so sections are found by
-  the outline and the text at each entry's destination (research R8).
+- **Exit 1:** at least one fault, one line each:
+  - `fault missing-pathway <stId>`: a top-level pathway with no PDF;
+  - `fault extra-file <file name>`: a PDF in the folder that is no top-level pathway's;
+  - `fault <kind> <file name> <stId>` for the rest, naming the PDF, as an event under two
+    top-level pathways is in both: `not-in-contents`, `not-in-outline`, `no-name`,
+    `no-stable-id`, `missing-figure` and `broken-link`.
+
+  A file is matched to its top-level pathway by name: the names expected are made from
+  the graph as `book` makes them. The PDFs are untagged, so sections are found by the
+  outline and the text at each entry's destination (research R8).
 
 ## `pdf-export compare <reference> <new>`
 
 FR-012's comparison, for development only; it is never run by the release. The reference
 is a PDF, or a folder of today's PDFs, as today's book is one file per top-level
 pathway, and the new side likewise; a folder is compared file by file, by top-level
-pathway.
+pathway, and a file on one side only is reported as a difference.
 
 - **Output:** a JSON report of the differences by part and kind, with counts. Names
   appear only as counts and hashes (FR-013).

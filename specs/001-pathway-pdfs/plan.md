@@ -95,8 +95,8 @@ fonts above), run by the release and beside the website's services.
   - The book's printing peaks under 2.5 GB at four parts at once (R4: 2.1 GB measured
     with synthetic parts; real figures are heavier, so it is re-measured).
   - A join holds one PDF in memory: 120 MB for 4,930 synthetic pages, and perhaps near
-    400 MB for the largest real PDF (3,760 pages, 383 MB today; inference), with a few
-    joins at once. It is re-measured in the first tasks (R4).
+    400 MB for the largest real PDF (3,760 pages, 383 MB today; inference). A join takes
+    one of `--parallel`'s slots, so printing and joining stay within its bound. It is re-measured in the first tasks (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service (for `figures` and `serve`; `book`
   reads the figures' folder), the content service's release (for `figures`) and the
@@ -156,7 +156,7 @@ specs/001-pathway-pdfs/
 ```text
 src/
 ├── graph/          # the Neo4j driver, the queries (R2), mapping rows to the model
-├── model/          # Event, Section, Book, SingleEventPdf (data-model.md)
+├── model/          # Event, Section, Book and BookPdf, SingleEventPdf (data-model.md)
 ├── figures/        # the render service's client, id prefixing, figure choice, the figures step
 ├── analysis/       # the analysis service's client
 ├── layout/         # HTML templates for each part, the compiled theme, fonts

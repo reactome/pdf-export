@@ -8,6 +8,9 @@
 
 **Input**: User description: "Reactome's pathway PDFs from the graph, replacing reactome/event-pdf (plan: #3). Two outputs from one implementation: the release's book, as one PDF instead of today's folder of per-pathway PDFs, with a table of contents, bookmarks and links between pathways; and the website's PDF of one pathway or reaction, on request. Content as event-pdf writes today, proven against it by meaning. Data from the graph only, with the release's own files where needed. Figures in the new website's pathway-browser look. Every dependency under a non-restrictive licence, checked in CI. Runs as the release's step, with a check of the book that can fail on wrong content. Public repository: no people's names in fixtures."
 
+**Changed** (user's decision, 3 Nov 2026): the book stays a folder of PDFs, one per
+top-level pathway, as today's, not the single PDF the description asks for (Background).
+
 ## Background: what `event-pdf` writes today
 
 `reactome/event-pdf` makes both of Reactome's pathway PDFs, with the same parts in
@@ -80,8 +83,8 @@ Three things are to change, and one stays:
 
 - **The book stays a folder of PDFs,** one per top-level pathway, archived as today's
   (user's decision, 3 Nov 2026, in place of the single PDF first specified: the book is
-  large and grows with every release; separate files are printed in parallel, stay a
-  size readers can open, and fail and are remade one at a time).
+  large and grows with every release; separate files are printed in parallel, each
+  joined alone, and stay a size readers can open).
 - **The new look:** figures are drawn as the new website's pathway browser draws them.
 - **Loose licences:** `event-pdf` is AGPL-3.0, depends on GPL-3.0 code, and embeds a
   proprietary font.
@@ -231,7 +234,6 @@ A check then fails the step if the book's content is wrong.
 
 **Why this priority**: the book reaches readers only through the release. Today's check
 reads file names and sizes: a book of the right size and the wrong content passes it.
-And at the switch, the list it checks names files the new step does not write.
 
 **Independent Test**: run the step's command against a private copy of the graph. Then
 damage the output in each way FR-011 names, and see the check fail on each.
@@ -323,6 +325,11 @@ of pages with today's book.
   - an introduction;
   - a contents list before the sections;
   - nested bookmarks.
+
+  The PDFs are made, checked and reported in order of their top-level pathways' names,
+  ignoring case; "the first event in document order" across the book means in that
+  order.
+
 - **FR-003**: Each PDF MUST link:
   - each contents entry and bookmark to its section;
   - each pathway in an event's location to its section where the PDF holds it (otherwise
@@ -538,8 +545,10 @@ of pages with today's book.
   about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
   machine and time are open, to be agreed with the release's owners (SC-010).
 - **The release's check:** the check of FR-011 joins the release's file-list check,
-  which, with the files named as today's, can keep running. The release's owners agree
-  the arrangement.
+  which, with the files named as today's, can keep running. Its size tolerance compares
+  the new PDFs with `event-pdf`'s at the switch, sizes no one has measured (new look,
+  figures and layout), so the release's owners take the first new book's sizes as its
+  baseline. They agree the arrangement.
 - **The render service beside the figures' step:** the figures come from the website's
   render service, with its content service, run on the release's graph and files beside
   the step that draws the book's figures before the book (SC-010; plan, research R3,
