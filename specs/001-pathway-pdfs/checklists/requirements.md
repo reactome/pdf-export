@@ -89,3 +89,7 @@
   once); the gate table's render-service line matches Complexity Tracking; FR-016's
   floor reads as one; the EHLD summary's extra entry explained (an event the graph does
   not hold) and the preflight told to ignore such entries.
+- **The book as one PDF per top-level pathway (user's decision, 3 Nov 2026; #122,
+  replacing #121 and #120 after their reviews):** FR-001, FR-002 and the rest follow today's folder
+  of files; the one cover and the cross-pathway links leave the expected differences;
+  each PDF is still printed in parts and joined; the check's faults name their PDF.

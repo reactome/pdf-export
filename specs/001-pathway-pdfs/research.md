@@ -45,7 +45,7 @@ deployment pins; built here against graph-core 2.0.9, which its pom names).
   shown), summations, diseases and the events before and after. Only the root's own
   `hasEvent` and `compartment` are sorted. `inferredFrom` is a hash set.
 - **The top-level pathways** are written in database-id order today. FR-002 asks for
-  name order, ignoring case.
+  name order, ignoring case, for making, checking and reporting the book's PDFs.
 - **The cover's names** are written with U+2060 between every character and no-break
   spaces between words, presumably to stop the reader breaking them. A text comparison
   must normalise both.
@@ -191,25 +191,34 @@ synthetic documents, on this host under load.
 
 **Decision.**
 
-- **The book:**
-  - one part per top-level pathway, split at section boundaries when one runs past about
-    200 pages;
-  - printed untagged, a few at a time, then joined;
-  - links rewritten, and the outline written by pdf-export, which it needs anyway: in the
-    book, an event's later places point at its one section (FR-004), which Chromium's
-    headings would not do;
+- **The book: one PDF per top-level pathway** (user's decision, 3 Nov 2026, in place of
+  one PDF of the whole book, which joined about 23,500 pages in one process and grew
+  with every release; FR-001):
+  - each PDF printed in parts at section boundaries, about 200 pages a part, so a small
+    pathway's PDF is one part and the largest today (3,760 pages) about 19;
+  - printed untagged, a few parts at a time across the PDFs, then each PDF's parts
+    joined, the PDFs' joins independent of one another;
+  - links rewritten, and the outline written by pdf-export, which it needs anyway: an
+    event's later places in a PDF point at its one section (FR-004), which Chromium's
+    headings would not do. An event held only by another of the book's PDFs is, as
+    FR-003 has it for any event a PDF does not hold: plain text in a location, a link to
+    its page on the website for what an event was inferred from, and left out of a
+    reaction's events before and after;
   - **page numbers and running headers stamped after the join,** not printed: the parts
-    are printed without them, and pdf-lib writes each page's number ("12 of 23,541") and
-    its chapter's name, which the model knows from where each chapter's parts landed,
+    are printed without them, and pdf-lib writes each page's number ("12 of 3,760") and
+    its top-level pathway's name, which the model knows from where each part landed,
     in an embedded subset of Roboto, in the compiled theme's on-surface-variant colour,
     read from the compiled CSS, not written here (FR-015). SC-009's check sees that font
     and colour too. The other
     way, printing every part, counting, and printing them again with their offsets,
     doubles the printing time. Stamping is to be measured in the first tasks;
   - the contents list numbered by the second pass, its front part only;
-  - **the join's memory** re-measured on the real book (pdf-lib holds the whole file):
-    120 MB in the synthetic test, perhaps near 1 GB for real. If it does not fit, the
-    chapters are joined in groups and the groups joined last.
+  - **the join's memory** re-measured at the largest PDF's size (pdf-lib holds the whole
+    file): 120 MB for 4,930 synthetic pages, and today's 3,760-page file is 383 MB from
+    another producer, so perhaps near 400 MB (inference). A join takes one of
+    `--parallel`'s slots, as a part's print does, so printing and joining together stay
+    within that bound. Joining in groups is kept only as a fallback, if T011 finds even
+    one PDF's join does not fit.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
   from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
   are numbered as the book's are: a first print with placeholders, its anchors' pages
@@ -348,7 +357,7 @@ synthetic documents, on this host under load.
     diagram files the Figure rules choose to draw (a diagram's figure reads its file,
     research R3; a reaction's figure is laid out by the content service from the graph's
     names); and after drawing, in each SVG's text, before the part holding it is printed
-    (the book is printed in parts, R4);
+    (the book's PDFs are printed in parts, R4);
   - the check of FR-011 and SC-009 lists every font in the PDF.
 
 **Alternatives considered.**
@@ -696,7 +705,7 @@ is ignored, not a missing file.
   | Reading the graph                              | 4 min  | batched queries, one per level and part                                                                          |
   | Printing the parts                             | 13 min | about 11 ms a page four at once (18 ms one at a time) in the synthetic test; real figures are heavier            |
   | Join, links, outline, page numbers and headers | 6 min  | 6 s for 4,930 synthetic pages, scaled, with room                                                                 |
-  | The contents' second pass                      | 2 min  | the front part only                                                                                              |
+  | The contents' second pass                      | 2 min  | each PDF's front part only                                                                                       |
   | `check-book`                                   | 9 min  | 84 s for 4,930 pages scales to 6.7 min for 23,541 (inference), before the graph and text checks; 2 min of margin |
 
   The stages sum to 78 minutes, the whole of SC-003's budget, with no margin of their
@@ -783,7 +792,8 @@ is ignored, not a missing file.
   a result (R6; measured by T009); the join's memory and stamping (R4).
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
-  part (R4), it is split within its chapter, at section boundaries.
+  part (R4), its PDF is split at section boundaries and joined; the 29 PDFs are made
+  several at a time, so the joins overlap the printing.
 
 ## R8. The checks: by meaning, with tools under loose licences
 
@@ -818,8 +828,8 @@ embedded.
   inside that Chromium, at the same scale, the book's cropped to the figure's box. No
   more than 1% of pixels may differ. Run on a sample, in development.
 - **FR-012's comparison** (`compare`) reduces both sides to the parts FR-012 lists. Its
-  reference may be a folder of today's files, as today's book is 29 of them: their
-  covers' distinct names are counted across all of them.
+  reference may be a folder of today's files, as today's book is 29 of them, compared
+  with the new book's folder file by file, by top-level pathway.
   - It normalises the cover's hidden characters and white space.
   - It treats list order as a recorded difference.
   - It prints counts and hashes of names, never names (FR-013).
@@ -840,7 +850,7 @@ dependencies, though a person may use them to look.
   - `pdf-export figures`, the release's first command: graph, files and render service
     in, the figures' folder out (R7's route, contracts/figures.md);
   - `pdf-export book`, the release's command line: graph, files, the figures' folder and
-    output path in, `TheReactomeBook.pdf` and a run report out;
+    output folder in, the `TheReactomeBook` folder of PDFs and a run report out;
   - `pdf-export serve`, an HTTP service for the website: `GET /event/{stId}.pdf` with
     depth and token, answering a PDF or the errors of Story 2's scenario 4. Its bind
     address is a setting, loopback by default: in its own container it binds where its

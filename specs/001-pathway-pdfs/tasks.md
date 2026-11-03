@@ -164,15 +164,15 @@ for WebsiteAngular to ship it (T042).
 
   It can be written before T009, answering contract-shaped placeholders; T009's recorded answers replace them, and the task is ticked only then.
 
-- [ ] T011 [P] Measure the join and stamping at the book's size (research R4).
-  - Print synthetic parts totalling 23,541 pages, with figures in the real book's mix (T005's SVGs, so after T005).
+- [ ] T011 [P] Measure the join and stamping at the largest PDF's size (research R4; the book is one PDF per top-level pathway since 3 Nov 2026).
+  - Print synthetic parts totalling 3,760 pages (today's largest file), with figures in the real book's mix (T005's SVGs, so after T005), and join a few such PDFs at once, as `book` would.
   - Join them with `@cantoo/pdf-lib`, or pdf-lib 1.17 if the fork fails the tests.
   - Rewrite the links through placeholder URIs and probes recording page and y.
   - Write a nested outline, and stamp page numbers and headers in embedded Roboto.
 
-  Record time and peak memory per stage against research R7's 13 + 6 minutes. The script lives in `ci/measure/`. If the join does not fit in memory, take T012.
+  Record time and peak memory per stage against research R7's 13 + 6 minutes. The script lives in `ci/measure/`.
 
-- [ ] T012 Only if T011's join does not fit in memory: join in groups (research R4). Join the parts a few at a time into intermediate files, then join those, keeping the links' and the outline's targets. Record the memory and time against the budget.
+- [ ] T012 Only if T011's join of one PDF (about 3,760 pages) does not fit in memory: join in groups (research R4). Unlikely since the book became one PDF per top-level pathway (3 Nov 2026). Join the parts a few at a time into intermediate files, then join those, keeping the links' and the outline's targets. Record the memory and time against the budget.
 - [x] T013 The graph reader, `src/graph/`: — #28, replacing #26 after its review.
   - the Neo4j driver (`neo4j-driver`), with the database name and the `NEO4J_*` settings;
   - the batched queries of research R2: the tree by level; each part across a level's events; literature, the first five by `order`, with six authors and whether there are more; edits with their authors; the release; the top-level pathways;
@@ -332,19 +332,29 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
 
 ---
 
-## Phase 4: User Story 1 — the release's book is one PDF (P1)
+## Phase 4: User Story 1 — the release's book (P1)
 
-**Goal:** `pdf-export book` writes `TheReactomeBook.pdf` and checks it (contracts/cli.md).
+**Goal:** `pdf-export book` writes the `TheReactomeBook` folder, one PDF per top-level
+pathway named as today's, and checks it (contracts/cli.md).
 
-**Independent test:** quickstart §4, on a private copy. The book is one file. Every
-top-level pathway and every event is in the contents and the bookmarks. `check-book`
+**Independent test:** quickstart §4, on a private copy. There is one PDF per top-level
+pathway and no other. Every event is in its PDF's contents and bookmarks. `check-book`
 passes.
+
+- [ ] T048 [US1] The book as one PDF per top-level pathway (user's decision, 3 Nov 2026; FR-001, FR-002, data-model BookPdf), changing what T014 and T018 built for one PDF.
+  - `src/model/build.ts`: the graph is read once, as now, and split, with what is computed over a document computed per document: the events it holds (`held`, so a reaction's events before and after in another PDF are dropped), each event's first place, and the cover's names: the book gives one document per top-level pathway, by name ignoring case (FR-002), each in full depth with its own cover (the pathway's name and diagram, the names across its own events, no excerpt note), introduction and contents. An event is in full at its first place in each document and a short entry at its later places there; one under two top-level pathways is in full in both.
+  - The layout needs no change: `layoutBookFront` already inlines a cover's figure (`src/layout/front.ts`), and the cover now has one, set by `build.ts`, so the front part falls under T024's label check before it is printed.
+  - Links (FR-003): to a section only within the same PDF; an event held only by another of the book's PDFs is as any event a PDF does not hold: plain text in a location, its page on the website for what an event was inferred from, and left out of a reaction's events before and after (`build.ts` already drops those). The excerpt note's "The Reactome Book" (`src/layout/text.ts`) names the book, which stays its name.
+  - **What changes in the code and tests built for one PDF:** `src/model/types.ts` (`Cover.release`, "a book's chapters"), `src/model/build.ts` (its header and the book's assembly); `test/model/build.test.ts` (chapters across the book; the shared reaction, now in full under both top-level pathways; the subtree beta reaches through "beta sub with diagram", whose "Alpha sub two", "Two-parent sub" and "Disease reaction" are now in full in beta's PDF as well, so the places asserted for them change; the book's cover and counts), `test/layout/layout.test.ts` (Reaction one's events before and after it in other top-level pathways' PDFs, Polymerisation four and Inferred reaction, are now left out; the book's front and its title), and `test/layout/fixture.ts`, `test/layout/print.test.ts` and `test/print/print.test.ts`, which build one `built.book`.
+
+  Tests on the fixture: one document per top-level pathway in name order, seen failing with one document; an event under two top-level pathways is in full in each, seen failing with a short entry in the second; each cover's names are its own document's, seen failing with the book's names; no link targets a section in another document.
 
 - [ ] T024 [US1] The preflight, in `src/cli.ts` `book --files <dir> --figures <dir>` (contracts/cli.md).
   - **Figures:** each figure the Figure rules choose must be in `--figures` (contracts/figures.md); one missing is a fault `missing-file {stId}.svg`, and the folder checks contracts/figures.md lists under "What `book` checks" (`incomplete-folder`, `no-checksum`, `stale-folder`, `stale-summary`, `stale-figure {stId}`); T024 adds a `checksum` to the fixture's `DBInfo` and to `src/graph/queries.ts`'s release reader. The preflight's checks live in `src/preflight/`, for T046 to run too. Tests, with a figures' folder the test writes (T046 comes after): a planted missing figure file, a manifest entry with another source, a figure the rules choose with no line, a line for an event the rules give no figure, a folder of another checksum and one of another release number (`stale-folder`), one of another summary hash (`stale-summary`), a folder with no `complete` line, one with a figure line after `complete`, one with a torn last line, one with a middle line that is not JSON, one with two lines for one figure, and one whose `complete` differs from its first line (each `incomplete-folder`), and a graph with no checksum (`no-checksum`) are each caught before anything is printed.
   - **Files:** the files the figures need come from the graph's events. The summary only says which of them are illustrations, and its entries for events the graph does not hold are ignored (research R7). Each missing file is a fault `missing-file <name>`.
   - **Characters (FR-017):** first FR-017's substitutions, in T022's `src/layout/characters.ts` (with T017's detector), which T024 extends with the book's fault mode, applied to every text the layout writes and to the text of every inlined figure's labels (their text content only, never an element, id or attribute): U+2011 (non-breaking hyphen) by U+002D, which every face draws and a reader's search finds; U+FB01 (the ﬁ ligature) by "fi"; U+02D9 (spacing dot above, in release 98 a radical's dot, "O2˙−") by U+2022; and U+05F3 (geresh, in release 98 a prime, "2׳-O methylation") by U+2032. Measured on release 98, every text the PDFs print but people's names: summations and event names (U+2011 on 197 lines, U+FB01 on 5, U+02D9 on 1), publications' titles, journals and chapters (U+2011 on 6, U+05F3 on 1), and the names of compartments, diseases, species and physical entities (none); and the 115,376 `displayName`s of the nodes, compartments, notes, shadows and links in the release's 1,390 human diagram files (`{stId}.json` only, not `.graph.json`; the 220 illustrated pathways' files among them, a superset of what is drawn) (none). People's names were not measured (the organisation's rule on personal information); the preflight checks them, as everything, when the book is made. Then each character no font covers is a fault `uncovered-character <code point> <stId>` (T017's detector), checked twice (contracts/cli.md): before drawing, over the texts, the names the figures label (every physical entity a reaction's figure draws, inputs, outputs, catalysts and regulators, and their compartments, from the graph) and the labels of the diagram files the Figure rules choose to draw, read in `src/preflight/labels.ts`; and after drawing, before each part is printed, over each SVG's label text, in T022's `src/figures/labels.ts`, extended here with the book's fault mode, which also makes the substitutions there after T014's id prefixing. Only the substitutions made in what is printed are counted for the run report, not the preflight's own.
-  - Either fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
+  - **File names:** a top-level pathway's name holding `/` or NUL, or over 255 bytes with `.pdf`, or two names equal ignoring case, is a fault `bad-file-name <stId>` (data-model Book); tested with a planted name of each kind.
+  - Any fault means exit 1, with no book written (Story 5, scenarios 3 and 4).
 
   Tests:
   - a planted missing diagram, a planted missing illustration and a planted uncovered character are each caught;
@@ -370,58 +380,56 @@ passes.
   Tests, on the fixture against the stub render service: exit 0 with one file per figure the fixture's book needs, by kind, and a `complete` manifest that passes T024's folder checks, seen failing with a selection keyed by its ancestor; a non-empty `--out` is refused (exit 2); a `build` of `unknown`, and a graph with no checksum, are refused; a `build` changed between a figure's render and the read after it, and a content release changed likewise, each leave that figure with no file and no line, and the run exits 1 with no `complete`; a figure failing its label check is left with no file and no line; one figure the stub refuses with a 404 and one with a 500 (its health unchanged), and one failing its label check: the run draws all the others, then exits 1 naming all three, with no `complete`; a content service not answering the read after a figure stops the run, exit 1; the render stub stopping answering mid-run stops the run at the next failed figure, exit 1, without waiting through the rest, and its report names why; the stub answering `/health` but returning 504 to every render trips the breaker, exit 1, its report naming it; ten figures in a row answering 500 (cause `failed`) do not trip it, the run drawing the rest; nor do 500s answered slowly for longer than `5 × --timeout` in all, each within `--timeout`; a deployment change's stop writes the report too; an unreachable content service is exit 2; a content service answering another release is refused before any drawing; a planted missing release file and a planted uncovered character each fail with exit 1 before any request; a figure that times out once and then answers, and one that answers 504 once and then draws, are drawn (the retry); a refused figure leaves no partial file; exit 2 on the render service unreachable.
 
 - [ ] T025 [US1] Parts, `src/print/parts.ts`.
-  - One part per top-level pathway, by name ignoring case (FR-002).
+  - Each of the book's PDFs is printed in parts (T048's documents).
   - A part is split at section boundaries past a page threshold: a setting, about 200 pages by default.
-  - Parts are printed untagged, a few at a time (`--parallel`), and joined.
+  - Parts are printed untagged, a few at a time across the PDFs, and each PDF's parts joined; a join takes one of `--parallel`'s slots, as a print does, and one PDF's join does not wait for another's printing.
 
-  Tests on the fixture, with the threshold lowered so a chapter splits:
-  - the joined page count equals the sum of the parts';
-  - no section is split between parts;
-  - the chapters are in FR-002's order, seen failing with database-id order.
+  Tests on the fixture, with the threshold lowered so a pathway's PDF splits:
+  - each joined PDF's page count equals the sum of its parts';
+  - no section is split between parts, and no part holds two PDFs' pages.
 
 - [ ] T026 [US1] Links and outline after the join, `src/print/links.ts` and `src/print/outline.ts`.
   - Each placeholder URI becomes a `/XYZ` destination at its probe's page and y, and the probes are removed.
-  - The outline is nested as the chapters' trees.
-  - An event's later places point at its one full section (FR-004). A short entry is not repeated with its subtree.
+  - Each PDF's outline is nested as its pathway's tree.
+  - An event's later places in a PDF point at its one full section there (FR-004). A short entry is not repeated with its subtree.
 
   Tests: every link and bookmark lands on its target heading, seen failing with links copied as pdf-lib leaves them.
 
-- [ ] T027 [US1] Page numbers and running headers, `src/print/stamp.ts`, stamped after the join with pdf-lib.
-  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (T022's `src/layout/characters.ts`): a chapter's name is stamped, not laid out, so it would otherwise bypass the list. The stamped headers' substitutions are not counted in the run report: the chapter's name is counted where its section prints it.
-  - Each page's header is its chapter's name, or its front part's name.
+- [ ] T027 [US1] Page numbers and running headers, `src/print/stamp.ts`, stamped after each PDF's join with pdf-lib, numbered within that PDF.
+  - Text in embedded Roboto, in the theme's colour, after FR-017's substitutions (T022's `src/layout/characters.ts`): a top-level pathway's name is stamped, not laid out, so it would otherwise bypass the list. The stamped headers' substitutions are not counted in the run report: the pathway's name is counted where its section prints it.
+  - Each page's header is its PDF's top-level pathway's name, or its front part's name.
   - No number on the cover (FR-016).
 
-  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering; a chapter name holding U+2011 is stamped with U+002D, seen failing with the name stamped as it is.
+  Tests: numbers continuous across parts, and headers right at a part boundary, seen failing with the parts' own numbering; a pathway's name holding U+2011 is stamped with U+002D, seen failing with the name stamped as it is.
 
-- [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in the joined book and reprint only the front part. The reprinted front part is swapped in before T026's links and T027's stamping run, so its links are rewritten and its pages stamped like the rest. Tests: every entry's number is its target's page, across parts; the contents' links land; the front pages carry their headers and numbers.
+- [ ] T028 [US1] The book's contents, second pass: T019's `src/print/contents.ts`, extended to read where each section landed in each joined PDF and reprint only that PDF's front part. The reprinted front part is swapped in before T026's links and T027's stamping run, so its links are rewritten and its pages stamped like the rest. Tests: every entry's number is its target's page, across parts; the contents' links land; the front pages carry their headers and numbers.
 - [ ] T029 [US1] `book` end to end, `src/cli.ts` (contracts/cli.md).
   - **Flags and their environment variables** (contracts/cli.md): `--graph` (`NEO4J_URI`), `--database` (`NEO4J_DATABASE`), `--figures`, `--site` (`REACTOME_SITE`), `--files`, `--species`, `--out`, `--parallel` and `--report`. Credentials come from `NEO4J_USER` and `NEO4J_PASSWORD`, never the command line.
-  - **Writing:** the file is written beside its name and moved into place.
-  - **The run report:** the release; the characters FR-017's list replaced, by code point and count; each stage's time; pages and size; figures by kind; the figures whose labels print below 1 pt (research R4); missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
+  - **Writing:** `--out` must be absent or empty (exit 2); the folder is written beside its name and moved into place; each PDF is named as today's (the pathway's name and `.pdf`).
+  - **The run report:** the release; the characters FR-017's list replaced, by code point and count; each stage's time; the page count and size of each PDF and in all; figures by kind; the figures whose labels print below 1 pt (research R4); missing figures and missing release files; and each FR-011 check's result. Everything is named by stable identifier, never a person.
 
   Tests:
-  - exit 0 on the fixture with one PDF (provisional until T030 adds the check);
-  - exit 1 on a figure file missing from `--figures`, with no partial book left;
+  - exit 0 on the fixture with one PDF per top-level pathway and no other (provisional until T030 adds the check);
+  - exit 1 on a figure file missing from `--figures`, with no partial folder left;
+  - exit 2 on an `--out` that is not empty;
   - exit 2 on bad arguments, and on the graph unreachable at the start;
   - no request to a render service: the book's run is given none;
-  - the run report lists the characters replaced, by code point and count. The test plants them itself, in a copy of the fixture: one listed character in a summation, one in the name of Reaction eight (`R-HSA-90000132`, at one place, with no events before or after it and no children, so its name prints only in its heading and its contents entry), and, in a figures' folder the test writes itself (a valid manifest, `complete`), one in the label of Reaction eight's own reaction figure (drawn once; a pathway's diagram can be drawn again for its subpathways). The counts are of occurrences in the finished book: the summation's 1, the name's 2, the label's 1, each plant a different one of the list's characters. What is not printed text is not counted: the bookmark's title (T026) and the figure's `aria-label`, which an untagged part does not carry. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it; and the fourth listed character, planted in a chapter's name, is counted where that name prints as text (its heading, its contents entry and the locations beneath it) and not for its stamped headers (T027), seen failing with the stamps counted;
-  - with T025's threshold lowered and, in a figures' folder the test writes itself with a valid manifest, a character off the list planted in one SVG of a later part (the backstop for a folder changed by hand; `figures` would have refused it): exit 1 after earlier parts are printed, and no book, temporary file or part file left.
+  - the run report lists the characters replaced, by code point and count. The test plants them itself, in a copy of the fixture: one listed character in a summation, one in the name of Reaction eight (`R-HSA-90000132`, at one place, with no events before or after it and no children, so its name prints only in its heading and its contents entry), and, in a figures' folder the test writes itself (a valid manifest, `complete`), one in the label of Reaction eight's own reaction figure (drawn once; a pathway's diagram can be drawn again for its subpathways). The counts are of occurrences in the finished book: the summation's 1, the name's 2, the label's 1, each plant a different one of the list's characters. What is not printed text is not counted: the bookmark's title (T026) and the figure's `aria-label`, which an untagged part does not carry. A count of the preflight's substitutions too, or of the front part's first print (T028), fails it; and the fourth listed character, planted in a top-level pathway's name, is counted where that name prints as text (its heading, its contents entry and the locations beneath it) and not for its stamped headers (T027), seen failing with the stamps counted;
+  - with T025's threshold lowered and, in a figures' folder the test writes itself with a valid manifest, a character off the list planted in one SVG of a later part (the backstop for a folder changed by hand; `figures` would have refused it): exit 1 after earlier parts are printed, and no folder, PDF, temporary file or part file left.
 
 - [ ] T030 [US1] `check-book`, `src/check/book.ts` (FR-011, contracts/cli.md).
   - **Flags:** `--graph`, `--species` and `--files`.
-  - **Output:** one line per fault, `fault <kind> <stId>`.
+  - **Output:** one line per fault, in contracts/cli.md's three forms: `fault missing-pathway <stId>`, `fault extra-file "<file name>"`, and `fault <kind> "<file name>" <stId>` for the rest.
   - **Method:** it reads the graph, and the book's outline and text, since the book is untagged.
   - **Faults:**
-    - `missing-pathway`, `not-in-contents`, `not-in-outline`;
-    - `no-name`, `no-stable-id`;
-    - `missing-figure`, where the source exists;
-    - `broken-link`.
+    - `missing-pathway`, `extra-file`;
+    - each naming its PDF: `not-in-contents`, `not-in-outline`, `no-name`, `no-stable-id`, `missing-figure` (where the source exists) and `broken-link`.
 
-  `book` runs it, and exits 0 only when it passes. Tests: a fixture book with each fault planted one at a time fails with that fault's line (SC-007).
+  `book` runs it on the folder, and exits 0 only when it passes. Tests: a fixture book with each fault planted one at a time fails with that fault's line (SC-007).
 
 - [ ] T031 [US1] The book on a private copy of release 98's graph.
   - Run `figures` first and time it for SC-010; then time each of `book`'s stages against research R7's budget, check memory, and run `check-book`. Record the results in research R7.
-  - Open the book in the three readers of SC-004, and follow a sample of bookmarks and links in each.
+  - Open every one of the book's PDFs in the three readers of SC-004, and follow a sample of bookmarks and links in each, the largest PDF's among them.
 
 **Checkpoint:** the book is made, and its check can fail.
 
@@ -496,7 +504,7 @@ passes.
   - Keep Chromium's and the base image's licence notices in the image.
   - `fc-list` shows only FR-015's fonts, seen failing with `fonts-liberation` installed.
 - [ ] T039 [US5] The release's step, documented in `README.md`.
-  - Two runs of the image: `figures`, with the render service and its content service beside it, writing the figures' folder; then `book`, with the release's graph, files and that folder as inputs, writing one PDF.
+  - Two runs of the image: `figures`, with the render service and its content service beside it, writing the figures' folder; then `book`, with the release's graph, files and that folder as inputs, writing the book's folder of PDFs, which the release archives as it does today's.
   - Keep it generic: the image, its inputs and its output, with no schedules, hosts or paths.
   - Time `book` against SC-003 and `figures` for SC-010 on the machine the release uses, and show a planted fault failing each.
   - Raise the switch from `event-pdf` with the release's owners (spec, Assumptions).
@@ -544,7 +552,7 @@ passes.
     - T014 after T004; T016 and T017 alongside T013 and T015.
     - T018 needs T014, T016 and T017.
 - **US2 (Phase 3)** needs Phase 2 and T010: T020 → T021 → T022 (every figure drawn on request); T047 after T024; T023 after T046 and T047.
-- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031, with T046 after T024 and before T031 (T029's tests write their own folder). T024 and T027 also need T022, which creates the character modules they extend and use.
+- **US1 (Phase 4)** needs Phase 2 and a go from T005 (one resting on page reuse alone also waits for T042 to ship it), or T006's route: T048 first; T024 and T025 → T026 → T027 → T028 → T029 → T030 → T031, with T046 after T024 and before T031 (T029's tests write their own folder). T024 and T027 also need T022, which creates the character modules they extend and use.
 - **US6:** T032 needs T027; T033 needs T031.
 - **US3:** T034 needs T019, T023 and T031.
 - **US5 and US4:**

@@ -14,8 +14,10 @@ in TypeScript on Node (research R1).
   drawings (R3).
 - **Layout:** HTML in the website's theme and fonts, compiled from the website's theme
   package (R5).
-- **Printing:** Chromium prints the HTML. The book is printed in parts of about 200
-  pages, joined, its links rewritten and its bookmarks written by pdf-export (R4). A
+- **Printing:** Chromium prints the HTML. The book is one PDF per top-level pathway, as
+  today's (user's decision, 3 Nov 2026); each is printed in parts of about 200 pages,
+  joined, its links rewritten and its bookmarks written by pdf-export, the PDFs made
+  several at a time (R4). A
   single-event PDF is printed tagged; one with a contents list is printed twice, the
   second time with the contents' page numbers (R4).
 - **The analysis overlay:** read through the analysis service's API (R6).
@@ -92,8 +94,9 @@ fonts above), run by the release and beside the website's services.
 - **Memory:**
   - The book's printing peaks under 2.5 GB at four parts at once (R4: 2.1 GB measured
     with synthetic parts; real figures are heavier, so it is re-measured).
-  - The join holds the whole book in memory: 120 MB in the synthetic test, and perhaps
-    near 1 GB for the real book (inference). It is re-measured in the first tasks (R4).
+  - A join holds one PDF in memory: 120 MB for 4,930 synthetic pages, and perhaps near
+    400 MB for the largest real PDF (3,760 pages, 383 MB today; inference). A join takes
+    one of `--parallel`'s slots, so printing and joining stay within its bound. It is re-measured in the first tasks (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service (for `figures` and `serve`; `book`
   reads the figures' folder), the content service's release (for `figures`) and the
@@ -104,8 +107,8 @@ fonts above), run by the release and beside the website's services.
 **Scale/Scope**: the human book holds every top-level pathway in full depth (R7):
 
 - 29 top-level pathways, 2,889 pathways and 16,424 reactions;
-- 23,541 pages and 1.42 GB as `event-pdf` writes it today; its largest top-level
-  pathway is 3,760 pages.
+- 23,541 pages and 1.42 GB in 29 files as `event-pdf` writes it today; its largest
+  top-level pathway's file is 3,760 pages.
 
 ## Constitution Check
 
@@ -153,7 +156,7 @@ specs/001-pathway-pdfs/
 ```text
 src/
 ├── graph/          # the Neo4j driver, the queries (R2), mapping rows to the model
-├── model/          # Event, Section, Book, SingleEventPdf (data-model.md)
+├── model/          # Event, Section, Book and BookPdf, SingleEventPdf (data-model.md)
 ├── figures/        # the render service's client, id prefixing, figure choice, the figures step
 ├── analysis/       # the analysis service's client
 ├── layout/         # HTML templates for each part, the compiled theme, fonts
@@ -190,7 +193,7 @@ Dockerfile
    - what the analysis service answers for an expired and a malformed token, and its
      retention period (R6; measured by T009 on a non-production instance: expiry is the
      service's to judge, so no period is set here);
-   - the join's memory, and stamping page numbers after it (R4).
+   - the join's memory at the largest PDF's size, and stamping page numbers after it (R4).
 2. **Foundations:**
    - the package, TypeScript, lint, Prettier and CI;
    - the licence check, shown failing;
@@ -202,8 +205,8 @@ Dockerfile
 5. **The single-event PDF** (Story 2): the service, the tagged print and, with a
    contents list, its second print (R4), the analysis overlay (R6), and the errors of
    scenario 4.
-6. **The book** (Story 1): parts, the join, links, the outline, and the contents
-   list's second pass (R4).
+6. **The book** (Story 1): one PDF per top-level pathway; each one's parts, join,
+   links, outline, and contents list's second pass (R4).
 7. **The checks:**
    - `check-book` (FR-011);
    - `compare` against `event-pdf` (FR-012), run on the private copy, with each difference
