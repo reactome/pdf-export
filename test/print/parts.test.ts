@@ -16,7 +16,7 @@ import {
   pageStyles,
   type LayoutOptions,
 } from '../../src/layout/document.ts';
-import { figureKey } from '../../src/layout/figure.ts';
+import { PORTRAIT, figureKey } from '../../src/layout/figure.ts';
 import { PROBE } from '../../src/layout/html.ts';
 import type { Document } from '../../src/model/types.ts';
 import { Printer } from '../../src/print/print.ts';
@@ -199,6 +199,56 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     }
   });
 
+  test('a figure as tall as the text area prints no page more, and is estimated', async () => {
+    // a section with text after its figure (Reaction one: a summation, references), its
+    // figure drawn as tall as the text area allows: landscape, 1,300 by 900, and portrait,
+    // 600 by 1,400; each page holds text, the figure's own a label
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
+    assert.ok(place?.full && place.section.figure);
+    const key = figureKey(place.section.figure);
+    const printer = started;
+    assert.ok(printer);
+    for (const [width, height, landscape] of [
+      [1300, 900, true],
+      [600, 1400, false],
+    ] as const) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}"><rect width="${String(width)}" height="${String(height)}" fill="#eee"/><text x="20" y="40" font-size="12">tall figure</text></svg>`;
+      const figures = new Map(options.figures).set(key, svg);
+      const sizes = figureSizes(figures);
+      assert.equal(sizes(place.section.figure)?.landscape, landscape);
+      const pages = await pagesOf(
+        await printer.part(layoutBookPart(alpha, [place], { ...options, figures }).html)
+      );
+      const blank = pages.flatMap((page, i) => (page.text.trim() === '' ? [i + 1] : []));
+      assert.deepEqual(blank, [], `${String(width)} by ${String(height)}: blank pages`);
+      const estimate = estimatePages(place, sizes);
+      assert.equal(
+        Math.ceil(estimate),
+        pages.length,
+        `${String(width)} by ${String(height)}: ${String(estimate)}`
+      );
+    }
+  });
+
+  test('a portrait figure counts its margins, and a reaction its events before and after', () => {
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
+    assert.ok(place?.full && place.section.event.kind === 'reaction');
+    assert.ok(place.section.event.before.length + place.section.event.after.length > 0);
+    const none = estimatePages(place, () => null);
+    // a portrait figure 100 pt tall, that fits: its height and its 10 pt margins
+    const figure = estimatePages(place, () => ({ landscape: false, height: 100 }));
+    assert.ok(Math.abs((figure - none) * PORTRAIT.height - 120) < 1e-6, String(figure - none));
+    // without events before and after, two lines (15 pt each) fewer
+    const alone = {
+      ...place,
+      section: { ...place.section, event: { ...place.section.event, before: [], after: [] } },
+    };
+    const fewer = estimatePages(alone, () => null);
+    assert.ok(Math.abs((none - fewer) * PORTRAIT.height - 30) < 1e-6, String(none - fewer));
+  });
+
   test('a part ends at the boundary where it reaches the threshold, not after', () => {
     // a section with a landscape figure and nothing after it: exactly two pages
     const gamma = bookPdf(built, 'Gamma pathway');
@@ -237,7 +287,8 @@ describe('parts', { skip: skipWithoutGraph }, () => {
       },
     });
     assert.equal(most, 3);
-    // Alpha's join starts before the later PDFs' prints are all started
+    // the first join (Gamma's, the largest PDF printed first) starts before the later
+    // PDFs' prints are all started
     assert.ok(events.indexOf('join') < events.lastIndexOf('print'), events.join(' '));
   });
 
@@ -321,6 +372,64 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     });
     assert.equal(titles[0], 'Gamma pathway');
     assert.deepEqual([...new Set(titles)], ['Gamma pathway', 'Alpha pathway', 'beta pathway']);
+  });
+
+  test('a failed join, or what is done with one, starts no join waiting', async () => {
+    // all three PDFs printed together, their joins waiting on one join's slot; the first
+    // fails, in the join or after it
+    for (const where of ['join', 'joined'] as const) {
+      const handed: string[] = [];
+      let joins = 0;
+      await assert.rejects(
+        printBook(built.book, {
+          printer: await blankPrinter(10),
+          layout: options,
+          settings: { threshold: 1000, parallel: 6, joins: 1 },
+          // each failing after a while, so the other joins are waiting by then
+          join: async (parts) => {
+            joins += 1;
+            await sleep(30);
+            if (where === 'join') throw new Error('no join');
+            return joinParts(parts);
+          },
+          joined: async (j) => {
+            handed.push(j.doc.cover.title);
+            await sleep(30);
+            if (where === 'joined') throw new Error('not kept');
+          },
+        }),
+        where === 'join' ? /no join/ : /not kept/
+      );
+      assert.equal(joins, 1, where);
+      assert.equal(handed.length, where === 'join' ? 0 : 1, where);
+    }
+  });
+
+  test('a figure that cannot be measured is thrown with the rest, naming it', async () => {
+    const gamma = bookPdf(built, 'Gamma pathway');
+    const figure = gamma.places.find((p) => p.full && p.section.figure);
+    assert.ok(figure?.full && figure.section.figure);
+    const key = figureKey(figure.section.figure);
+    let prints = 0;
+    const blank = await blankPrinter(0);
+    const error: unknown = await printBook([gamma], {
+      printer: {
+        part: (html) => {
+          prints += 1;
+          return blank.part(html);
+        },
+      },
+      layout: { ...options, figures: new Map(options.figures).set(key, '<svg></svg>') },
+      settings: { threshold: THRESHOLD, parallel: 2, joins: 1 },
+      joined: () => Promise.resolve(),
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    assert.ok(error instanceof AggregateError, String(error));
+    const [first] = error.errors as Error[];
+    assert.ok(first?.message.startsWith(`The figure ${key}: `), first?.message);
+    assert.equal(prints, 0);
   });
 
   test('every failure is thrown together, once what was printing has finished', async () => {

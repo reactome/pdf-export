@@ -27,13 +27,14 @@ export interface PartsSettings {
   parallel: number;
   /**
    * PDFs joined at once, each join still holding one of `parallel`'s slots: a join holds
-   * its whole PDF, and four of 6,203 pages at once did not fit in 4 GB (T011).
+   * its whole PDF, and four of 6,203 pages at once did not fit in 4 GB (T011). Default 1:
+   * two, by inference, need 4.1–4.9 GiB, until T029 measures that two fit.
    */
   joins: number;
 }
 
-/** About 200 pages a part (research R4); `--parallel`'s default (contracts/cli.md); two joins. */
-export const PARTS: PartsSettings = { threshold: 200, parallel: 4, joins: 2 };
+/** About 200 pages a part (research R4); `--parallel`'s default (contracts/cli.md); one join. */
+export const PARTS: PartsSettings = { threshold: 200, parallel: 4, joins: 1 };
 
 /** What prints a part: the Printer (src/print/print.ts). */
 export interface PartPrinter {
@@ -90,7 +91,13 @@ export function figureSizes(figures: ReadonlyMap<string, string>): Sizes {
       if (svg === undefined) {
         size = null;
       } else {
-        const measured = measure(svg);
+        let measured;
+        try {
+          measured = measure(svg);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(`The figure ${key}: ${message}`, { cause: error });
+        }
         const { landscape, scale } = placeFigure(measured);
         size = { landscape, height: measured.height * scale };
       }
@@ -179,9 +186,9 @@ export class Flow {
     }
   }
 
-  /** The page under way ended, if anything is on it. */
+  /** The page under way ended: never empty, as a section's name and facts come first. */
   #end(): void {
-    if (this.#used > 0) this.#ended += 1;
+    this.#ended += 1;
     this.#used = 0;
   }
 }
@@ -270,21 +277,26 @@ export async function printBook(docs: readonly Document[], run: BookRun): Promis
   const sizes = figureSizes(layout.figures);
   const failures: unknown[] = [];
   const tasks: Promise<void>[] = [];
-  // the largest PDFs first, by their estimated pages; the sort is stable
-  const estimated = new Map(
-    docs.map((doc) => {
-      const flow = new Flow(sizes);
-      for (const place of doc.places) flow.add(place);
-      return [doc, flow.pages] as const;
-    })
-  );
-  const largest = [...docs].sort((a, b) => (estimated.get(b) ?? 0) - (estimated.get(a) ?? 0));
-  for (const doc of largest) {
+  // the largest PDFs first, by their estimated pages (the sort is stable), each split; a
+  // figure that cannot be measured is a failure like any other, and nothing is printed
+  let split: [Document, Place[][]][] = [];
+  try {
+    const estimated = new Map(
+      docs.map((doc) => {
+        const flow = new Flow(sizes);
+        for (const place of doc.places) flow.add(place);
+        return [doc, flow.pages] as const;
+      })
+    );
+    split = [...docs]
+      .sort((a, b) => (estimated.get(b) ?? 0) - (estimated.get(a) ?? 0))
+      .map((doc) => [doc, splitParts(doc.places, settings.threshold, sizes)]);
+  } catch (error) {
+    failures.push(error);
+  }
+  for (const [doc, sections] of split) {
     // the front part first, then the sections' parts, laid out only once a slot is theirs
-    const parts: (readonly Place[] | null)[] = [
-      null,
-      ...splitParts(doc.places, settings.threshold, sizes),
-    ];
+    const parts: (readonly Place[] | null)[] = [null, ...sections];
     let printed: Uint8Array[] = [];
     const reports: Report[] = [];
     let left = parts.length;
@@ -300,18 +312,23 @@ export async function printBook(docs: readonly Document[], run: BookRun): Promis
       // bytes are let go
       await joinSlots.run(async () => {
         if (failures.length > 0) return;
-        const { pdf, pages } = await join(printed);
-        printed = [];
-        await joined({
-          doc,
-          pdf,
-          parts: parts.map((p, k) => ({ places: p ?? [], pages: pages[k] ?? 0 })),
-          report: {
-            belowFloor: reports.flatMap((r) => r.belowFloor),
-            missing: reports.flatMap((r) => r.missing),
-            unmeasured: reports.flatMap((r) => r.unmeasured),
-          },
-        });
+        // noted before the join's slot is let go, so no join waiting starts after it
+        try {
+          const { pdf, pages } = await join(printed);
+          printed = [];
+          await joined({
+            doc,
+            pdf,
+            parts: parts.map((p, k) => ({ places: p ?? [], pages: pages[k] ?? 0 })),
+            report: {
+              belowFloor: reports.flatMap((r) => r.belowFloor),
+              missing: reports.flatMap((r) => r.missing),
+              unmeasured: reports.flatMap((r) => r.unmeasured),
+            },
+          });
+        } catch (error) {
+          failures.push(error);
+        }
       });
     };
     parts.forEach((places, i) => {

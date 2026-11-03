@@ -176,9 +176,16 @@ h6 {
   margin: 10pt 0;
   text-align: center;
 }
+/*
+ * Blocks, not inline: an inline SVG sits on a line box whose descent, under a figure as
+ * tall as the text area, overflows the page and prints a page more (T025's review).
+ */
 .figure svg,
 .figure-link {
-  display: inline-block;
+  display: block;
+}
+.figure svg {
+  margin: 0 auto;
 }
 .figure.landscape {
   page: wide;
