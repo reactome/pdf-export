@@ -29,6 +29,13 @@ describe("a figure's link", () => {
       );
     });
 
+    test(`an ancestor's illustration standing in opens that, the event selected, ${where}`, () => {
+      assert.equal(
+        links.figure({ kind: 'ehld', stId: 'R-HSA-1', unselectedFor: 'R-HSA-2' }, 'R-HSA-2'),
+        'https://site.example/PathwayBrowser/#/R-HSA-1&SEL=R-HSA-2'
+      );
+    });
+
     test(`a reaction's opens its page, ${where}`, () => {
       assert.equal(
         links.figure({ kind: 'reaction', stId: 'R-HSA-4' }, 'R-HSA-4'),

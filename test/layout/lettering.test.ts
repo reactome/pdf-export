@@ -115,6 +115,58 @@ describe("an illustration's lettering", () => {
     assert.equal(place(measure(svg)).unmeasured, true);
   });
 
+  test('a letter’s holes are not letters: they do not set the baseline', () => {
+    // three Bs, each an outline and two counters, bottoms at 20, 19 and 14.5
+    const b = (x: number) =>
+      letter(x, 10, x + 5, 20) + letter(x + 1, 11, x + 4, 14.5) + letter(x + 1, 15.5, x + 4, 19);
+    const svg = illustration([b(0) + b(6) + b(12)], 'matrix(1,0,0,1,0,0)');
+    assert.equal(smallest(svg), 10 / CAP_HEIGHT);
+  });
+
+  test('a number with an exponent is read as a number', () => {
+    assert.deepEqual(outlineBoxes('M1e-3 0L2 2Z'), [[0.001, 0, 2, 2]]);
+    assert.deepEqual(outlineBoxes('M1E-3 0L2 2Z'), [[0.001, 0, 2, 2]]);
+  });
+
+  test('a subpath begun after a close, without a move, starts where the last one did', () => {
+    assert.deepEqual(outlineBoxes('M0 0H5V10H0ZL20 20L25 25Z'), [
+      [0, 0, 5, 10],
+      [0, 0, 25, 25],
+    ]);
+    assert.deepEqual(outlineBoxes('M0 0H5V10H0ZH8V3Z'), [
+      [0, 0, 5, 10],
+      [0, 0, 8, 3],
+    ]);
+  });
+
+  test('a command with the wrong count of numbers is not read', () => {
+    for (const d of ['M0 0C1 1 2 2Z', 'M0 0Q1 1 2Z', 'M0 0S1 1 2 2 3 3Z', 'M0 0 1Z']) {
+      assert.equal(outlineBoxes(d), null, d);
+    }
+  });
+
+  test('a label transformed, or inside a transformed group, is not read', () => {
+    const d = word(0, 20, 10);
+    const own = illustration([]).replace(
+      '</g></svg>',
+      `<path transform="scale(0.25)" d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    const inGroup = illustration([]).replace(
+      '</g></svg>',
+      `<g transform="scale(0.25)"><g><path d="${d}" id="PATHWAY TEXT"/></g></g></svg>`
+    );
+    for (const svg of [own, inGroup]) {
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 });
+      assert.equal(place(measure(svg)).unmeasured, true);
+    }
+    // a group transformed and closed before the label does not count
+    const before = illustration([]).replace(
+      '</g></svg>',
+      `<g transform="scale(0.25)"><path d="M0 0H1V1Z"/></g><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    assert.deepEqual(lettering(before), { smallest: (10 * 0.5) / CAP_HEIGHT, unread: 0 });
+  });
+
   test('an illustration with no label path is still unmeasured', () => {
     assert.equal(place(measure(illustration([]))).unmeasured, true);
   });
