@@ -1,0 +1,141 @@
+{
+  "machine": {
+    "cpus": 8,
+    "memoryGb": 31
+  },
+  "cap": "4294967296",
+  "together": true,
+  "objectStreams": true,
+  "pdfs": 3,
+  "parallel": 4,
+  "seed": 98,
+  "perSection": 2.013,
+  "sectionsPerPart": 99,
+  "sectionsPerPdf": 1868,
+  "pages": 11268,
+  "partPages": {
+    "min": 143,
+    "max": 195
+  },
+  "partSeconds": {
+    "min": 2.66,
+    "max": 5.46
+  },
+  "layoutSeconds": 15.5,
+  "wallS": 102.99,
+  "printWallS": 61.19,
+  "printMsPerPage": 5,
+  "joins": [
+    {
+      "pdf": 1,
+      "joinS": 3.47,
+      "joinHeapMb": 251,
+      "pages": 3756,
+      "links": 7817,
+      "unresolved": 0,
+      "probes": 1868,
+      "linksS": 0.1,
+      "linksHeapMb": 290,
+      "outline": 1868,
+      "outlineMissing": 0,
+      "outlineS": 0.05,
+      "outlineHeapMb": 256,
+      "stampS": 2.24,
+      "stampHeapMb": 322,
+      "mb": 81,
+      "saveS": 24.06,
+      "saveHeapMb": 196
+    },
+    {
+      "pdf": 2,
+      "joinS": 3.33,
+      "joinHeapMb": 250,
+      "pages": 3756,
+      "links": 7492,
+      "unresolved": 0,
+      "probes": 1868,
+      "linksS": 0.14,
+      "linksHeapMb": 241,
+      "outline": 1868,
+      "outlineMissing": 0,
+      "outlineS": 0.04,
+      "outlineHeapMb": 256,
+      "stampS": 2.13,
+      "stampHeapMb": 326,
+      "mb": 78,
+      "saveS": 31.46,
+      "saveHeapMb": 231
+    },
+    {
+      "pdf": 0,
+      "joinS": 3.66,
+      "joinHeapMb": 270,
+      "pages": 3756,
+      "links": 7814,
+      "unresolved": 0,
+      "probes": 1868,
+      "linksS": 0.12,
+      "linksHeapMb": 260,
+      "outline": 1868,
+      "outlineMissing": 0,
+      "outlineS": 0.03,
+      "outlineHeapMb": 274,
+      "stampS": 2.31,
+      "stampHeapMb": 346,
+      "mb": 80,
+      "saveS": 35.45,
+      "saveHeapMb": 196
+    }
+  ],
+  "joinStagesSPerPdf": [29.9, 37.1, 41.6],
+  "perStage": {
+    "print": {
+      "secondsPerPdf": [59.96, 60.37, 60.61],
+      "peakAnonMb": 1426,
+      "peakCgroupMb": 1730,
+      "peakNodeRssMb": 755
+    },
+    "join": {
+      "secondsPerPdf": [3.66, 3.47, 3.34],
+      "peakAnonMb": 1920,
+      "peakCgroupMb": 2226,
+      "peakNodeRssMb": 1969
+    },
+    "links": {
+      "secondsPerPdf": [0.12, 0.1, 0.14],
+      "peakAnonMb": 1939,
+      "peakCgroupMb": 2246,
+      "peakNodeRssMb": 1988
+    },
+    "outline": {
+      "secondsPerPdf": [0.03, 0.05, 0.04],
+      "peakAnonMb": 1952,
+      "peakCgroupMb": 2259,
+      "peakNodeRssMb": 2001
+    },
+    "stamp": {
+      "secondsPerPdf": [2.31, 2.24, 2.13],
+      "peakAnonMb": 2082,
+      "peakCgroupMb": 2393,
+      "peakNodeRssMb": 2131
+    },
+    "save": {
+      "secondsPerPdf": [35.45, 24.06, 31.46],
+      "peakAnonMb": 2331,
+      "peakCgroupMb": 2690,
+      "peakNodeRssMb": 2378
+    }
+  },
+  "peak": {
+    "anonMb": 2331,
+    "cgroupMb": 2690,
+    "nodeRssMb": 2378,
+    "cgroupPeakMb": 2690
+  },
+  "bookScaled": {
+    "printMin": 2.1,
+    "printBudgetMin": 13,
+    "joinMin": 3.8,
+    "joinBudgetMin": 6
+  }
+}

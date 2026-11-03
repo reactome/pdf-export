@@ -168,7 +168,7 @@ for WebsiteAngular to ship it (T042).
   - **From #123's review:** the stub took any resource and either importable-only setting and answered as for FR-006's defaults, so a client sending others would pass (reproduced by a test, failing before the fix); the 7-day boundary is tested at 7 days 12 hours; human alone and the analysis's own setting no longer share a count. It also made a `q=0` range refuse its type, which #124's review doubted; measured, the service ignores weights and answers the CSV to `text/csv;q=0`, so #125 took that rule out again. Lows left: `species` as a database id, a raw `/` reaching another endpoint, and `forget()` given a non-canonical token are not modelled. T020 checks the canonical token on the stub's `requests`.
   - **Carried from #119's and #122's reviews (lows):** research R6's summary fields no longer list `server` (the service never writes it) and say the service leaves out null ones, not empty ones; T048 notes that the cover's figure must be in the front part's figures, as a missing one is dropped without a word; data-model's "none of today's names" breaks the file-name rule is marked as not yet measured.
 
-- [ ] T011 [P] Measure the join and stamping at the largest PDF's size (research R4; the book is one PDF per top-level pathway since 3 Nov 2026).
+- [x] T011 [P] Measure the join and stamping at the largest PDF's size (research R4; the book is one PDF per top-level pathway since 3 Nov 2026).
   - Print synthetic parts totalling 3,760 pages (today's largest file), with figures in the real book's mix (T005's SVGs, so after T005), and join a few such PDFs at once, as `book` would.
   - Join them with `@cantoo/pdf-lib`, or pdf-lib 1.17 if the fork fails the tests.
   - Rewrite the links through placeholder URIs and probes recording page and y.
@@ -176,7 +176,12 @@ for WebsiteAngular to ship it (T042).
 
   Record time and peak memory per stage against research R7's 13 + 6 minutes. The script lives in `ci/measure/`.
 
+  **Done (#129)** (research R4, R7): one PDF's join fits with room, so T012 is not needed. Synthetic sections in the book's mix, from T005's SVGs, printed four parts at once and joined in a worker thread each, under a 4 GB cap: a 3,760-page PDF printed in 25 s and took 12 s to join, rewrite 7,814 links, write 1,868 outline entries, stamp and save, at 1.4 GB at most for the whole run (Chromium included; the read-back aside), the join adding about 0.5 GB. Three, and four, 3,760-page PDFs joined at once peaked at 3.05 and 3.47 GB. The layout prints a wide reaction on a landscape page of its own (T008's rule), so a section took 2.0 pages, not today's 1.22, and today's largest file's events (3,085, inference) took 6,203 pages: 17 s to join alone, 3.36 GB for three at once, and four at once were killed by the cap. Scaled to the book (inference), printing takes 2–3 minutes of R7's 13 and the join's stages 1–1.5 of its 6. pdf-lib's object streams made the save five to eight times slower for a 6% smaller file, so `book` should save without them (T026, T027). pdf.js read the saved files back: every link lands on a page, no placeholder or probe is left, the outline is whole, and the sampled pages carry their number and the pathway's name. The script is `ci/measure/join.ts`; its outputs are in `ci/measure/results/2026-11-03/join/`.
+
 - [ ] T012 Only if T011's join of one PDF (about 3,760 pages) does not fit in memory: join in groups (research R4). Unlikely since the book became one PDF per top-level pathway (3 Nov 2026). Join the parts a few at a time into intermediate files, then join those, keeping the links' and the outline's targets. Record the memory and time against the budget.
+
+  **Not needed** (T011, research R4): the largest PDF's join adds about 0.5 GB (0.65 GB at 6,203 pages), and three of the largest size join at once within 4 GB.
+
 - [x] T013 The graph reader, `src/graph/`: — #28, replacing #26 after its review.
   - the Neo4j driver (`neo4j-driver`), with the database name and the `NEO4J_*` settings;
   - the batched queries of research R2: the tree by level; each part across a level's events; literature, the first five by `order`, with six authors and whether there are more; edits with their authors; the release; the top-level pathways;
