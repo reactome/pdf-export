@@ -22,7 +22,6 @@
   "devDependencies": {
     "@angular/cdk": "21.2.14",
     "@angular/material": "21.2.14",
-    "@cantoo/pdf-lib": "2.11.1",
     "@eslint/js": "10.0.1",
     "@types/fontkit": "2.0.9",
     "@types/node": "24.19.2",
@@ -35,6 +34,7 @@
     "typescript-eslint": "8.72.1"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "2.11.1",
     "@fontsource/noto-sans": "5.3.0",
     "@fontsource/noto-sans-math": "5.3.0",
     "@fontsource/noto-sans-symbols-2": "5.3.0",
