@@ -11,8 +11,13 @@ import {
   type AnalysedEvent,
   type AnalysisFailure,
 } from '../../src/analysis/client.ts';
-import { canonicalToken } from '../../src/analysis/token.ts';
-import { NOT_FOUND, TOKENS, startAnalysisStub, type AnalysisStub } from '../stubs/analysis.ts';
+import {
+  NOT_FOUND,
+  TOKENS,
+  issue,
+  startAnalysisStub,
+  type AnalysisStub,
+} from '../stubs/analysis.ts';
 
 const ALPHA = 'R-HSA-90000200';
 const PARENT = 'R-HSA-90000210';
@@ -62,7 +67,9 @@ describe('the analysis client', () => {
   test('sends the canonical token, each call its Accept, and asks for the CSV last', async () => {
     const token = TOKENS.stored;
     const bare = decodeURIComponent(token).replace(/=+$/, '');
-    for (const given of [token, encodeURIComponent(encodeURIComponent(token)), bare]) {
+    let deep = token;
+    for (let i = 0; i < 1000; i++) deep = encodeURIComponent(deep);
+    for (const given of [token, encodeURIComponent(encodeURIComponent(token)), bare, deep]) {
       stub.reset();
       await read(given, [{ kind: 'pathway', stId: ALPHA }]);
       assert.deepEqual(
@@ -122,6 +129,31 @@ describe('the analysis client', () => {
     assert.equal(stub.requests.length, 4, 'a token that cannot be decoded is never sent');
   });
 
+  test('a malformed token is unknown-token, and nothing is sent', async () => {
+    const whole = issue('20200101000000_123');
+    const malformed = [
+      '',
+      'QQ=',
+      'Xw==',
+      TOKENS.underscore,
+      TOKENS.undated,
+      issue(`20200101000000_${'1'.repeat(20)}`),
+      // a `/` or a `+` in place of a letter, the length left whole
+      'MjAyMDAxMDEwMDAwMDBfM/',
+      'MjAyMDAxMDEwMDAwMDBfM%2F',
+      'MjAyMDAxMDEwMDAwMDBfM+',
+      'MjAyMDAxMDEwMDAwMDBfM%2B',
+      // over the bound, nested in layers it would take seconds to decode
+      `MjAyMDAxMDEwMDAwMDBfMQ%${'25'.repeat(8_000)}3D%3D`,
+      `${whole}A`,
+      '%25',
+    ];
+    for (const token of malformed) {
+      await assert.rejects(read(token, [{ kind: 'pathway', stId: ALPHA }]), fails('unknown-token'));
+    }
+    assert.deepEqual(stub.requests, []);
+  });
+
   test('a result gone after the summary ends the PDF as gone-token, from found/… or from the CSV', async () => {
     const events: AnalysedEvent[] = [{ kind: 'pathway', stId: PARENT }];
     stub.forget(TOKENS.recent, 1);
@@ -171,6 +203,22 @@ describe('the analysis client, given answers the service should not give', () =>
     identifiersNotFound: 0,
     pathwaysFound: 1,
   };
+  const uniprot = (ids: string[]) => ({ resource: 'UNIPROT', ids });
+  /** Each base path's one odd entity. */
+  const ODD_ENTITIES: Record<string, unknown> = {
+    entities: { id: 'X00001', mapsTo: ['X00001'] },
+    'entities-unmapped': { id: 'X00001' },
+    'entities-no-resource': { id: 'X00001', mapsTo: [{ ids: ['X00001'] }] },
+    'entities-null-resource': { id: 'X00001', mapsTo: [{ resource: null, ids: ['X00001'] }] },
+    'entities-no-id': { mapsTo: [uniprot(['X00001'])] },
+  };
+  /** Each base path's one odd interactor. */
+  const ODD_INTERACTORS: Record<string, unknown> = {
+    interactors: { id: 'X00002', exp: [], mapsTo: ['X00002'] },
+    'interactor-ids': { id: 'X00002', interactsWith: { resource: 'UNIPROT', ids: 'X9' } },
+    'interactors-no-resource': { id: 'X00002', interactsWith: { ids: ['X00009'] } },
+    'interactors-no-id': { interactsWith: uniprot(['X00009']) },
+  };
   before(async () => {
     stub = await startAnalysisStub();
     odd = createServer((req, res) => {
@@ -182,17 +230,12 @@ describe('the analysis client, given answers the service should not give', () =>
         res.writeHead(302, { Location: `${stub.url}/${url.replace(/^\/redirect\//, '')}` }).end();
       else if (url.startsWith('/summary/')) json({ summary: {}, pathwaysFound: '6' });
       else if (!url.includes('/found/')) json(summary);
-      // under /entities/ the entities are odd, under /interactors… the interactors; the other 404
-      else if (!url.startsWith(url.includes('/found/entities/') ? '/entities/' : '/interactor'))
-        res.writeHead(404).end();
-      else if (url.includes('/found/entities/')) {
-        json({ identifiers: [{ id: 'X00001', mapsTo: ['X00001'] }] });
-      } else if (url.startsWith('/interactors/')) {
-        json({ identifiers: [{ id: 'X00002', exp: [], mapsTo: ['X00002'] }] });
-      } else {
-        json({
-          identifiers: [{ id: 'X00002', interactsWith: { resource: 'UNIPROT', ids: 'X9' } }],
-        });
+      else {
+        // under each base path, its found list is odd and the other one 404
+        const bodies = url.includes('/found/entities/') ? ODD_ENTITIES : ODD_INTERACTORS;
+        const name = url.split('/')[1] ?? '';
+        if (Object.hasOwn(bodies, name)) json({ identifiers: [bodies[name]] });
+        else res.writeHead(404).end();
       }
     });
     await new Promise<void>((resolve) => odd.listen(0, '127.0.0.1', resolve));
@@ -240,6 +283,21 @@ describe('the analysis client, given answers the service should not give', () =>
     await assert.rejects(read('interactor-ids'), unavailable);
   });
 
+  test('an entity with no maps-to is unavailable', async () => {
+    await assert.rejects(read('entities-unmapped'), unavailable);
+  });
+
+  test('a row with no resource, or a null one, is unavailable', async () => {
+    await assert.rejects(read('entities-no-resource'), unavailable);
+    await assert.rejects(read('entities-null-resource'), unavailable);
+    await assert.rejects(read('interactors-no-resource'), unavailable);
+  });
+
+  test('an identifier with no id is unavailable', async () => {
+    await assert.rejects(read('entities-no-id'), unavailable);
+    await assert.rejects(read('interactors-no-id'), unavailable);
+  });
+
   // bounded, so that a client with no timeout fails the test rather than hanging it
   test('a call with no answer within its time is unavailable', { timeout: 2_000 }, async () => {
     await assert.rejects(read('hang', { timeoutMs: 100 }), unavailable);
@@ -267,11 +325,4 @@ test('a reaction keeps only the rows naming its own identifiers', () => {
     entities: [{ identifier: 'A', mapsTo: ['A2'], resource: 'UNIPROT' }],
     interactors: [],
   });
-});
-
-test('the canonical token is padded Base64 with its = as %3D, however often it was encoded', () => {
-  assert.equal(canonicalToken('QUJD'), 'QUJD');
-  assert.equal(canonicalToken('QUI'), 'QUI%3D');
-  assert.equal(canonicalToken('QQ%3D%3D'), 'QQ%3D%3D');
-  assert.equal(canonicalToken('QQ%25253D%25253D'), 'QQ%3D%3D');
 });
