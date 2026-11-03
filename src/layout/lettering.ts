@@ -154,11 +154,28 @@ function attribute(attributes: string, name: string): string | undefined {
   return match ? (match[1] ?? match[2]) : undefined;
 }
 
-/** A tag: its name and attributes, a quoted value holding no `>` of its own. */
-const TAG = /<(\/?)([A-Za-z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+/**
+ * A tag: its name and attributes, a quoted value holding no `>` of its own. XML allows no `<`
+ * in a tag, quoted or not, so none is matched and the scan stays linear: a tag holding one is
+ * not matched at all, and the `<` it holds is found between matches (STRAY).
+ */
+const TAG = /<(\/?)([A-Za-z][\w:.-]*)((?:[^<>"']|"[^"<]*"|'[^'<]*')*)>/g;
+
+/** A `<` that would begin a tag, met between tags: one was not matched, so the markup is not read. */
+const STRAY = /<[A-Za-z/]/;
 
 /** Elements whose content is not drawn where it stands: a label there is unread. */
-const UNDRAWN = new Set(['defs', 'symbol', 'clippath', 'mask', 'pattern', 'marker']);
+const UNDRAWN = new Set([
+  'defs',
+  'symbol',
+  'clippath',
+  'mask',
+  'pattern',
+  'marker',
+  'title',
+  'desc',
+  'metadata',
+]);
 
 /** An element's name without its namespace prefix, in lower case. */
 const local = (name: string) => name.slice(name.lastIndexOf(':') + 1).toLowerCase();
@@ -192,11 +209,13 @@ function withoutComments(svg: string): string {
  * style), other than the render service's viewport, whose plain scale fits the illustration
  * to the figure's frame and is applied (a viewport that is not a plain scale leaves every
  * label inside it unread); or when it is in a nested `<svg>`, or in content not drawn where
- * it stands (`<defs>` and the like). The elements are followed through the markup in one
+ * it stands (`<defs>`, `<symbol>`, a clip path, mask, pattern or marker, a title, a
+ * description or metadata), or after a close tag that skipped open elements or a tag the scan could not match (one holding a `<`). Malformed markup is not otherwise caught: a quote left open, or a stray close tag that ends the viewport itself, may be read wrongly. The elements are followed through the markup in one
  * pass of its tags, its comments and character data left out, names known with a prefix or
  * in capitals, and a close tag ending the element it names. Markup this does not read as a
- * browser would (a style element's rules, an unquoted value, an entity in an id) is not
- * looked for: the render service writes none of it.
+ * browser would (a style element's rules, `display="none"`, an unquoted value, an entity in
+ * an id, a name in capitals taken as SVG's) is not looked for: the render service writes
+ * none of it.
  */
 export function lettering(svg: string): { smallest: number | null; unread: number } {
   let smallest: number | null = null;
@@ -219,15 +238,25 @@ export function lettering(svg: string): { smallest: number | null; unread: numbe
   };
   // for each open element: its name, and the scale it applies, or null where it is not known
   const open: { name: string; scale: number | null }[] = [];
+  // a close tag that skipped open elements, or a tag not matched: the markup is not what it
+  // seems, so no label after it is read
+  let malformed = false;
   const markup = withoutComments(svg);
   // up to the last `>`: past it no tag can end, and a tail of `<` would be searched from each
-  for (const [, close, name = '', attributes = ''] of markup
-    .slice(0, markup.lastIndexOf('>') + 1)
-    .matchAll(TAG)) {
+  const scanned = markup.slice(0, markup.lastIndexOf('>') + 1);
+  let last = 0;
+  for (const match of scanned.matchAll(TAG)) {
+    const [whole, close, name = '', attributes = ''] = match;
+    // a tag left unmatched, its element unknown: nothing after it is read
+    if (STRAY.test(scanned.slice(last, match.index))) malformed = true;
+    last = match.index + whole.length;
     if (close) {
       // it ends the element it names, and any left open inside it; a stray one, nothing
       const at = open.map((e) => e.name).lastIndexOf(local(name));
-      if (at >= 0) open.length = at;
+      if (at >= 0) {
+        if (at !== open.length - 1) malformed = true;
+        open.length = at;
+      }
       continue;
     }
     const selfClosing = attributes.trimEnd().endsWith('/');
@@ -238,7 +267,7 @@ export function lettering(svg: string): { smallest: number | null; unread: numbe
       const d = attribute(attributes, 'd');
       const boxes = d === undefined ? null : outlineBoxes(d);
       const cap = boxes === null ? null : capHeight(boxes);
-      if (scale === null || cap === null || !(cap > 0)) unread += 1;
+      if (malformed || scale === null || cap === null || !(cap > 0)) unread += 1;
       else {
         const size = (cap * scale) / CAP_HEIGHT;
         if (smallest === null || size < smallest) smallest = size;

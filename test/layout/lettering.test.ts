@@ -263,6 +263,7 @@ describe("an illustration's lettering", () => {
   test('many comments, or tags never closed, are read in linear time', () => {
     const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
     for (const filler of [
+      '<a "' + '<a '.repeat(20_000) + "'>",
       '<!-- x -->'.repeat(40_000),
       '<![CDATA[x]]>'.repeat(40_000),
       '<a '.repeat(20_000),
@@ -275,6 +276,37 @@ describe("an illustration's lettering", () => {
         `${filler.slice(0, 12)}: ${String(performance.now() - started)} ms`
       );
     }
+  });
+
+  test('a close tag that skips open elements leaves the labels after it unread', () => {
+    const d = word(0, 20, 10);
+    const svg = illustration([]).replace(
+      '</g></svg>',
+      `<g></svg><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    assert.deepEqual(lettering(svg), { smallest: null, unread: 1 });
+  });
+
+  test('a label in a title, a description or metadata is unread', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const name of ['title', 'desc', 'metadata']) {
+      const svg = illustration([]).replace('</g></svg>', `<${name}>${label}</${name}></g></svg>`);
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, name);
+    }
+  });
+
+  test('a < that starts no tag leaves the labels after it unread', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const inner of [
+      `<g transform="scale(0.1)" data-x="a<b">${label}</g>`,
+      `<defs data-x="a<b">${label}</defs>`,
+      `<g style="transform: scale(0.1); --x: '<'">${label}</g>`,
+    ]) {
+      const svg = illustration([]).replace('</g></svg>', `${inner}</g></svg>`);
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, inner);
+    }
+    const viewport = `<svg width="9" height="9"><g class="svg-pan-zoom_viewport" data-x="a<b" transform="matrix(0.5,0,0,0.5,0,0)">${label}</g></svg>`;
+    assert.deepEqual(lettering(viewport), { smallest: null, unread: 1 });
   });
 
   test('an illustration with no label path is still unmeasured', () => {
