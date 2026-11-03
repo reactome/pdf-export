@@ -310,14 +310,13 @@ synthetic documents, on this host under load.
       PDF at a time (2.7 ms for the larger), so 1.1–1.3 minutes for 23,541 pages against
       6, before they overlap printing; with object streams on, 4.1–4.4 minutes.
   - **Decided from T011, for T025 and T029:**
-    - **Joins have a limit of their own** inside `--parallel`: at most 2 at once by
-      default, a setting with a flag (T029). A join still takes one of `--parallel`'s
-      slots. Why 2: two of the largest joining beside one print (`--parallel` 3) peaked
-      at 2,597 MiB (3,070 with page cache); three alone took 3,360 MiB; four were killed.
-      The default `--parallel` 4 allows a second print beside two joins, which was not
-      run: a print's share was up to about 680 MiB, so it may come near the cap. These
-      files are light, and on real ones even two joins may not fit, so the default is
-      provisional: T029 measures the real book and sets it.
+    - **Joins have a limit of their own** inside `--parallel`: 1 at a time by default,
+      a setting with a flag (T029). A join still takes one of `--parallel`'s slots. On
+      these light files two of the largest joining beside one print (`--parallel` 3)
+      peaked at 2,597 MiB (3,070 with page cache), three alone took 3,360 MiB, and four
+      were killed. But a real join's increment (roughly 1.7–2.1 GiB, inference) means two
+      real joins would need about 4.1–4.9 GiB with Node's own, over a 4 GiB cap, so the
+      default is 1. T029 measures the real book and raises it to 2 only if two fit.
     - **The largest PDFs are printed first,** by their estimated pages (T025's parts estimate), each
       PDF's parts before the next's, so their joins arrive one at a time, each
       overlapping the smaller PDFs' printing. An interleaved order ("a few parts at a
@@ -327,7 +326,7 @@ synthetic documents, on this host under load.
       off saves five to eight times faster for 6% more file, but may cost memory.
     - **Joining in groups (T012) stays the fallback:** one PDF's join adds about 0.5
       GiB on these files, but a real one (roughly 1.7–2.1 GiB, inference) beside
-      printing (1.4–1.6 GiB at four prints alone, plus page cache) may exceed 4 GiB even
+      printing (1.4–1.5 GiB at four prints alone, before page cache) may exceed 4 GiB even
       with one join at a time. If T029 finds that one real join does not fit beside
       printing, T012 is done; otherwise it is not needed.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers

@@ -100,7 +100,8 @@ fonts above), run by the release and beside the website's services.
     join does not fit beside printing, T012 joins in groups. Two of the largest
     joining beside a print peaked at 2.5 GiB, three alone at 3.3 GiB, and four were
     killed by a 4 GiB cap. So a join takes one of `--parallel`'s slots and joins have a
-    limit of their own, at most 2 at once by default, and the largest PDFs are printed
+    limit of their own, 1 at a time by default (T029 raises it only if two real joins fit),
+    and the largest PDFs are printed
     first so their joins do not coincide (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service (for `figures` and `serve`; `book`
