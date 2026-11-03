@@ -140,9 +140,9 @@ From the analysis service's API (research R6).
 - **Requested with FR-006's defaults:** all resources together, no expression column, all
   identifiers rather than only importable ones.
 - `identifiersFound`, `identifiersTotal`, `pathwaysHit`. Found is the count of distinct
-  submitted identifiers in the found identifiers' CSV, as the summary carries none; the
-  total adds the summary's `identifiersNotFound`; the pathways hit are its
-  `pathwaysFound` (research R6).
+  submitted identifiers in the found identifiers' CSV (header skipped), as
+  `/token/{token}` carries none; the total adds its `identifiersNotFound`; the pathways
+  hit are its `pathwaysFound`, asked for with `includeDisease=true` (research R6).
 - `found(pathwayStId)`: the entities and interactors found. A reaction uses its first
   parent pathway's, filtered to the reaction's own identifiers.
 - **Errors:** the token's form is checked here before the service is asked (research

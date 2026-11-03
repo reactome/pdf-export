@@ -299,9 +299,9 @@ of pages with today's book.
   event the graph does not hold is ignored: plan, research R7.) The step fails and names
   it (Story 5, scenario 3).
 - **An analysis token unknown, malformed, or gone:** a malformed token is answered as
-  unknown, as is one the analysis service answers 404 (no result, and dated more than 7
-  days ago or not at all); one it answers 410 (no result, though dated within its 7 days)
-  is answered as gone. Whether a token has expired is the analysis service's to say, as
+  unknown, as is one the analysis service answers 404 (no result, and dated 8 whole days
+  ago or more, or not at all); one it answers 410 (no result, though dated within its 7
+  whole days or in the future) is answered as gone. Whether a token has expired is the analysis service's to say, as
   it answers a result still stored whatever its date (Story 2, scenario 4; research R6).
 - **A release file missing for a single-event PDF:** the PDF is made without that figure,
   as today, and the absence is logged; only the book's step fails on it.
@@ -576,7 +576,7 @@ of pages with today's book.
   and joined into one PDF (plan, research R4).
 - **The analysis result** is read through the analysis service, which reads the files
   it writes by its own rules; its stored format is Java's own (plan, research R6). Tests
-  use a private instance or a stub, never production.
+  use a non-production instance or a stub, never production.
 - **The website's part:** routing, the depth choice, the token and the error answers live
   in WebsiteAngular's specs. This spec provides the means.
 - **Comparison inputs:** a private copy of the release's graph (release 98), with

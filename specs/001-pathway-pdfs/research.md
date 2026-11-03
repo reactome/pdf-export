@@ -365,13 +365,14 @@ synthetic documents, on this host under load.
   strings. A TypeScript reader would depend on the analysis library's internal Java
   fields, and would break silently when they changed.
 - **The analysis service's API reads the same files by the same rules:**
-  - 404 for an unknown token, and 410 for one gone within its retention, judged by the
-    date inside the token;
+  - 404 or 410 for a token with no stored result, judged by the date inside the token
+    (measured below);
   - `/token/{token}` gives the summary, the resource summary, the not-found count and the
     pathways hit;
   - `/token/{token}/found/entities/{pathway}` and `/found/interactors/{pathway}` give the
     found lists, a 404 meaning none;
-  - `/download/{token}/result.json` gives the count of identifiers found.
+  - the count of identifiers found is in neither the summary nor `result.json` (measured
+    below).
 - **Today's errors:** a malformed token throws an unhandled Base64 error, and the
   content service answers it with an empty response, as it does the other token errors.
 - **The render page** reads the same API for its overlays.
@@ -380,8 +381,9 @@ synthetic documents, on this host under load.
 service on release 98, never production. Nothing was deleted from its storage: each case
 was made from a token the service reads by its own rules, and one small analysis was
 submitted (three accessions that map and one that does not; projection to human, without
-and then with interactors). The rules were read from analysis-core 3.6.0's `TokenUtils`
-and `Tokenizer`, and the answers agree with them.
+and then with interactors). The rules were read from the deployed analysis-core
+(3.6.0-SNAPSHOT: `TokenUtils`, `Tokenizer`, `AnalysisResult`) and the analysis service's
+own source, and the answers agree with them.
 
 - **A token** is Base64 of `{yyyyMMddHHmmss}_{counter}`, URL-encoded (`=` as `%3D`). The
   service URL-decodes it until it no longer changes (Java's `URLDecoder`, which reads `+`
@@ -389,38 +391,59 @@ and `Tokenizer`, and the answers agree with them.
 - **The service reads the stored result first.** Only when there is none does it judge
   the token's date: within 7 days, 410; otherwise, or with no date in it, 404. The 7 is
   `DAYS_TO_LIVE`, a constant in analysis-core, not a setting, and counted in whole days
-  (Joda's `daysBetween`): a token dated 7 days 23 hours ago is still 410, one dated 8
-  days ago 404, and one dated in the future 410.
-- **So a result outlives its 7 days while its file is kept:** a token older than 7 days
-  whose result is still stored is answered in full. Read from the code; not seen here, as
-  no stored result older than 7 days was at hand (five recorded tokens from September and
-  October were all 404).
+  (Joda's `daysBetween`, `<= 7` alive) in the service's time zone (UTC on this instance;
+  the token's date is written and read in the JVM's default zone): a token dated 7 days
+  23 hours ago is still 410, one dated 8 days ago 404, and one dated in the future 410.
+  So the 7 days only tell a missing result's 410 from its 404; they delete nothing.
+- **How long a result is kept** is the service's own cleanup, hard-coded in its
+  configuration (`WebConfig`): every 10 s a checker (reactome-utils'
+  `LruFolderContentChecker`) measures the results folder, and only once it reaches its
+  maximum less a threshold (2.5 GB less 500 MB) deletes the files last accessed more than
+  a week ago, least recently used first, until it is under. (The service's API documents
+  its 410 as a result deleted for a new data release.) So retention depends on the folder's size and on use, not on a token's age: a
+  result read recently is kept, and a token older than 7 days whose result is still
+  stored is answered in full. Read from the code; not seen here, as no stored result
+  older than 7 days was at hand (five recorded tokens from September and October were
+  all 404).
+- **A stored result that cannot be read** (a class changed after an analysis-core
+  upgrade, say) is the catch-all 500 (read, not run).
 - **The answers,** each `application/json;charset=UTF-8`:
 
-  | Case                                                                                    | Status | Body                                                                                                                                                          |
-  | --------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | a good token, `/token/{token}`                                                          | 200    | the summary (below)                                                                                                                                           |
-  | dated within 7 days (or in the future), no result stored                                | 410    | `{"code":410,"reason":"Gone","messages":[]}`                                                                                                                  |
-  | dated 8 days ago or more, no result stored                                              | 404    | `{"code":404,"reason":"Not Found","messages":[]}`                                                                                                             |
-  | Base64 of text with no date (no `_`)                                                    | 404    | as above                                                                                                                                                      |
-  | not Base64 (`not-base64!`), or a URL-decoding error (`%25`)                             | 500    | `{"code":500,"reason":"Internal Server Error","messages":["Please get in touch with our help desk (help@reactome.org) for more details about this problem"]}` |
-  | `found/interactors/{pathway}`, none found (with or without interactors in the analysis) | 404    | the 404 body above                                                                                                                                            |
+  | Case                                                                                         | Status | Body                                                                                                                                                            |
+  | -------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | a good token, `/token/{token}`                                                               | 200    | the summary (below)                                                                                                                                             |
+  | dated within 7 days (or in the future), no result stored                                     | 410    | `{"code":410,"reason":"Gone","messages":[]}`                                                                                                                    |
+  | dated 8 days ago or more, no result stored                                                   | 404    | `{"code":404,"reason":"Not Found","messages":[]}`                                                                                                               |
+  | Base64 of text with no date (no `_`)                                                         | 404    | as above                                                                                                                                                        |
+  | not Base64 (`not-base64!`, or `QQ=` with the wrong padding), or a URL-decoding error (`%25`) | 500    | `{"code":500,"reason":"Internal Server Error","messages":["Please get in touch with our help desk ({help-desk address}) for more details about this problem"]}` |
+  | a `/` in the token: encoded (`%2F`)                                                          | 400    | the servlet container's own HTML page, not the service's JSON                                                                                                   |
+  | a `/` in the token: raw                                                                      | —      | another route: the framework's own JSON 404, or another endpoint (`{x}/resources`)                                                                              |
+  | `found/interactors/{pathway}`, none found (with or without interactors in the analysis)      | 404    | the 404 body above                                                                                                                                              |
 
   A malformed token is the service's catch-all 500, the same answer as any failure of its
   own, so it cannot be told apart from one by its answer.
 
 - **The summary** (`summary` in `/token/{token}`) holds `token`, `projection`,
   `interactors`, `type`, `sampleName`, `text` and `includeDisease`. Beside it,
-  `/token/{token}` gives `identifiersNotFound` (a count), `pathwaysFound`,
-  `resourceSummary`, `speciesSummary`, `expression` and `warnings`. **It carries no count
-  of identifiers found,** nor of identifiers submitted.
+  `/token/{token}` gives `identifiersNotFound` (a count), `pathwaysFound`, `pathways` (a
+  page of them), `resourceSummary`, `speciesSummary`, `expression` and `warnings`. **None
+  of them is a count of identifiers found,** nor of identifiers submitted.
+- **`pathwaysFound` follows `includeDisease`:** the answer is filtered by the stored
+  analysis's own setting unless the request names one. For the analysis submitted here,
+  229 with disease pathways and 191 without. Today's book counts the stored result's
+  pathways unfiltered (229), as `includeDisease=true` gives; `identifiersNotFound` is the
+  stored not-found set's size, as today's book's.
 - **`/download/{token}/result.json`** has no such count either: its keys are `summary`,
   `pathways`, `notFound`, `expressionSummary` and `warnings`, and it was 468 KB for this
   four-identifier analysis.
-- **`/download/{token}/entities/found/TOTAL/{name}.csv`** lists them: a row per
-  submitted identifier and what it maps to (three columns: submitted identifier, found identifier, resource), 113 bytes here. It is built from the same map as today's book's
-  count (`getAnalysisIdentifiers()`, the found entities map's keys, which are equal when
-  their ids are), so the count of distinct submitted identifiers in it is that count.
+- **`/download/{token}/entities/found/TOTAL/{name}.csv`** lists them: a header row,
+  then a row per submitted identifier and what it maps to (three columns: submitted
+  identifier, found identifier, resource), 113 bytes here. It is built from the same map
+  as today's book's count (`getAnalysisIdentifiers()`, the found entities map's keys,
+  which are equal when their ids are; interactors are a separate map, left out of both),
+  so the count of distinct submitted identifiers in it, the header skipped, is that
+  count. Its values are not quoted. Each request writes a temporary file on the service's
+  host, cleared within about half an hour.
 
 **Decision.**
 
@@ -429,11 +452,13 @@ and `Tokenizer`, and the answers agree with them.
   service still answers, and the website still shows, whenever its file outlives 7 days.
   - The identifier is checked first: an unknown or non-event identifier is answered as
     such whatever the token.
-  - A malformed token: `unknown-token` (404), as the service's own catch-all 500 would
-    read as `unavailable`. Malformed is what the service fails on: URL-decoding, repeated
-    until the token no longer changes (`+` read as a space), that fails, or Base64 that
-    Java's basic decoder refuses (a character outside its alphabet, misplaced padding, a
-    length of 1 modulo 4).
+  - A malformed token: `unknown-token` (404), as the service's answers to one (a 500, a
+    400 page, another route) would read as `unavailable` or worse. Malformed is anything
+    but the form the service issues: once URL-decoded until it no longer changes (a
+    decoding error is malformed), letters and digits only, then at most two `=` making
+    the length a multiple of 4, and an unpadded length that is not 1 modulo 4. The
+    service's tokens, Base64 of digits and `_`, never hold `+` or `/`, so the rule refuses
+    none it issues. The token is sent percent-encoded as one path segment.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
@@ -441,17 +466,18 @@ and `Tokenizer`, and the answers agree with them.
     it. CI's stub has a case for each row of the table.
 - **The requests carry FR-006's defaults:** all resources together (`TOTAL`), no
   expression column, all identifiers rather than only importable ones.
-- **The found count** is the count of distinct submitted identifiers in
-  `/download/{token}/entities/found/TOTAL/{name}.csv`, which grows with what was found,
-  not with the pathways hit as `result.json` does. The total is that count plus the
-  summary's `identifiersNotFound`, and the pathways hit are its `pathwaysFound`, as
-  today's book counts them.
+- **The counts,** as today's book's: the identifiers found are the distinct submitted
+  identifiers in `/download/{token}/entities/found/TOTAL/{name}.csv` (header skipped),
+  which grows with what was found, not with the pathways hit as `result.json` does; the
+  total adds `/token/{token}`'s `identifiersNotFound`; the pathways hit are its
+  `pathwaysFound`, asked for with `includeDisease=true` so that an analysis submitted
+  without disease pathways is counted as today's book counts it.
 - pdf-export reads the analysis through the analysis service's API, at an address that
   is a setting. It is the same service, reading the same files by the same rules, and
   the render page reads it too, so a PDF's figures and its text agree.
 - FR-007's wording ("from where the analysis service writes it") is amended to "through
   the analysis service that holds it".
-- In tests, a private instance, or a stub of its answers.
+- In tests, a non-production instance, or a stub of its answers.
 
 **Alternatives considered.** A Kryo reader in TypeScript: tied to Java's internals.
 
@@ -694,8 +720,8 @@ is ignored, not a missing file.
 
 - **To measure in the first tasks:** the render service's throughput (above); the
   diagrams' widths, from the release's diagram files, for FR-016's floor (R4); what the
-  analysis service answers for an expired and a malformed token, and its retention
-  period (R6); the join's memory and stamping (R4).
+  analysis service answers for an expired and a malformed token, and how long it keeps
+  a result (R6; measured by T009); the join's memory and stamping (R4).
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), it is split within its chapter, at section boundaries.

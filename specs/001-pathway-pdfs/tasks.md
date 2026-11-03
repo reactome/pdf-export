@@ -142,17 +142,17 @@ for WebsiteAngular to ship it (T042).
   - a good token;
   - an unknown one;
   - a malformed one;
-  - one gone within retention;
-  - one older than retention;
+  - one gone within retention (as measured: no result, dated within the service's 7 days);
+  - one older than retention (as measured: no result, dated 8 days ago or more);
   - `found/interactors` with none.
 
   Also record its retention period, and whether its summary carries the count of identifiers found (otherwise `/download/{token}/result.json` is needed). Recorded answers are scrubbed of host names, paths and identifiers before they are committed.
 
-  - **Done (#112):** against a non-production instance on release 98, not a private one: nothing in its storage was touched, each case being a token the service reads by its own rules (analysis-core's `Tokenizer`, read alongside), and one small analysis was submitted. The period is 7 days, a constant in analysis-core, and the service judges it only when no result is stored: a result kept longer is still answered. So the token's date is no longer judged here (T021) and there is no `--retention` setting. A malformed token is the service's catch-all 500. Neither the summary nor `result.json` carries the found count; the found identifiers' CSV does, from the same set as today's book's count. Research R6 has the table.
+  - **Done (#113, replacing #112 after its review):** against a non-production instance on release 98, not a private one: nothing in its storage was touched, each case being a token the service reads by its own rules (analysis-core's `Tokenizer` and `TokenUtils`, read alongside), and one small analysis was submitted. The service reads a stored result first; its 7 days (a constant) only tell a missing result's 410 from its 404. How long a result is kept is the service's own cleanup: by the results folder's size and the files' last access, so a result read recently outlives its 7 days and is still answered. So the token's date is no longer judged here (T021) and there is no `--retention` setting. A malformed token is the service's catch-all 500, and a `/` in one is a 400 page or another route, so T021 accepts only the form the service issues. Neither `/token/{token}` nor `result.json` carries the found count; the found identifiers' CSV does, from the same set as today's book's count. `pathwaysFound` follows the analysis's `includeDisease`, so it is asked for with `includeDisease=true`, as today's book counts. Research R6 has the table. From #112's review: the includeDisease filter, the cleanup recorded as the retention, the wrong-padding and `/` cases, and R6's older text, which contradicted the measurement.
 
 - [ ] T010 The analysis stub, `test/stubs/analysis.ts`. It is a small HTTP server on loopback that answers T009's recorded, scrubbed answers:
   - 404 (unknown);
-  - 410 (gone within retention);
+  - 410 (no result, dated within the service's 7 days);
   - found entities and interactors on a reaction's first parent pathway;
   - a `found/interactors` 404 meaning none;
   - the found identifiers' CSV, `/download/{token}/entities/found/TOTAL/{name}.csv` (T009: neither the summary nor `result.json` has the count);
@@ -288,7 +288,7 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
   Tests against T010's stub.
 
 - [ ] T021 [US2] Tokens, `src/analysis/token.ts`.
-  - A malformed token is `unknown-token`: one the analysis service would fail to read (research R6: URL-decoding until unchanged fails, or Java's basic Base64 decoder refuses it).
+  - A malformed token is `unknown-token`: anything but the form the service issues (research R6: URL-decoded until unchanged, then letters and digits with at most two `=` of padding, the length a multiple of 4 when padded, and not 1 modulo 4 unpadded). Tests include wrong padding (`QQ=`), a `/` encoded and raw, a `+`, and a decoding error. The token is sent percent-encoded as one path segment.
   - The token's date is not judged here: the service's 404 is `unknown-token`, its 410 is `gone-token`, and any other failure is `unavailable` (research R6, from T009).
 
   Tests for each case of T009's table, each seen failing.
