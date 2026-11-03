@@ -98,7 +98,7 @@ Cases).
 - `title`:
   - the event's name: the top-level pathway's in each of the book's PDFs (FR-002), the
     event's in a single-event PDF.
-- `figure`: a pathway's diagram.
+- `figure`: a pathway's diagram or illustration.
 - `names`: the authors of the edits of every event the PDF holds, each name once (as
   `event-pdf` removes duplicates, by name), sorted by code units, case and all.
 - `excerpt`: true for a single pathway at depth 1 or less. Its note points at the book.
