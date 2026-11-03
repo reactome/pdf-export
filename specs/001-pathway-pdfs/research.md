@@ -240,9 +240,9 @@ synthetic documents, on this host under load.
       selection is the same 649 KB SVG; the diagrams are three (one, `small.svg`, 5,976 ×
       3,350 px). The joined PDFs were 85 MiB (3,756 pages) and 140 MiB (6,203 pages), and
       what pdf-lib holds grows with the file. A real all-vector PDF of 300–400 MB (today's
-      largest is 383 MB from `event-pdf`, whose figures are rasters) could need about
-      1.7–2.2 GiB a join (inference: 365 MiB scaled by these runs' 670 MiB per 140 MiB
-      and 510 MiB per 85 MiB).
+      largest is 383 MB from `event-pdf`, whose figures are rasters) would need more:
+      scaled by these runs' 510–670 MiB for 85–140 MiB of file, roughly 1.7–2.1 GiB for
+      today's 383 MB (inference; the scaling itself is untested at that size).
     - **A section took 2.0 pages here, not today's 1.22** (23,541 pages for 19,313
       events). `place()` (T008) puts a figure on a landscape page of its own only where
       that prints it larger, never above its natural size (0.75 pt a pixel): a figure up
@@ -311,15 +311,14 @@ synthetic documents, on this host under load.
       6, before they overlap printing; with object streams on, 4.1–4.4 minutes.
   - **Decided from T011, for T025 and T029:**
     - **Joins have a limit of their own** inside `--parallel`: at most 2 at once by
-      default, a setting (T029 gives it a flag in contracts/cli.md). A join still takes
-      one of `--parallel`'s slots. Why 2: two of the largest joining beside one print
-      (`--parallel` 3) peaked at 2,597 MiB, a GiB under 4 GiB; the default `--parallel`
-      4 allows a second print beside them, which was not run (inference: a few hundred
-      MiB more, about 2.9 GiB, 3.4 with page cache); three alone took 3,360 MiB and with
-      a print would come to the cap; four were killed. On real, heavier files (about
-      1.7–2.2 GiB a join, inference) even two may not fit in 4 GiB, so T029 measures the
-      real book and sets the default, 1 if need be.
-    - **The largest PDFs are printed first,** by their estimated pages (T025's estimate), each
+      default, a setting with a flag (T029). A join still takes one of `--parallel`'s
+      slots. Why 2: two of the largest joining beside one print (`--parallel` 3) peaked
+      at 2,597 MiB (3,070 with page cache); three alone took 3,360 MiB; four were killed.
+      The default `--parallel` 4 allows a second print beside two joins, which was not
+      run: a print's share was up to about 680 MiB, so it may come near the cap. These
+      files are light, and on real ones even two joins may not fit, so the default is
+      provisional: T029 measures the real book and sets it.
+    - **The largest PDFs are printed first,** by their estimated pages (T025's parts estimate), each
       PDF's parts before the next's, so their joins arrive one at a time, each
       overlapping the smaller PDFs' printing. An interleaved order ("a few parts at a
       time across the PDFs") finishes the largest together, which is the together case
@@ -327,10 +326,10 @@ synthetic documents, on this host under load.
     - **Object streams: off unless memory binds,** to be settled on real files in T029:
       off saves five to eight times faster for 6% more file, but may cost memory.
     - **Joining in groups (T012) stays the fallback:** one PDF's join adds about 0.5
-      GiB on these files, but a real one (about 1.7–2.2 GiB, inference) beside printing
-      (1.4–1.9 GiB measured at four prints, plus 350–475 MiB of page cache) comes to
-      about 3.4–3.9 GiB, at the 4 GiB cap even with the join limit at 1. Whether it is
-      needed is T029's to measure on the real book.
+      GiB on these files, but a real one (roughly 1.7–2.1 GiB, inference) beside
+      printing (1.4–1.6 GiB at four prints alone, plus page cache) may exceed 4 GiB even
+      with one join at a time. If T029 finds that one real join does not fit beside
+      printing, T012 is done; otherwise it is not needed.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
   from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
   are numbered as the book's are: a first print with placeholders, its anchors' pages
