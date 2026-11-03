@@ -370,7 +370,8 @@ synthetic documents, on this host under load.
   - `/token/{token}` gives the summary, the resource summary, the not-found count and the
     pathways hit;
   - `/token/{token}/found/entities/{pathway}` and `/found/interactors/{pathway}` give the
-    found lists, a 404 meaning none;
+    found lists, a 404 meaning none (or that the result has gone since: the service
+    answers both alike);
   - the count of identifiers found is in neither the summary nor `result.json` (measured
     below).
 - **Today's errors:** a malformed token throws an unhandled Base64 error, and the
@@ -440,15 +441,17 @@ own source, and the answers agree with them.
   analysis's own setting unless the request names one, and the summary it returns then
   reports the request's setting, not the analysis's. For the analysis submitted here, 229
   with disease pathways and 191 without.
-- **Today's book counts after its own filter:** it filters the stored result by species,
-  resource and importable-only (`filterBySpecies`, which writes the filtered pathways
-  back into the result), keeping disease pathways, those found for the resource and
-  those with a p-value, and counts the pathways hit and the identifiers found from what
-  is left. Under FR-006's defaults (all resources, not importable-only) that is
-  `pathwaysFound` with `includeDisease=true` (229 here, both ways), except for a pathway
-  without a p-value, which the two filters may treat differently; how often there is
-  one is not known. `identifiersNotFound` is the stored not-found set's size, as today's
-  book's.
+- **Today's book counts after its own filter, over every species:** `filterBySpecies`
+  first filters the stored result by resource and importable-only (`filterPathways`,
+  which writes the filtered pathways back into the result, every species kept): disease
+  pathways kept, those found for the resource, those with a p-value. The species only
+  shapes the list it returns. The book then counts the pathways hit and the identifiers
+  found from the written-back, all-species result (`PropertiesSection`). Under FR-006's
+  defaults (all resources, not importable-only) the pathways hit are `pathwaysFound` with
+  `includeDisease=true` and no species (229 here, both ways): the service's filter
+  skips a pathway with no p-value as the book's does, and differs only in dropping a
+  p-value above 1, which the book would keep. Spec 002's research (R1) reads it the same
+  way. `identifiersNotFound` is the stored not-found set's size, as today's book's.
 - **`/download/{token}/result.json`** has no such count either: its keys are `summary`,
   `pathways`, `notFound`, `expressionSummary` and `warnings`, and it was 468 KB for this
   four-identifier analysis.
@@ -459,7 +462,8 @@ own source, and the answers agree with them.
   which are equal when their ids are; interactors are a separate map, left out of both),
   so the count of distinct submitted identifiers in it, the header skipped, is that
   count, but over all the stored pathways rather than the book's filtered ones: the same
-  except where a pathway left out by the filter holds an identifier no other does. Its values are not quoted. Each request writes a temporary file on the service's
+  except where a pathway the filter leaves out (no p-value, say) holds an identifier no
+  kept pathway does. Its values are not quoted. Each request writes a temporary file on the service's
   host, cleared within about half an hour.
 
 **Decision.**
@@ -474,10 +478,14 @@ own source, and the answers agree with them.
     but the form the service issues: URL-decoded until it no longer changes (a decoding
     error is malformed), it must be non-empty ASCII letters and digits with at most two
     `=` of padding (the length then a multiple of 4, and not 1 modulo 4 without it), and
-    its Base64 must decode to `{14 digits}_{digits}`. A check of the Base64 alone is not
-    enough: `Xw==`, Base64 of `_`, is well formed and the service fails on it. The
-    service's tokens never hold `+` or `/`, so the rule refuses none it issues. The token
-    is sent percent-encoded as one path segment.
+    its Base64 must decode to `{14 digits}_{1 to 19 digits}` (the counter is a Java
+    `long`). A check of the Base64 alone is not enough: `Xw==`, Base64 of `_`, is well
+    formed and the service fails on it; and without the bound, a token with a
+    7,000-digit counter is answered by the servlet container's HTML 400. The service's
+    tokens never hold `+` or `/`, and this instance writes their dates in ASCII digits
+    (as its JVM's locale does; one that wrote other digits would issue tokens this rule
+    refuses), so the rule refuses none it issues. The token is sent percent-encoded as
+    one path segment.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
@@ -490,9 +498,14 @@ own source, and the answers agree with them.
   which grows with what was found, not with the pathways hit as `result.json` does; the
   total adds `/token/{token}`'s `identifiersNotFound`; the pathways hit are its
   `pathwaysFound`, asked for with `includeDisease=true` so that an analysis submitted
-  without disease pathways is counted as today's book counts it. Where a pathway has no
-  p-value the counts may differ from today's book's; the comparison (FR-012) records any
-  such difference. The analysis's own `includeDisease`, if shown, is read from an answer
+  without disease pathways is counted as today's book counts it, and with no species, as
+  it counts every species. The identifiers found may differ from the book's where a
+  pathway the filter leaves out holds an identifier no kept pathway does; the comparison
+  (FR-012) records any such difference. The exact count would be spec 002's (`POST
+/token/{token}/found/all` over every kept pathway, its research R1), at the cost of
+  sending the whole pathway list; the CSV is one small request, and its edge is rare.
+- **A 404 from `found/…` is read as none found,** as today's book reads it, though it
+  may mean the result went between `/token/{token}` and that call. The analysis's own `includeDisease`, if shown, is read from an answer
   asked for without the parameter.
 - pdf-export reads the analysis through the analysis service's API, at an address that
   is a setting. It is the same service, reading the same files by the same rules, and
