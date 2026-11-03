@@ -126,7 +126,7 @@ describe('the analysis stub', () => {
     assert.equal((await csv(TOKENS.stored, { Accept: 'text/csv' })).status, 200);
     assert.equal(
       (await csv(TOKENS.stored, { Accept: 'text/csv;q=0, application/json' })).status,
-      406
+      200
     );
     const refused = await csv(TOKENS.stored, JSON_TYPE);
     assert.equal(refused.status, 406);

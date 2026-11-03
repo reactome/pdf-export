@@ -531,7 +531,8 @@ own source, and the answers agree with them.
   with `Accept: application/json` alone it answers the framework's own 406, not the
   service's JSON, and `/token/{token}` asked for `text/csv` answers an empty 406. With
   `text/csv` listed (alone, or with JSON), or no `Accept` at all, an error comes back in
-  the service's JSON (ran).
+  the service's JSON (ran). Weights are ignored: `text/csv;q=0, application/json` is
+  answered with the CSV (ran).
 - **`/token/{token}` is paged to one pathway** (`pageSize=1&page=1`): the counts and the
   summary are the same, and the answer was 1 KB rather than 94 KB unpaged for 229
   pathways (ran).
