@@ -4,12 +4,13 @@
 // lists the case each item is here for. Load with: cypher-shell -d graph.db -f fixture.cypher
 CREATE INDEX fixture_dbId IF NOT EXISTS FOR (n:DatabaseObject) ON (n.dbId);
 CREATE INDEX fixture_stId IF NOT EXISTS FOR (n:DatabaseObject) ON (n.stId);
-CREATE (db:DatabaseObject:MetaDatabaseObject:DBInfo:Release {dbId: 90000001, displayName: '98 on 2026-09-18', name: 'reactome', releaseNumber: 98, releaseDate: '2026-09-18', schemaClass: 'DBInfo'})
+CREATE (db:DatabaseObject:MetaDatabaseObject:DBInfo:Release {dbId: 90000001, displayName: '98 on 2026-09-18', name: 'reactome', releaseNumber: 98, checksum: 9007199254740993, releaseDate: '2026-09-18', schemaClass: 'DBInfo'})
 CREATE (hsa:DatabaseObject:Taxon:Species {dbId: 90000002, displayName: 'Homo sapiens', name: ['Homo sapiens'], taxId: '9606', abbreviation: 'HSA', schemaClass: 'Species'})
 CREATE (mmu:DatabaseObject:Taxon:Species {dbId: 90000003, displayName: 'Mus musculus', name: ['Mus musculus'], taxId: '10090', abbreviation: 'MMU', schemaClass: 'Species'})
 CREATE (rno:DatabaseObject:Taxon:Species {dbId: 90000004, displayName: 'Rattus norvegicus', name: ['Rattus norvegicus'], taxId: '10116', abbreviation: 'RNO', schemaClass: 'Species'})
 CREATE (cyto:DatabaseObject:Compartment:GO_CellularComponent:GO_Term {dbId: 90000010, displayName: 'cytosol', name: 'cytosol', accession: '0000010', databaseName: 'GO', schemaClass: 'Compartment'})
 CREATE (nucl:DatabaseObject:Compartment:GO_CellularComponent:GO_Term {dbId: 90000011, displayName: 'nucleoplasm', name: 'nucleoplasm', accession: '0000011', databaseName: 'GO', schemaClass: 'Compartment'})
+CREATE (memb:DatabaseObject:Compartment:GO_CellularComponent:GO_Term {dbId: 90000014, displayName: 'placeholder membrane', name: 'placeholder membrane', accession: '0000014', databaseName: 'GO', schemaClass: 'Compartment'})
 CREATE (dis1:DatabaseObject:ExternalOntology:Disease {dbId: 90000012, displayName: 'placeholder infectious disease', name: ['placeholder infectious disease'], identifier: '0000001', databaseName: 'DOID', schemaClass: 'Disease'})
 CREATE (dis2:DatabaseObject:ExternalOntology:Disease {dbId: 90000013, displayName: 'disease', name: ['disease'], identifier: '4', databaseName: 'DOID', schemaClass: 'Disease'})
 CREATE (beta:DatabaseObject:Event:Pathway:Trackable:Deletable:TopLevelPathway {dbId: 90000100, stId: 'R-HSA-90000100', stIdVersion: 'R-HSA-90000100.1', displayName: 'beta pathway', name: ['beta pathway'], schemaClass: 'TopLevelPathway', speciesName: 'Homo sapiens', hasDiagram: true, hasEHLD: false, isInferred: false, isInDisease: false, releaseDate: '2026-09-18'})
@@ -144,6 +145,7 @@ CREATE (ewas5)-[:referenceEntity {order: 0, stoichiometry: 1}]->(ref5)
 CREATE (r1)-[:input {order: 2, stoichiometry: 1}]->(poly1)
 CREATE (poly1)-[:repeatedUnit {order: 0, stoichiometry: 1}]->(ewas6)
 CREATE (ewas6)-[:referenceEntity {order: 0, stoichiometry: 1}]->(ref6)
+CREATE (ewas1)-[:compartment {order: 0, stoichiometry: 1}]->(memb)
 CREATE (r1)-[:compartment {order: 0, stoichiometry: 1}]->(nucl)
 CREATE (r1)-[:compartment {order: 1, stoichiometry: 1}]->(cyto)
 CREATE (r3)-[:compartment {order: 0, stoichiometry: 1}]->(cyto)

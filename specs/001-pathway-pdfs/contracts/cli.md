@@ -1,6 +1,6 @@
 # Contract: the command line
 
-One executable, `pdf-export`, with five commands. Settings come from flags or from the
+One executable, `pdf-export`, with six commands. Settings come from flags or from the
 environment variables named beside them. A password never goes on the command line.
 
 ## `pdf-export figures`
@@ -94,6 +94,24 @@ the figures already drawn by `figures`.
   identifier or file name, never a person.
 - **Exit 2:** bad arguments; an `--out` that is not absent or empty, as for `figures`
   (an old book is never replaced in place); or the graph cannot be reached at the start.
+
+## `pdf-export preflight`
+
+`book`'s preflight alone (T024), with `book`'s `--graph`, `--database`, `--files`,
+`--figures` (both required) and `--species`, so a release's inputs and figures' folder can
+be checked before the book is made. It prints one line per fault, `fault <fault>`, in the
+forms above (`missing-file <name>`, `incomplete-folder`, `no-checksum`,
+`stale-folder <folder's release>/<checksum> <graph's release>/<checksum>`, `stale-summary`,
+`stale-figure <stId>`, `bad-file-name <stId>`, `uncovered-character <code point> <stId>`),
+each naming a stable identifier or a file, never a text or a person. A release file is named
+as in `--files` (`diagram/R-HSA-….json`), a figure's as in `--figures` (`R-HSA-….svg`).
+
+- **Exit 0:** no fault. **Exit 1:** at least one. **Exit 2:** bad arguments, or the graph
+  cannot be reached at the start (said at once, without the driver's retries).
+- A folder that is not whole, or not this graph's release or summary's, is refused as a
+  whole: its figures are then not checked one by one.
+- Without the EHLD summary the Figure rules cannot be followed: the one fault is
+  `missing-file ehld/svgsummary.txt`.
 
 ## `pdf-export check-book <folder>`
 

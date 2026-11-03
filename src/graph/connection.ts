@@ -45,6 +45,12 @@ export interface GraphOptions {
    * hint): a caller that must not wait on a silent one bounds its own wait.
    */
   connectionTimeoutMs?: number;
+  /**
+   * How long the driver goes on retrying a read that failed for want of a connection; the
+   * driver's own default (30 s) without it. A command that must say at once that the graph
+   * cannot be reached sets it to 0.
+   */
+  retryTimeMs?: number;
 }
 
 export function openGraph(settings: GraphSettings, options: GraphOptions = {}): Graph {
@@ -60,6 +66,9 @@ export function openGraph(settings: GraphSettings, options: GraphOptions = {}): 
             connectionTimeout: options.connectionTimeoutMs,
             connectionAcquisitionTimeout: options.connectionTimeoutMs,
           }),
+      ...(options.retryTimeMs === undefined
+        ? {}
+        : { maxTransactionRetryTime: options.retryTimeMs }),
     }
   );
   return {

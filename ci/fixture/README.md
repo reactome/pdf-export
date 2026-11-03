@@ -14,6 +14,7 @@ release 98's (every relationship has `order` and `stoichiometry`).
 | Case                                                                                                             | Where                                                                                       | For                                           |
 | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | Release 98                                                                                                       | `DBInfo.releaseNumber`                                                                      | the introduction, the base of ids             |
+| A checksum beyond what a JavaScript number holds whole (2^53 + 1)                                                | `DBInfo.checksum`                                                                           | the figures' folder's fingerprint (T024)      |
 | Three human top-level pathways, ordered differently by id, by case and ignoring case                             | `beta pathway`, `Alpha pathway`, `Gamma pathway`                                            | FR-002's order                                |
 | A non-human top-level pathway                                                                                    | `Mouse pathway`                                                                             | `--species`                                   |
 | A subpathway with no diagram, under one with a diagram                                                           | `Alpha sub one`                                                                             | the ancestor's diagram with a selection       |
@@ -32,6 +33,7 @@ release 98's (every relationship has `order` and `stoichiometry`).
 | A disease, and one named exactly "disease"                                                                       | `Disease reaction`                                                                          | the "disease" exclusion                       |
 | A node that is not an event, with a stable id                                                                    | `Placeholder complex`                                                                       | 400 `not-an-event`                            |
 | Participants of each kind, in a complex, a set, a candidate set and a polymer, with identifiers (one an isoform) | `Reaction one`                                                                              | a reaction's own identifiers, for an analysis |
+| A compartment only a participant holds, named in no event's section                                              | `placeholder membrane`, of Reaction one's output                                            | FR-017 in the figures' names (T024)           |
 
 ## The release's files
 
