@@ -375,3 +375,51 @@ export async function diagramChoices(
     ])
   );
 }
+
+/**
+ * Each reaction's own identifiers, for an analysis's found lists (spec 001 T022): the
+ * reference identifiers of its participants, its inputs, outputs, catalysts and regulators,
+ * through every complex's components, every set's members and candidates and every
+ * polymer's unit, with an isoform's variant identifier beside its own. Sorted, each once.
+ */
+export async function reactionIdentifiers(
+  graph: Graph,
+  ids: readonly number[]
+): Promise<Map<number, string[]>> {
+  const rows = await graph.read<{ id: number; identifiers: string[] }>(
+    `UNWIND $ids AS id
+     MATCH (r:DatabaseObject {dbId: id})
+     WHERE r:ReactionLikeEvent
+     CALL {
+       WITH r
+       MATCH (r)-[:input|output]->(pe:PhysicalEntity) RETURN pe
+       UNION
+       WITH r
+       MATCH (r)-[:catalystActivity]->(:CatalystActivity)-[:physicalEntity]->(pe:PhysicalEntity)
+       RETURN pe
+       UNION
+       WITH r
+       MATCH (r)-[:regulatedBy]->(:Regulation)-[:regulator]->(pe:PhysicalEntity) RETURN pe
+     }
+     MATCH (pe)-[:hasComponent|hasMember|hasCandidate|repeatedUnit*0..]->(:PhysicalEntity)
+           -[:referenceEntity]->(re:ReferenceEntity)
+     WITH id, collect(DISTINCT re.identifier) + collect(DISTINCT re.variantIdentifier) AS identifiers
+     RETURN id, identifiers`,
+    { ids: unique(ids) }
+  );
+  return new Map(
+    rows.map(({ id, identifiers }) => [id, [...new Set(identifiers)].sort(byCodeUnit)])
+  );
+}
+
+/** A reaction's parent pathways' stable ids, by database id: the first is its first parent. */
+export async function parentPathways(graph: Graph, id: number): Promise<string[]> {
+  const rows = await graph.read<{ stId: string }>(
+    `MATCH (r:DatabaseObject {dbId: $id})<-[:hasEvent]-(p:Pathway)
+     RETURN p.stId AS stId ORDER BY p.dbId`,
+    { id }
+  );
+  return rows.map((row) => row.stId);
+}
+
+const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);

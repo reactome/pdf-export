@@ -11,26 +11,27 @@ release 98's (every relationship has `order` and `stoichiometry`).
 
 ## The cases
 
-| Case                                                                                 | Where                                                                                       | For                                       |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Release 98                                                                           | `DBInfo.releaseNumber`                                                                      | the introduction, the base of ids         |
-| Three human top-level pathways, ordered differently by id, by case and ignoring case | `beta pathway`, `Alpha pathway`, `Gamma pathway`                                            | FR-002's order                            |
-| A non-human top-level pathway                                                        | `Mouse pathway`                                                                             | `--species`                               |
-| A subpathway with no diagram, under one with a diagram                               | `Alpha sub one`                                                                             | the ancestor's diagram with a selection   |
-| A subpathway beneath a pathway with an illustration                                  | `Gamma sub`                                                                                 | the illustration unselected, recorded     |
-| A subpathway with two parents that have diagrams                                     | `Two-parent sub`                                                                            | which ancestor's diagram                  |
-| A pathway with an illustration of its own                                            | `Gamma pathway`                                                                             | EHLD figures                              |
-| Reactions of three kinds                                                             | `Reaction one`, `Black box two`, `Polymerisation four`                                      | reaction figures and types                |
-| An event shared by two pathways                                                      | `Shared reaction`                                                                           | FR-004's short entries                    |
-| An event inferred from two species                                                   | `Inferred reaction`, from a mouse and a rat source                                          | inferred-from, sorted by species          |
-| Preceding events, one outside a single-event PDF                                     | `Black box two` → `Reaction one` → `Polymerisation four`                                    | FR-003's links                            |
-| Lists whose order differs from id order                                              | `Alpha pathway`'s and `beta pathway`'s events; `Reaction one`'s compartments and literature | list order                                |
-| Seven references, one with eight authors                                             | `Reaction one`                                                                              | the first five, six authors then "et al." |
-| A book with a publisher, and a web page                                              | `Shared reaction`                                                                           | each kind of literature                   |
-| Edits of each kind; one with no date; one with no author; two sharing a date         | `Reaction one`                                                                              | the edit history's rules                  |
-| A summation whose HTML must be sanitised                                             | `Alpha pathway`                                                                             | sanitising                                |
-| A disease, and one named exactly "disease"                                           | `Disease reaction`                                                                          | the "disease" exclusion                   |
-| A node that is not an event, with a stable id                                        | `Placeholder complex`                                                                       | 400 `not-an-event`                        |
+| Case                                                                                 | Where                                                                                       | For                                           |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Release 98                                                                           | `DBInfo.releaseNumber`                                                                      | the introduction, the base of ids             |
+| Three human top-level pathways, ordered differently by id, by case and ignoring case | `beta pathway`, `Alpha pathway`, `Gamma pathway`                                            | FR-002's order                                |
+| A non-human top-level pathway                                                        | `Mouse pathway`                                                                             | `--species`                                   |
+| A subpathway with no diagram, under one with a diagram                               | `Alpha sub one`                                                                             | the ancestor's diagram with a selection       |
+| A subpathway beneath a pathway with an illustration                                  | `Gamma sub`                                                                                 | the illustration unselected, recorded         |
+| A subpathway with two parents that have diagrams                                     | `Two-parent sub`                                                                            | which ancestor's diagram                      |
+| A pathway with an illustration of its own                                            | `Gamma pathway`                                                                             | EHLD figures                                  |
+| Reactions of three kinds                                                             | `Reaction one`, `Black box two`, `Polymerisation four`                                      | reaction figures and types                    |
+| An event shared by two pathways                                                      | `Shared reaction`                                                                           | FR-004's short entries                        |
+| An event inferred from two species                                                   | `Inferred reaction`, from a mouse and a rat source                                          | inferred-from, sorted by species              |
+| Preceding events, one outside a single-event PDF                                     | `Black box two` → `Reaction one` → `Polymerisation four`                                    | FR-003's links                                |
+| Lists whose order differs from id order                                              | `Alpha pathway`'s and `beta pathway`'s events; `Reaction one`'s compartments and literature | list order                                    |
+| Seven references, one with eight authors                                             | `Reaction one`                                                                              | the first five, six authors then "et al."     |
+| A book with a publisher, and a web page                                              | `Shared reaction`                                                                           | each kind of literature                       |
+| Edits of each kind; one with no date; one with no author; two sharing a date         | `Reaction one`                                                                              | the edit history's rules                      |
+| A summation whose HTML must be sanitised                                             | `Alpha pathway`                                                                             | sanitising                                    |
+| A disease, and one named exactly "disease"                                           | `Disease reaction`                                                                          | the "disease" exclusion                       |
+| A node that is not an event, with a stable id                                        | `Placeholder complex`                                                                       | 400 `not-an-event`                            |
+| Participants of each kind, nested, with identifiers (one an isoform)                 | `Reaction one`                                                                              | a reaction's own identifiers, for an analysis |
 
 ## The release's files
 

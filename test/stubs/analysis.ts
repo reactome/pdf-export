@@ -9,7 +9,7 @@
 // never sends, one given twice, or a resource or importable-only setting other than
 // FR-006's defaults, so a client getting one wrong fails a test instead of passing
 // silently; the service itself ignores unknown ones and filters by the others.
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 const BASE = '/AnalysisService';
@@ -222,7 +222,9 @@ export interface AnalysisStub {
    * are answered (at once without it), as when the service fails partway through a PDF.
    */
   refuse(times?: number, after?: number): void;
-  /** Restore the stored results and forget the refusals and requests, for the next test. */
+  /** Answer every request `ms` late, as a loaded service does (0 to answer at once). */
+  slow(ms: number): void;
+  /** Restore the stored results and forget the refusals, delays and requests, for the next test. */
   reset(): void;
   close(): Promise<void>;
 }
@@ -234,6 +236,8 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
   let refusing = 0;
   /** Requests still to answer before the refusals start. */
   let refusingAfter = 0;
+  let delay = 0;
+  const delayed = new Set<ReturnType<typeof setTimeout>>();
 
   /** The service's reading of a token: `TokenUtils.getFromToken`, then `Tokenizer`. */
   function read(raw: string): Read {
@@ -280,6 +284,18 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
   }
 
   const server: Server = createServer((req, res) => {
+    if (delay === 0) {
+      answer(req, res);
+      return;
+    }
+    const timer = setTimeout(() => {
+      delayed.delete(timer);
+      answer(req, res);
+    }, delay);
+    delayed.add(timer);
+  });
+
+  function answer(req: IncomingMessage, res: ServerResponse) {
     const raw = req.url ?? '/';
     const accept = req.headers.accept;
     requests.push({ path: raw, accept });
@@ -446,7 +462,7 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
         .map((s) => ({ ...s, pathways: counts.get(s.name), filtered: counts.get(s.name) })),
       warnings: ['Missing header. Using a default one.'],
     });
-  });
+  }
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
@@ -463,14 +479,19 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
       refusing = times;
       refusingAfter = after;
     },
+    slow(ms) {
+      delay = ms;
+    },
     reset() {
       for (const token of [STORED, RECENT, UNREADABLE]) stored.add(token);
+      delay = 0;
       forgetting.clear();
       refusing = 0;
       refusingAfter = 0;
       requests.length = 0;
     },
     async close() {
+      for (const timer of delayed) clearTimeout(timer);
       server.closeAllConnections();
       await new Promise<void>((resolve) =>
         server.close(() => {

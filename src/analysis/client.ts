@@ -33,6 +33,8 @@ export interface Analysis {
 export interface ClientOptions {
   /** How long one request may take. */
   timeoutMs?: number;
+  /** The caller's own end, across every call: the service's deadline for the PDF. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -63,7 +65,7 @@ interface FoundInteractors {
 export async function readAnalysis(
   base: string,
   request: AnalysisRequest,
-  { timeoutMs = 60_000 }: ClientOptions = {}
+  { timeoutMs = 60_000, signal }: ClientOptions = {}
 ): Promise<Analysis> {
   const root = base.endsWith('/') ? base : `${base}/`;
   const token = canonicalToken(request.token);
@@ -76,7 +78,9 @@ export async function readAnalysis(
         headers: { Accept: accept },
         // a redirect is the service failing, and the token is never sent on elsewhere
         redirect: 'error',
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal
+          ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal])
+          : AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
       throw new AnalysisError('unavailable', `${what}: no answer (${reason(error)})`);

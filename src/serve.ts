@@ -1,0 +1,538 @@
+// The single-event service (spec 001 T022, contracts/service.md, User Story 2): `GET
+// /event/{stId}.pdf?depth&token` answers one event's PDF, `GET /health` the service's state.
+// The checks go in the contract's order, the depth, then the identifier, then the token's
+// form, then the concurrency limit, and only then is anything made. Every figure is drawn on
+// request, with the token where there is one; one that cannot be drawn leaves its section
+// without it, logged. Characters no font draws print as U+FFFD (FR-017), logged once per PDF.
+// Each request has a deadline across everything it waits for, the analysis service's calls
+// among them; past it the answer is 503 `unavailable`. A reason never carries a path, a host
+// or a name: the content service writes WebsiteAngular's envelope from it.
+import { readFileSync } from 'node:fs';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { join } from 'node:path';
+
+import { AnalysisError, readAnalysis, type AnalysedEvent } from './analysis/client.ts';
+import { canonicalToken } from './analysis/token.ts';
+import { fetchFigure, type FigureRequest } from './figures/client.ts';
+import { labelsOnRequest } from './figures/labels.ts';
+import { graphSettings, openGraph, type Graph, type GraphSettings } from './graph/connection.ts';
+import {
+  eventByIdentifier,
+  parentPathways,
+  reactionIdentifiers,
+  release,
+  type Child,
+} from './graph/queries.ts';
+import { CharacterLog, onRequestStrings } from './layout/characters.ts';
+import { layoutSingle, pageStyles } from './layout/document.ts';
+import { figureKey } from './layout/figure.ts';
+import { buildSingle } from './model/build.ts';
+import type { Document, Figure, Section } from './model/types.ts';
+import { Printer } from './print/print.ts';
+
+/** Why a PDF is not made (contracts/service.md). */
+export type Reason =
+  'bad-depth' | 'not-an-event' | 'no-event' | 'unknown-token' | 'gone-token' | 'unavailable';
+
+const STATUS: Readonly<Record<Reason, number>> = {
+  'bad-depth': 400,
+  'not-an-event': 400,
+  'no-event': 404,
+  'unknown-token': 404,
+  'gone-token': 410,
+  unavailable: 503,
+};
+
+export interface ServeSettings {
+  bind: string;
+  port: number;
+  graph: GraphSettings;
+  /** The release's folder: its EHLD summary says which pathways are illustrated. */
+  files: string;
+  /** The release's figures' folder: read from T047; until then every figure is drawn. */
+  figures: string | null;
+  render: string;
+  analysis: string;
+  site: string;
+  /** PDFs made at once; a request beyond them is answered 503 at once. */
+  concurrency: number;
+}
+
+/** What the service waits for, and how long: the defaults suit the website. */
+export interface ServeLimits {
+  /** A request's whole time, from its arrival to its answer. */
+  deadlineMs: number;
+  /** One call to the analysis service. */
+  analysisTimeoutMs: number;
+  /** One attempt at a figure. */
+  figureTimeoutMs: number;
+  /** The pause before a figure's one retry after a 503. */
+  retryPauseMs: number;
+  /** A health check's call to another service. */
+  healthTimeoutMs: number;
+}
+
+export const LIMITS: ServeLimits = {
+  deadlineMs: 120_000,
+  analysisTimeoutMs: 30_000,
+  figureTimeoutMs: 60_000,
+  retryPauseMs: 5_000,
+  healthTimeoutMs: 5_000,
+};
+
+/** Figures asked of the render service at once: its own default concurrency. */
+const FIGURES_AT_ONCE = 2;
+
+/** An argument the command line refuses (exit 2). */
+export class SettingsError extends Error {
+  override name = 'SettingsError';
+}
+
+/**
+ * The settings from `serve`'s flags and the environment (contracts/cli.md): a flag wins
+ * over its variable. The graph's credentials come from the environment only.
+ */
+export function serveSettings(
+  args: readonly string[],
+  env: Readonly<Record<string, string | undefined>>
+): ServeSettings {
+  const FLAGS = [
+    '--port',
+    '--bind',
+    '--graph',
+    '--database',
+    '--files',
+    '--figures',
+    '--render',
+    '--analysis',
+    '--site',
+    '--concurrency',
+  ];
+  const flags = new Map<string, string>();
+  for (let i = 0; i < args.length; i++) {
+    const [name = '', inline] = (args[i] ?? '').split(/=(.*)/s, 2);
+    if (!FLAGS.includes(name)) throw new SettingsError(`Unknown argument: ${name}`);
+    const value = inline ?? args[++i];
+    if (value === undefined || value === '') throw new SettingsError(`${name} needs a value`);
+    if (flags.has(name)) throw new SettingsError(`${name} is given twice`);
+    flags.set(name, value);
+  }
+  const setting = (flag: string, variable?: string) =>
+    flags.get(flag) ?? (variable === undefined ? undefined : env[variable] || undefined);
+  const required = (flag: string, variable?: string) => {
+    const value = setting(flag, variable);
+    if (value === undefined) {
+      throw new SettingsError(`${flag}${variable ? ` (or ${variable})` : ''} is needed`);
+    }
+    return value;
+  };
+  const whole = (flag: string, value: string, max: number) => {
+    if (!/^[0-9]+$/.test(value) || Number(value) < 1 || Number(value) > max) {
+      throw new SettingsError(`${flag} must be a whole number from 1 to ${String(max)}`);
+    }
+    return Number(value);
+  };
+  const graphEnv = { ...env };
+  const uri = setting('--graph');
+  if (uri !== undefined) graphEnv['NEO4J_URI'] = uri;
+  const database = setting('--database');
+  if (database !== undefined) graphEnv['NEO4J_DATABASE'] = database;
+  let graph: GraphSettings;
+  try {
+    graph = graphSettings(graphEnv);
+  } catch {
+    throw new SettingsError('--graph (or NEO4J_URI) is needed');
+  }
+  return {
+    bind: setting('--bind', 'BIND_ADDRESS') ?? '127.0.0.1',
+    port: whole('--port', setting('--port', 'PORT') ?? '4370', 65_535),
+    graph,
+    files: required('--files'),
+    figures: setting('--figures') ?? null,
+    render: required('--render', 'RENDER_SERVICE'),
+    analysis: required('--analysis', 'ANALYSIS_SERVICE'),
+    site: required('--site', 'REACTOME_SITE'),
+    concurrency: whole('--concurrency', setting('--concurrency') ?? '2', 1_000),
+  };
+}
+
+export interface Service {
+  /** The address it answers at: `http://{bind}:{port}`. */
+  url: string;
+  close(): Promise<void>;
+}
+
+export interface ServiceOptions {
+  /** The graph, if not opened from the settings (tests give one). */
+  graph?: Graph;
+  /** Where log lines go: standard error by default. */
+  log?: (line: string) => void;
+  limits?: Partial<ServeLimits>;
+}
+
+/** The package's version, for the health answer. */
+const VERSION = (
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+
+/** The pathways the EHLD summary names: their figure is their illustration. */
+function readIllustrated(files: string): Set<string> {
+  return new Set(
+    readFileSync(join(files, 'ehld', 'svgsummary.txt'), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('R-'))
+  );
+}
+
+/** A refusal with its reason, answered as JSON. */
+class Refusal extends Error {
+  readonly reason: Reason;
+  constructor(reason: Reason, message: string = reason) {
+    super(message);
+    this.reason = reason;
+  }
+}
+
+/** A stable identifier, a versioned one, or a database id: anything else names nothing. */
+const IDENTIFIER = /^(?:R-[A-Z]{3}-[0-9]{1,12}(?:\.[0-9]{1,6})?|[0-9]{1,15})$/;
+
+export async function startService(
+  settings: ServeSettings,
+  options: ServiceOptions = {}
+): Promise<Service> {
+  const limits: ServeLimits = { ...LIMITS, ...options.limits };
+  const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));
+  const illustrated = readIllustrated(settings.files);
+  const graph = options.graph ?? openGraph(settings.graph);
+  const ownGraph = options.graph === undefined;
+  const printer = await Printer.start();
+  const styles = pageStyles();
+  let active = 0;
+
+  /** Rejects once the deadline passes, so a wait that cannot be stopped is not waited on. */
+  const within = <T>(work: Promise<T>, deadline: AbortSignal): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const stop = () => {
+        reject(new Refusal('unavailable', 'the deadline passed'));
+      };
+      if (deadline.aborted) stop();
+      deadline.addEventListener('abort', stop, { once: true });
+      void work.then(resolve, reject).finally(() => {
+        deadline.removeEventListener('abort', stop);
+      });
+    });
+
+  async function identify(identifier: string, deadline: AbortSignal): Promise<Child> {
+    if (!IDENTIFIER.test(identifier)) throw new Refusal('no-event');
+    let found;
+    try {
+      found = await within(eventByIdentifier(graph, identifier), deadline);
+    } catch (error) {
+      if (error instanceof Refusal) throw error;
+      throw new Refusal('unavailable', `the graph: ${describe(error)}`);
+    }
+    if (found === null) throw new Refusal('no-event');
+    if ('notAnEvent' in found) throw new Refusal('not-an-event');
+    return found.event;
+  }
+
+  /** The PDF: the model, the analysis, the figures, the characters, the layout, the print. */
+  async function make(
+    root: Child,
+    depth: 0 | 1,
+    token: string | null,
+    deadline: AbortSignal
+  ): Promise<Uint8Array> {
+    const doc = await buildSingle(graph, root, { depth, illustrated, analysis: token !== null });
+    const sections = doc.places.flatMap((place) => (place.full ? [place.section] : []));
+    const analysis =
+      token === null
+        ? null
+        : await readAnalysis(
+            settings.analysis,
+            {
+              token,
+              species: sections[0]?.event.speciesName ?? '',
+              events: await analysedEvents(graph, sections),
+            },
+            { timeoutMs: limits.analysisTimeoutMs, signal: deadline }
+          );
+    const characters = new CharacterLog(
+      token === null ? root.stId : `${root.stId} token=${token}`,
+      log
+    );
+    // the token as the render service is to receive it once decoded: its padding as `=`
+    const figures = await drawFigures(doc, token === null ? undefined : decodeURIComponent(token), {
+      characters,
+      deadline,
+    });
+    const laid = layoutSingle(onRequestStrings(doc, characters), {
+      site: settings.site,
+      date: new Date(),
+      figures,
+      styles,
+      analysis: analysis === null ? null : onRequestStrings(analysis, characters),
+    });
+    return printer.single(laid.html);
+  }
+
+  /** Each figure the document draws, once, at most FIGURES_AT_ONCE at a time. */
+  async function drawFigures(
+    doc: Document,
+    token: string | undefined,
+    { characters, deadline }: { characters: CharacterLog; deadline: AbortSignal }
+  ): Promise<Map<string, string>> {
+    const wanted = new Map<string, Figure>();
+    for (const place of doc.places) {
+      const figure = place.full ? place.section.figure : null;
+      if (figure) wanted.set(figureKey(figure), figure);
+    }
+    if (doc.cover.figure) wanted.set(figureKey(doc.cover.figure), doc.cover.figure);
+    const queue = [...wanted];
+    const drawn = new Map<string, string>();
+    const worker = async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        const [key, figure] = next;
+        const answer = await fetchFigure(settings.render, figureRequest(figure, token), {
+          timeoutMs: limits.figureTimeoutMs,
+          retryPauseMs: limits.retryPauseMs,
+          signal: deadline,
+        });
+        if ('missing' in answer) {
+          log(`missing-figure ${key}: ${answer.missing}`);
+          continue;
+        }
+        try {
+          drawn.set(key, labelsOnRequest(answer.svg, characters));
+        } catch (error) {
+          log(`missing-figure ${key}: its labels could not be read (${describe(error)})`);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: FIGURES_AT_ONCE }, worker));
+    return drawn;
+  }
+
+  async function answerPdf(req: IncomingMessage, res: ServerResponse, rawId: string) {
+    const deadline = AbortSignal.timeout(limits.deadlineMs);
+    const query = new URL(req.url ?? '/', 'http://service').searchParams;
+    // the depth first
+    const depths = query.getAll('depth');
+    if (depths.length > 1 || (depths.length === 1 && depths[0] !== '0' && depths[0] !== '1')) {
+      refuse(res, 'bad-depth');
+      return;
+    }
+    const depth = depths[0] === '0' ? 0 : 1;
+    // then the identifier, whatever the token
+    let identifier: string;
+    try {
+      identifier = decodeURIComponent(rawId);
+    } catch {
+      refuse(res, 'no-event');
+      return;
+    }
+    let root: Child;
+    try {
+      root = await identify(identifier, deadline);
+    } catch (error) {
+      fail(res, error, identifier);
+      return;
+    }
+    // then the token's form
+    const tokens = query.getAll('token');
+    let token: string | null = null;
+    if (tokens.length > 0) {
+      try {
+        if (tokens.length > 1) throw new AnalysisError('unknown-token', 'two tokens given');
+        token = canonicalToken(tokens[0] ?? '');
+      } catch (error) {
+        fail(res, error, root.stId);
+        return;
+      }
+    }
+    // then the limit: a request beyond it is not queued
+    if (active >= settings.concurrency) {
+      log(`unavailable ${root.stId}: ${String(active)} PDFs already being made`);
+      refuse(res, 'unavailable');
+      return;
+    }
+    active += 1;
+    // the slot is held until the work ends, not only until the answer: work past the
+    // deadline still runs until its calls are stopped
+    const work = make(root, depth, token, deadline);
+    void work
+      .catch(() => undefined)
+      .finally(() => {
+        active -= 1;
+      });
+    let pdf: Uint8Array;
+    try {
+      pdf = await within(work, deadline);
+    } catch (error) {
+      fail(res, error, root.stId);
+      return;
+    }
+    res
+      .writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(pdf.byteLength),
+        'Content-Disposition': `attachment; filename="${root.stId}.pdf"`,
+      })
+      .end(pdf);
+  }
+
+  /** A failure's answer: its reason, and a log line; never its message in the answer. */
+  function fail(res: ServerResponse, error: unknown, subject: string) {
+    const reason: Reason =
+      error instanceof Refusal || error instanceof AnalysisError ? error.reason : 'unavailable';
+    if (reason === 'unavailable') log(`unavailable ${subject}: ${describe(error)}`);
+    refuse(res, reason);
+  }
+
+  async function answerHealth(res: ServerResponse) {
+    const answers = async (url: string, ok: (status: number) => boolean) => {
+      try {
+        const response = await fetch(url, {
+          redirect: 'error',
+          signal: AbortSignal.timeout(limits.healthTimeoutMs),
+        });
+        await response.body?.cancel();
+        return ok(response.status);
+      } catch {
+        return false;
+      }
+    };
+    const base = (url: string) => (url.endsWith('/') ? url : `${url}/`);
+    let graphRelease: number;
+    try {
+      graphRelease = await release(graph);
+    } catch (error) {
+      log(`unavailable health: the graph: ${describe(error)}`);
+      refuse(res, 'unavailable');
+      return;
+    }
+    const [render, analysis] = await Promise.all([
+      answers(new URL('health', base(settings.render)).href, (status) => status === 200),
+      // any answer of its own: the service has no health endpoint of its own to ask
+      answers(new URL('database/version', base(settings.analysis)).href, (status) => status < 500),
+    ]);
+    json(res, 200, { version: VERSION, release: graphRelease, render, analysis, figures: 'none' });
+  }
+
+  const server: Server = createServer((req, res) => {
+    const path = (req.url ?? '/').split('?')[0] ?? '/';
+    if (req.method !== 'GET') {
+      res.writeHead(405, { Allow: 'GET' }).end();
+      return;
+    }
+    const pdf = /^\/event\/([^/]+)\.pdf$/.exec(path);
+    const handle = pdf?.[1]
+      ? answerPdf(req, res, pdf[1])
+      : path === '/health'
+        ? answerHealth(res)
+        : Promise.resolve(void res.writeHead(404).end());
+    handle.catch((error: unknown) => {
+      log(`unavailable: ${describe(error)}`);
+      if (!res.headersSent) refuse(res, 'unavailable');
+      else res.destroy();
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(settings.port, settings.bind, () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  const { address, port } = server.address() as AddressInfo;
+  const host = address.includes(':') ? `[${address}]` : address;
+
+  return {
+    url: `http://${host}:${String(port)}`,
+    async close() {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) =>
+        server.close(() => {
+          resolve();
+        })
+      );
+      try {
+        await printer.close();
+      } finally {
+        if (ownGraph) await graph.close();
+      }
+    },
+  };
+}
+
+/** The events whose found lists the PDF shows, a reaction's from its first parent's. */
+async function analysedEvents(
+  graph: Graph,
+  sections: readonly Section[]
+): Promise<AnalysedEvent[]> {
+  const reactions = sections.filter((s) => s.event.kind === 'reaction');
+  const identifiers =
+    reactions.length > 0
+      ? await reactionIdentifiers(
+          graph,
+          reactions.map((s) => s.event.dbId)
+        )
+      : new Map<number, string[]>();
+  const events: AnalysedEvent[] = [];
+  for (const section of sections) {
+    const { event } = section;
+    if (event.kind === 'pathway') {
+      events.push({ kind: 'pathway', stId: event.stId });
+      continue;
+    }
+    // its parent where the PDF places it; a reaction alone, its first in the graph
+    const parent = section.path.at(-1)?.stId ?? (await parentPathways(graph, event.dbId))[0];
+    if (parent === undefined) continue;
+    events.push({
+      kind: 'reaction',
+      stId: event.stId,
+      parent,
+      identifiers: identifiers.get(event.dbId) ?? [],
+    });
+  }
+  return events;
+}
+
+function figureRequest(figure: Figure, token: string | undefined): FigureRequest {
+  const withToken = token === undefined ? {} : { token };
+  switch (figure.kind) {
+    case 'ancestor':
+      return { kind: 'ancestor', stId: figure.stId, highlight: figure.highlight, ...withToken };
+    case 'reaction':
+      return { kind: 'reaction', stId: figure.stId, ...withToken };
+    default:
+      return { kind: figure.kind, stId: figure.stId, ...withToken };
+  }
+}
+
+function refuse(res: ServerResponse, reason: Reason) {
+  json(res, STATUS[reason], { reason });
+}
+
+function json(res: ServerResponse, status: number, body: unknown) {
+  const text = JSON.stringify(body);
+  res
+    .writeHead(status, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Length': String(Buffer.byteLength(text)),
+    })
+    .end(text);
+}
+
+/** An error for the log: its name and message, its cause's code where there is one. */
+function describe(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause as { code?: unknown } | undefined;
+  const code = typeof cause?.code === 'string' ? ` (${cause.code})` : '';
+  return `${error.name}: ${error.message}${code}`;
+}
