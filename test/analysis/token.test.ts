@@ -54,6 +54,15 @@ test('a token as long as the bound is read; one longer is refused before it is d
   const over = deepPadding(2000, MAX_TOKEN_LENGTH / 2 - 2013);
   assert.equal(over.length, MAX_TOKEN_LENGTH + 2);
   assert.throws(() => canonicalToken(over), unknown);
+  // one character over: an unpadded token (23 characters) with its last nested in layers,
+  // an odd length, read when one shorter
+  const bare = issue('20200101000000_12').replace(/%3D$/, '');
+  const odd = (layers: number) =>
+    `${bare.slice(0, -1)}%${'25'.repeat(layers)}${(bare.codePointAt(22) ?? 0).toString(16)}`;
+  assert.equal(odd(4083).length, MAX_TOKEN_LENGTH - 1);
+  assert.equal(canonicalToken(odd(4083)), issue('20200101000000_12'));
+  assert.equal(odd(4084).length, MAX_TOKEN_LENGTH + 1);
+  assert.throws(() => canonicalToken(odd(4084)), unknown);
   // decoded layer by layer, this one would take seconds; refused, it takes none
   const long = deepPadding(16_000, 16_000);
   const start = performance.now();

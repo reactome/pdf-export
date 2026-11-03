@@ -4,7 +4,8 @@
 // given twice, a JSON error body, and Retry-After on a 503. It answers 400 to a query
 // parameter the contract does not name, so a wrongly named one fails a test instead of
 // passing silently, and refuses on request: 404, 503, a timeout, a body that stops part way,
-// or an answer that is not SVG.
+// or an answer that is not SVG. A test can also plant text in a figure's first label. Its
+// `/health` answers as the service's does.
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -31,7 +32,9 @@ export interface RenderStub {
   requests: string[];
   /** Refuse requests for a stable id, `times` times (every time without it). */
   refuse(stId: string, how: Refusal, times?: number): void;
-  /** Forget the refusals and the recorded requests, for the next test. */
+  /** Put `text` at the start of the first label of every figure drawn for a stable id. */
+  label(stId: string, text: string): void;
+  /** Forget the refusals, the planted labels and the recorded requests, for the next test. */
   reset(): void;
   close(): Promise<void>;
 }
@@ -41,7 +44,11 @@ export interface RenderStub {
  * service selects events (`data-highlight`) and an analysis marked as an overlay
  * (`data-token`), so a test can tell which was asked for.
  */
-function figure(stId: string, query: URLSearchParams): string | undefined {
+function figure(
+  stId: string,
+  query: URLSearchParams,
+  label: string | undefined
+): string | undefined {
   const name = query.get('layout') === 'reaction' ? `${stId}.reaction.svg` : `${stId}.svg`;
   const file = new URL(name, FIGURES);
   if (!existsSync(file)) return undefined;
@@ -53,12 +60,14 @@ function figure(stId: string, query: URLSearchParams): string | undefined {
     token === null ? '' : ` data-token="${encodeURIComponent(token)}"`,
   ].join('');
   if (marks) svg = svg.replace('<svg ', `<svg${marks} `);
+  if (label !== undefined) svg = svg.replace(/<text\b[^>]*>/, (tag) => `${tag}${label}`);
   return svg;
 }
 
 export async function startRenderStub(): Promise<RenderStub> {
   const requests: string[] = [];
   const refusals = new Map<string, { how: Refusal; left: number }>();
+  const labels = new Map<string, string>();
   const hanging = new Set<import('node:http').ServerResponse>();
 
   const server: Server = createServer((req, res) => {
@@ -68,6 +77,13 @@ export async function startRenderStub(): Promise<RenderStub> {
       res
         .writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers })
         .end(JSON.stringify({ error: message }));
+    if (url.pathname === '/health') {
+      // the service's health answer (contracts/render.md), its build a placeholder
+      res
+        .writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        .end(JSON.stringify({ build: '000000000000', files: 'local' }));
+      return;
+    }
     const match = /^\/render\/(R-[A-Z]{3}-\d+)\.([a-z]+)$/.exec(url.pathname);
     if (!match?.[1]) {
       error(404, 'Not a render request');
@@ -112,7 +128,7 @@ export async function startRenderStub(): Promise<RenderStub> {
       else error(404, `No figure for ${stId}`);
       return;
     }
-    const svg = figure(stId, url.searchParams);
+    const svg = figure(stId, url.searchParams, labels.get(stId));
     if (svg === undefined) {
       error(404, `No figure for ${stId}`);
       return;
@@ -129,8 +145,12 @@ export async function startRenderStub(): Promise<RenderStub> {
     refuse(stId, how, times = -1) {
       refusals.set(stId, { how, left: times });
     },
+    label(stId, text) {
+      labels.set(stId, text);
+    },
     reset() {
       refusals.clear();
+      labels.clear();
       requests.length = 0;
     },
     async close() {
