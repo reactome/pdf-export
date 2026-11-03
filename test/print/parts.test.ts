@@ -1,7 +1,8 @@
 // The book's parts (spec 001 T025, research R4), on the fixture's book with the threshold
-// lowered so a pathway's PDF splits: parts end at section boundaries, each holds one PDF's
-// pages, each PDF's join holds its parts' pages in order, and no more than `parallel`
-// prints and joins run at once.
+// lowered so a pathway's PDF splits: the pages estimated are the pages printed, parts end
+// at section boundaries, each holds one PDF's pages, each PDF's join holds its parts' pages
+// in order, no more than `parallel` prints and joins run at once, and a failure anywhere
+// stops the run and is thrown.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -15,10 +16,19 @@ import {
   pageStyles,
   type LayoutOptions,
 } from '../../src/layout/document.ts';
+import { figureKey } from '../../src/layout/figure.ts';
 import { PROBE } from '../../src/layout/html.ts';
 import type { Document } from '../../src/model/types.ts';
 import { Printer } from '../../src/print/print.ts';
-import { joinParts, printBook, splitParts, type Joined } from '../../src/print/parts.ts';
+import {
+  Flow,
+  estimatePages,
+  figureSizes,
+  joinParts,
+  printBook,
+  splitParts,
+  type Joined,
+} from '../../src/print/parts.ts';
 import {
   bookPdf,
   buildFixture,
@@ -50,8 +60,8 @@ async function pagesOf(pdf: Uint8Array): Promise<{ text: string; probes: string[
   }
 }
 
-/** Pages a part is estimated past which the fixture's PDFs split: about three sections. */
-const THRESHOLD = 3;
+/** The pages at which the fixture's parts end: about three of Alpha's sections. */
+const THRESHOLD = 1;
 
 describe('parts', { skip: skipWithoutGraph }, () => {
   let built: Built;
@@ -81,7 +91,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
         },
       },
       layout: options,
-      settings: { threshold: THRESHOLD, parallel: 2 },
+      settings: { threshold: THRESHOLD, parallel: 2, joins: 2 },
       joined: async (j) => {
         joined.set(j.doc.cover.title, { joined: j, pdf: await j.pdf.save() });
       },
@@ -110,7 +120,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   };
 
   test('a PDF past the threshold is split, at section boundaries only', async () => {
-    assert.deepEqual([...joined.keys()], ['Alpha pathway', 'beta pathway', 'Gamma pathway']);
+    assert.deepEqual([...joined.keys()].sort(), ['Alpha pathway', 'Gamma pathway', 'beta pathway']);
     // Alpha's ten sections, each with a figure, in several parts besides the front
     assert.ok(joinedOf('Alpha pathway').joined.parts.length >= 4);
     for (const doc of built.book) {
@@ -160,6 +170,45 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     assert.equal(printed.size, parts);
   });
 
+  test('the pages estimated are the pages printed: each section alone, and each PDF', async () => {
+    // a section alone prints its estimate rounded up (Gamma's two landscape figures, three
+    // pages and two, among them); a PDF's sections together, within a page
+    const sizes = figureSizes(options.figures);
+    const printer = started;
+    assert.ok(printer);
+    const pagesPrinted = async (doc: Document, places: Document['places']) =>
+      (await joinParts([await printer.part(layoutBookPart(doc, places, options).html)])).pages[0];
+    for (const doc of built.book) {
+      for (const place of doc.places) {
+        if (!place.full) continue;
+        const estimate = estimatePages(place, sizes);
+        const printed = await pagesPrinted(doc, [place]);
+        assert.equal(
+          Math.ceil(estimate),
+          printed,
+          `${place.section.event.stId}: ${String(estimate)}`
+        );
+      }
+      const flow = new Flow(sizes);
+      for (const place of doc.places) flow.add(place);
+      const printed = (await pagesPrinted(doc, doc.places)) ?? 0;
+      assert.ok(
+        Math.abs(flow.pages - printed) < 1,
+        `${doc.cover.title}: ${String(flow.pages)}, ${String(printed)}`
+      );
+    }
+  });
+
+  test('a part ends at the boundary where it reaches the threshold, not after', () => {
+    // a section with a landscape figure and nothing after it: exactly two pages
+    const gamma = bookPdf(built, 'Gamma pathway');
+    const sizes = figureSizes(options.figures);
+    const two = gamma.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000310');
+    assert.ok(two);
+    assert.equal(estimatePages(two, sizes), 2);
+    assert.deepEqual(splitParts([two, two], 2, sizes), [[two], [two]]);
+  });
+
   test('at most `parallel` prints and joins at once; a join waits for no other PDF', async () => {
     const one = await PDFDocument.create();
     one.addPage();
@@ -181,7 +230,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     await printBook(built.book, {
       printer: { part: () => busy('print', () => Promise.resolve(blank.slice())) },
       layout: options,
-      settings: { threshold: THRESHOLD, parallel: 3 },
+      settings: { threshold: THRESHOLD, parallel: 3, joins: 2 },
       join: (parts) => busy('join', () => joinParts(parts)),
       joined: async () => {
         await sleep(5);
@@ -206,7 +255,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
           },
         },
         layout: options,
-        settings: { threshold: THRESHOLD, parallel: 2 },
+        settings: { threshold: THRESHOLD, parallel: 2, joins: 2 },
         joined: () => {
           handed += 1;
           return Promise.resolve();
@@ -216,6 +265,153 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     );
     assert.equal(prints, 2);
     assert.equal(handed, 0);
+  });
+
+  /** A printer of one blank page, after a wait, that fails for a PDF's parts by title. */
+  const blankPrinter = async (wait: number, failFor?: string) => {
+    const one = await PDFDocument.create();
+    one.addPage();
+    const blank = await one.save();
+    return {
+      part: async (html: string) => {
+        if (failFor && html.includes(`<title>${failFor}</title>`)) throw new Error(`no ${failFor}`);
+        await sleep(wait);
+        return blank.slice();
+      },
+    };
+  };
+
+  test('at most `joins` joins at once, however many PDFs are printed together', async () => {
+    // every PDF's two parts printed at once, so all three joins are ready together
+    let joining = 0;
+    let most = 0;
+    await printBook(built.book, {
+      printer: await blankPrinter(10),
+      layout: options,
+      settings: { threshold: 1000, parallel: 6, joins: 2 },
+      join: async (parts) => {
+        joining += 1;
+        most = Math.max(most, joining);
+        try {
+          await sleep(30);
+          return await joinParts(parts);
+        } finally {
+          joining -= 1;
+        }
+      },
+      joined: () => Promise.resolve(),
+    });
+    assert.equal(most, 2);
+  });
+
+  test('the largest PDF, by its estimated pages, is printed first', async () => {
+    // Gamma, its two landscape figures making it the largest, before Alpha and beta
+    const titles: string[] = [];
+    const blank = await blankPrinter(0);
+    await printBook(built.book, {
+      printer: {
+        part: (html) => {
+          titles.push(/<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '');
+          return blank.part(html);
+        },
+      },
+      layout: options,
+      settings: { threshold: THRESHOLD, parallel: 1, joins: 1 },
+      joined: () => Promise.resolve(),
+    });
+    assert.equal(titles[0], 'Gamma pathway');
+    assert.deepEqual([...new Set(titles)], ['Gamma pathway', 'Alpha pathway', 'beta pathway']);
+  });
+
+  test('every failure is thrown together, once what was printing has finished', async () => {
+    let finished = 0;
+    const blank = await blankPrinter(30);
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const beta = bookPdf(built, 'beta pathway');
+    const error: unknown = await printBook([alpha, beta], {
+      printer: {
+        part: async (html) => {
+          // each PDF in two parts, all four printing at once: Alpha's fail at once, beta's
+          // go on printing a while
+          if (html.includes('<title>Alpha pathway</title>')) throw new Error('no Alpha');
+          const pdf = await blank.part(html);
+          finished += 1;
+          return pdf;
+        },
+      },
+      layout: options,
+      settings: { threshold: 1000, parallel: 4, joins: 2 },
+      joined: () => Promise.resolve(),
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    assert.ok(error instanceof AggregateError, String(error));
+    assert.deepEqual(
+      error.errors.map((e: unknown) => (e instanceof Error ? e.message : e)),
+      ['no Alpha', 'no Alpha']
+    );
+    // the two of beta's started beside them had finished when it was thrown
+    assert.equal(finished, 2);
+  });
+
+  test("no PDF is joined once another's print has failed", async () => {
+    // each PDF in two parts, all four printing at once: Gamma's fail, beta's finish after
+    const beta = bookPdf(built, 'beta pathway');
+    const gamma = bookPdf(built, 'Gamma pathway');
+    let joins = 0;
+    await assert.rejects(
+      printBook([beta, gamma], {
+        printer: await blankPrinter(20, 'Gamma pathway'),
+        layout: options,
+        settings: { threshold: 1000, parallel: 4, joins: 2 },
+        join: (parts) => {
+          joins += 1;
+          return joinParts(parts);
+        },
+        joined: () => Promise.resolve(),
+      }),
+      /no Gamma pathway/
+    );
+    assert.equal(joins, 0);
+  });
+
+  test('a failed join, or a failure in what is done with a joined PDF, is thrown', async () => {
+    const gamma = bookPdf(built, 'Gamma pathway');
+    const run = async () => ({
+      printer: await blankPrinter(0),
+      layout: options,
+      settings: { threshold: THRESHOLD, parallel: 2, joins: 2 },
+      joined: () => Promise.resolve(),
+    });
+    await assert.rejects(
+      printBook([gamma], { ...(await run()), join: () => Promise.reject(new Error('no join')) }),
+      /no join/
+    );
+    await assert.rejects(
+      printBook([gamma], { ...(await run()), joined: () => Promise.reject(new Error('not kept')) }),
+      /not kept/
+    );
+  });
+
+  test('a joined PDF carries what laying out its parts reported', async () => {
+    // Gamma's last section laid out without its figure: missing, from the last part
+    const gamma = bookPdf(built, 'Gamma pathway');
+    const last = gamma.places.at(-1);
+    assert.ok(last?.full && last.section.figure);
+    const figures = new Map(options.figures);
+    figures.delete(figureKey(last.section.figure));
+    let report: Joined['report'] | undefined;
+    await printBook([gamma], {
+      printer: await blankPrinter(0),
+      layout: { ...options, figures },
+      settings: { threshold: THRESHOLD, parallel: 2, joins: 2 },
+      joined: (j) => {
+        report = j.report;
+        return Promise.resolve();
+      },
+    });
+    assert.deepEqual(report?.missing, [last.section.event.stId]);
   });
 });
 
@@ -230,9 +426,15 @@ test('a threshold below a section gives a part to each; none at all, one part', 
   });
   const places = [short(1), short(2), short(3)];
   assert.deepEqual(
-    splitParts(places, 1e-6).map((part) => part.length),
+    splitParts(places, 1e-6, () => null).map((part) => part.length),
     [1, 1, 1]
   );
-  assert.deepEqual(splitParts(places, 1e6), [places]);
-  assert.deepEqual(splitParts([], 1), []);
+  assert.deepEqual(
+    splitParts(places, 1e6, () => null),
+    [places]
+  );
+  assert.deepEqual(
+    splitParts([], 1, () => null),
+    []
+  );
 });
