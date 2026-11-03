@@ -217,8 +217,11 @@ export interface AnalysisStub {
    * as when a result goes while a PDF is being made: then 410 within its 7 days, 404 after.
    */
   forget(token: string, after?: number): void;
-  /** Answer 503 to the next `times` requests (every request without it). */
-  refuse(times?: number): void;
+  /**
+   * Answer 503 to `times` requests (every request without it), starting after `after` more
+   * are answered (at once without it), as when the service fails partway through a PDF.
+   */
+  refuse(times?: number, after?: number): void;
   /** Restore the stored results and forget the refusals and requests, for the next test. */
   reset(): void;
   close(): Promise<void>;
@@ -229,6 +232,8 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
   const stored = new Set([STORED, RECENT, UNREADABLE]);
   const forgetting = new Map<string, number>();
   let refusing = 0;
+  /** Requests still to answer before the refusals start. */
+  let refusingAfter = 0;
 
   /** The service's reading of a token: `TokenUtils.getFromToken`, then `Tokenizer`. */
   function read(raw: string): Read {
@@ -299,7 +304,8 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
       });
     };
 
-    if (refusing !== 0) {
+    if (refusing !== 0 && refusingAfter > 0) refusingAfter -= 1;
+    else if (refusing !== 0) {
       refusing -= 1;
       res.writeHead(503, { 'Content-Type': 'text/plain' }).end('Service Unavailable');
       return;
@@ -453,13 +459,15 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
       if (after === 0) stored.delete(decoded);
       else forgetting.set(decoded, after);
     },
-    refuse(times = -1) {
+    refuse(times = -1, after = 0) {
       refusing = times;
+      refusingAfter = after;
     },
     reset() {
       for (const token of [STORED, RECENT, UNREADABLE]) stored.add(token);
       forgetting.clear();
       refusing = 0;
+      refusingAfter = 0;
       requests.length = 0;
     },
     async close() {
