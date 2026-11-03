@@ -3,6 +3,7 @@
 // anything is printed, and the fixture's own inputs pass. Characters are planted in what the
 // graph answers, through a graph that rewrites its rows, so the shared fixture is unchanged.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,6 +32,7 @@ import { preflight } from '../../src/preflight/preflight.ts';
 
 const skip = process.env['NEO4J_URI'] ? false : 'no fixture graph: set NEO4J_URI';
 const FILES = fileURLToPath(new URL('../../ci/fixture/files/', import.meta.url));
+const CLI = fileURLToPath(new URL('../../src/cli.ts', import.meta.url));
 
 /** The graph, its rows' strings and rows rewritten: a character planted, a checksum taken. */
 function rewriting(
@@ -366,6 +368,7 @@ describe("the book's preflight", { skip }, () => {
   test('an error during the preflight is exit 2, its error on stderr, the faults found so far printed', async () => {
     const out: string[] = [];
     const err: string[] = [];
+    const both: string[] = [];
     // the graph fails at the reactions' names, after the folder's check has found its fault
     const failing = (settings: GraphSettings): Graph => {
       const real = openGraph(settings);
@@ -380,11 +383,23 @@ describe("the book's preflight", { skip }, () => {
     const code = await preflightCommand(
       ['--files', FILES, '--figures', scratch()],
       { NEO4J_URI: process.env['NEO4J_URI'] },
-      { out: (text) => out.push(text), err: (text) => err.push(text), open: failing }
+      {
+        out: (text) => {
+          out.push(text);
+          both.push('out');
+        },
+        err: (text) => {
+          err.push(text);
+          both.push('err');
+        },
+        open: failing,
+      }
     );
     assert.equal(code, 2);
     assert.equal(out.join(''), 'fault incomplete-folder\n');
     assert.match(err.join(''), /the planted failure/);
+    // the faults first, then the error
+    assert.deepEqual(both, ['out', 'err']);
   });
 
   test('pdf-export preflight: exit 0 with no fault, 1 with each fault a line, 2 on bad arguments or no graph', async () => {
@@ -428,5 +443,39 @@ describe("the book's preflight", { skip }, () => {
     assert.equal(unreachable.code, 2);
     assert.equal(unreachable.out, '');
     assert.ok(Date.now() - started < 15_000, `${String(Date.now() - started)} ms`);
+  });
+
+  test('a graph address that cannot be parsed is exit 2, its error on stderr', async () => {
+    // only addresses that fail to parse: one that falls back to the default port could reach
+    // another database on the host
+    for (const uri of ['127.0.0.1:17700', 'http://127.0.0.1:17700']) {
+      const out: string[] = [];
+      const err: string[] = [];
+      const code = await preflightCommand(
+        ['--files', FILES, '--figures', folder()],
+        { NEO4J_URI: uri },
+        { out: (text) => out.push(text), err: (text) => err.push(text) }
+      );
+      assert.equal(code, 2, uri);
+      assert.equal(out.join(''), '', uri);
+      assert.match(err.join(''), /^The graph cannot be read: /, uri);
+    }
+  });
+
+  test('the command ends once its checks are done: no driver is left open', () => {
+    // run as the command line runs it: a driver left open keeps the process alive
+    const started = Date.now();
+    const run = spawnSync(
+      process.execPath,
+      [CLI, 'preflight', '--files', FILES, '--figures', folder()],
+      {
+        env: { ...process.env, NEO4J_URI: process.env['NEO4J_URI'] },
+        encoding: 'utf8',
+        timeout: 30_000,
+      }
+    );
+    const elapsed = Date.now() - started;
+    assert.equal(run.status, 0, run.stderr);
+    assert.ok(elapsed < 15_000, `${String(elapsed)} ms`);
   });
 });

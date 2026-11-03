@@ -82,29 +82,36 @@ export async function preflightCommand(
   }
   // the start's check, its own driver retrying a failed read briefly, so a graph that cannot
   // be reached is said within seconds, not after the driver's default half minute
-  const start = open(settings.graph, { connectionTimeoutMs: 5000, retryTimeMs: 0 });
+  // (opened inside the try: the driver throws at once on an address it cannot parse)
+  let start: Graph | undefined;
   let release: ReleaseInfo;
   try {
+    start = open(settings.graph, { connectionTimeoutMs: 5000, retryTimeMs: 0 });
     release = await releaseInfo(start);
   } catch (error) {
     err(`The graph cannot be read: ${message(error)}\n`);
     return 2;
   } finally {
-    await start.close();
+    await start?.close();
   }
   // the checks' reads with the driver's own retries
   const graph = open(settings.graph);
   const faults: string[] = [];
+  let failure: { error: unknown } | null = null;
   try {
     await preflight(graph, release, settings, faults);
-    return faults.length > 0 ? 1 : 0;
   } catch (error) {
-    err(`The preflight stopped: ${message(error)}\n`);
-    return 2;
+    failure = { error };
   } finally {
-    for (const fault of faults) out(`fault ${fault}\n`);
     await graph.close();
   }
+  // the faults found first, then the error that stopped the checks, if one did
+  for (const fault of faults) out(`fault ${fault}\n`);
+  if (failure) {
+    err(`The preflight stopped: ${message(failure.error)}\n`);
+    return 2;
+  }
+  return faults.length > 0 ? 1 : 0;
 }
 
 const message = (error: unknown): string =>
