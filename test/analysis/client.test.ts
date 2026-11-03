@@ -138,9 +138,13 @@ describe('the analysis client', () => {
       TOKENS.underscore,
       TOKENS.undated,
       issue(`20200101000000_${'1'.repeat(20)}`),
-      `${whole.slice(0, 8)}/${whole.slice(8)}`,
-      `${whole.slice(0, 8)}%2F${whole.slice(8)}`,
-      `${whole.slice(0, 8)}++${whole.slice(8)}`,
+      // a `/` or a `+` in place of a letter, the length left whole
+      'MjAyMDAxMDEwMDAwMDBfM/',
+      'MjAyMDAxMDEwMDAwMDBfM%2F',
+      'MjAyMDAxMDEwMDAwMDBfM+',
+      'MjAyMDAxMDEwMDAwMDBfM%2B',
+      // over the bound, nested in layers it would take seconds to decode
+      `MjAyMDAxMDEwMDAwMDBfMQ%${'25'.repeat(8_000)}3D%3D`,
       `${whole}A`,
       '%25',
     ];

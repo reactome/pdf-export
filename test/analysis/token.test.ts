@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { AnalysisError } from '../../src/analysis/error.ts';
-import { canonicalToken } from '../../src/analysis/token.ts';
+import { MAX_TOKEN_LENGTH, canonicalToken } from '../../src/analysis/token.ts';
 import { TOKENS, issue } from '../stubs/analysis.ts';
 
 /** Base64 of 16 bytes: 22 characters and `==`. */
@@ -10,6 +10,13 @@ const PADDED = issue('20200101000000_1');
 const PADDED_BARE = decodeURIComponent(PADDED).replace(/=+$/, '');
 /** Base64 of 18 bytes: 24 characters and no padding. */
 const WHOLE = issue('20200101000000_123');
+
+/**
+ * `PADDED` with its two `=` nested in `first` and `second` layers: `2 * (first + second)`
+ * longer than it, built directly, as building it layer by layer takes as long as reading it.
+ */
+const deepPadding = (first: number, second: number) =>
+  `${PADDED_BARE}%${'25'.repeat(first)}3D%${'25'.repeat(second)}3D`;
 
 /** A token nested in `layers` layers of URL-encoding, each `%` becoming `%25`. */
 function nested(token: string, layers: number): string {
@@ -36,8 +43,30 @@ test('a token of the form the service issues is sent canonical: padded, its = as
 test('a token nested in many %25 layers is accepted, and sent canonical', () => {
   assert.equal(canonicalToken(nested(PADDED, 1)), PADDED);
   const deep = nested(PADDED, 1000);
-  assert.equal(deep.length > 2000, true);
+  assert.equal(deep.length > 4000, true);
   assert.equal(canonicalToken(deep), PADDED);
+});
+
+test('a token as long as the bound is read; one longer is refused before it is decoded', () => {
+  const at = deepPadding(2000, MAX_TOKEN_LENGTH / 2 - 2014);
+  assert.equal(at.length, MAX_TOKEN_LENGTH);
+  assert.equal(canonicalToken(at), PADDED);
+  const over = deepPadding(2000, MAX_TOKEN_LENGTH / 2 - 2013);
+  assert.equal(over.length, MAX_TOKEN_LENGTH + 2);
+  assert.throws(() => canonicalToken(over), unknown);
+  // decoded layer by layer, this one would take seconds; refused, it takes none
+  const long = deepPadding(16_000, 16_000);
+  const start = performance.now();
+  assert.throws(() => canonicalToken(long), unknown);
+  assert.ok(performance.now() - start < 50, 'refused at once');
+});
+
+test('one value is sent as one token: Base64 differing only in bits no byte holds is sent alike', () => {
+  const issued = issue('20200101000000_3');
+  assert.equal(issued, 'MjAyMDAxMDEwMDAwMDBfMw%3D%3D');
+  for (const given of ['MjAyMDAxMDEwMDAwMDBfMx==', 'MjAyMDAxMDEwMDAwMDBfMz', issued]) {
+    assert.equal(canonicalToken(given), issued, given);
+  }
 });
 
 test("the stub's tokens: every one the service issued is accepted, the two it could not have issued are not", () => {
@@ -66,10 +95,14 @@ const MALFORMED: [string, string][] = [
   [issue('2020010100000_1'), 'a date of 13 digits'],
   [issue('20200101T00000_1'), 'a date not all digits'],
   [issue('no date here'), 'no _'],
-  [`${WHOLE.slice(0, 8)}/${WHOLE.slice(8)}`, 'a / raw'],
-  [`${WHOLE.slice(0, 8)}%2F${WHOLE.slice(8)}`, 'a / encoded'],
-  [`${WHOLE.slice(0, 8)}++${WHOLE.slice(8)}`, 'a +, which decodes as a space'],
-  [`${WHOLE.slice(0, 8)}%2B%2B${WHOLE.slice(8)}`, 'a + encoded'],
+  [issue('202001010000000_1'), 'a date of 15 digits'],
+  [issue('x20200101000000_1'), 'a character before the date'],
+  // each in place of a letter, the length left whole: Node decodes the `/` to `…_3`
+  ['MjAyMDAxMDEwMDAwMDBfM/', 'a / raw'],
+  ['MjAyMDAxMDEwMDAwMDBfM%2F', 'a / encoded'],
+  // a `+` is a space once decoded, however it was encoded
+  ['MjAyMDAxMDEwMDAwMDBfM+', 'a + raw'],
+  ['MjAyMDAxMDEwMDAwMDBfM%2B', 'a + encoded'],
   [`${WHOLE.slice(0, 8)}!!${WHOLE.slice(8)}`, 'other characters'],
   ['not-base64!', 'not Base64'],
   ['%25', 'a decoding error, %25 decoding to a lone %'],

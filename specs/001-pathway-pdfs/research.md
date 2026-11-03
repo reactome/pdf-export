@@ -504,9 +504,12 @@ own source, and the answers agree with them.
     in the Gregorian calendar (as its JVM's locale does; one with other digits or another
     calendar would issue tokens this rule refuses, or the service misdates), so the rule
     refuses none it issues. **What is sent is the canonical token,** never the input as
-    given: the decoded Base64, padded, with `=` encoded as `%3D`, as one path segment.
-    The bound is on the decoded form, so a token wrapped in thousands of `%25` layers
-    passes the rule; sent as given, it too would reach the servlet container's HTML 400.
+    given: the decoded value encoded again as padded Base64, with `=` encoded as `%3D`, as
+    one path segment. The counter's bound is on the decoded form, so a token wrapped in
+    many `%25` layers passes the rule; sent as given, it too would reach the servlet
+    container's HTML 400. Each layer is decoded over the whole token, so the time grows
+    with the square of its length: a token longer than 8 KiB as given is refused before it
+    is decoded, which still reads one the service issues nested in a thousand layers.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
