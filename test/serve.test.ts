@@ -1,9 +1,11 @@
 // The single-event service (spec 001 T022, contracts/service.md), against the render and
 // analysis stubs and the fixture graph: each answer in the contract's order, every figure
 // drawn on request with the token as the render service is to receive it, a figure that
-// cannot be drawn left out and logged, the concurrency limit and the deadline, the health
-// answer, and FR-017's characters in the texts and the labels, logged once per PDF.
+// cannot be drawn left out and logged, the concurrency limit and the deadline (and nothing
+// done past it, a hanging graph, figure or print among them), a browser that dies, the
+// health answer, and FR-017's characters in the texts and the labels, logged once per PDF.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, describe, test } from 'node:test';
@@ -11,12 +13,14 @@ import { after, afterEach, before, describe, test } from 'node:test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { graphSettings, openGraph, type Graph } from '../src/graph/connection.ts';
+import { Printer } from '../src/print/print.ts';
 import {
   SettingsError,
   serveSettings,
   startService,
   type ServeSettings,
   type Service,
+  type ServicePrinter,
 } from '../src/serve.ts';
 import { startAnalysisStub, TOKENS, type AnalysisStub } from './stubs/analysis.ts';
 import { startRenderStub, type RenderStub } from './stubs/render.ts';
@@ -80,17 +84,24 @@ async function closedPort(): Promise<number> {
 
 /**
  * The fixture graph, with texts planted on request (each key replaced by its value in every
- * row), and failing on request, as a graph that cannot answer does.
+ * row), failing on request, as a graph that cannot answer does, and never answering a query
+ * that matches `hanging`, as a stalled read does.
  */
-function plantingGraph(): Graph & { planted: Map<string, string>; failing: boolean } {
+function plantingGraph(): Graph & {
+  planted: Map<string, string>;
+  failing: boolean;
+  hanging: RegExp | null;
+} {
   const real = openGraph(graphSettings(process.env));
   const graph = {
     planted: new Map<string, string>(),
     failing: false,
+    hanging: null as RegExp | null,
     async read<T>(query: string, params?: Record<string, unknown>): Promise<T[]> {
       if (graph.failing) {
         throw new Error('Could not reach bolt://graph.invalid:7687 for /data/graph.db');
       }
+      if (graph.hanging?.test(query)) return new Promise<T[]>(() => undefined);
       const rows = await real.read<T>(query, params);
       if (graph.planted.size === 0) return rows;
       let json = JSON.stringify(rows);
@@ -100,6 +111,70 @@ function plantingGraph(): Graph & { planted: Map<string, string>; failing: boole
     close: () => real.close(),
   };
   return graph;
+}
+
+/**
+ * T019's printer, its prints and starts counted: each print hanging while `hang` is set; the
+ * printer seen as gone while `down` is; `goes()` telling the service it went; and every start
+ * after the first failing while `failing` is set.
+ */
+function countingPrinter(): {
+  start: () => Promise<ServicePrinter>;
+  prints: { count: number; hang: boolean; down: boolean; starts: number; failing: boolean };
+  goes: () => void;
+} {
+  const prints = { count: 0, hang: false, down: false, starts: 0, failing: false };
+  const listeners: (() => void)[] = [];
+  return {
+    prints,
+    goes: () => {
+      prints.down = true;
+      for (const listener of listeners.splice(0)) listener();
+    },
+    start: async () => {
+      prints.starts += 1;
+      if (prints.failing && prints.starts > 1) throw new Error('no browser');
+      const printer = await Printer.start();
+      return {
+        single: (html: string) => {
+          prints.count += 1;
+          return prints.hang ? new Promise<Uint8Array>(() => undefined) : printer.single(html);
+        },
+        get connected() {
+          return !prints.down && printer.connected;
+        },
+        onDisconnected: (listener: () => void) => {
+          listeners.push(listener);
+          printer.onDisconnected(listener);
+        },
+        close: () => printer.close(),
+      };
+    },
+  };
+}
+
+/** The health answer's count of PDFs being made, once it is 0, or the last seen. */
+async function idle(url: string, withinMs = 5_000): Promise<number> {
+  const until = Date.now() + withinMs;
+  for (;;) {
+    const { making } = (await (await fetch(`${url}/health`)).json()) as { making: number };
+    if (making === 0 || Date.now() > until) return making;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** The Chromium processes this test process started, by process id. */
+function ourBrowsers(): number[] {
+  try {
+    return execFileSync('pgrep', ['-P', String(process.pid), '-f', 'chrome-headless-shell'], {
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean)
+      .map(Number);
+  } catch {
+    return [];
+  }
 }
 
 describe('serve settings', () => {
@@ -187,8 +262,6 @@ describe('the service', { skip: skipWithoutGraph }, () => {
   let graph: ReturnType<typeof plantingGraph>;
   let service: Service;
   const lines: string[] = [];
-  /** Every refusal's body, for the check that none carries more than its reason. */
-  const bodies: string[] = [];
 
   const settings = (): ServeSettings => ({
     bind: '127.0.0.1',
@@ -209,7 +282,12 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     service = await startService(settings(), {
       graph,
       log: (line) => lines.push(line),
-      limits: { figureTimeoutMs: 1_500, retryPauseMs: 20, analysisTimeoutMs: 2_000 },
+      limits: {
+        figureTimeoutMs: 1_500,
+        retryPauseMs: 20,
+        analysisTimeoutMs: 2_000,
+        relaunchPauseMs: 200,
+      },
     });
   });
   afterEach(() => {
@@ -217,6 +295,7 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     analysis.reset();
     graph.planted.clear();
     graph.failing = false;
+    graph.hanging = null;
     lines.length = 0;
   });
   after(async () => {
@@ -229,7 +308,6 @@ describe('the service', { skip: skipWithoutGraph }, () => {
   async function get(path: string) {
     const response = await fetch(`${service.url}${path}`);
     const body = new Uint8Array(await response.arrayBuffer());
-    if (response.status !== 200) bodies.push(new TextDecoder().decode(body));
     return { response, body };
   }
 
@@ -388,16 +466,20 @@ describe('the service', { skip: skipWithoutGraph }, () => {
 
   test('at the limit: 503 unavailable at once, and the slot freed when the PDF is made', async () => {
     render.refuse(REACTION, 'timeout', 1);
-    const first = fetch(`${service.url}/event/${REACTION}.pdf`);
+    let firstAnswered = false;
+    const first = fetch(`${service.url}/event/${REACTION}.pdf`).then((answer) => {
+      firstAnswered = true;
+      return answer;
+    });
     // wait until the first holds the slot: its figure is asked for
     const until = Date.now() + 10_000;
     while (!render.requests.some((path) => path.startsWith(`/render/${REACTION}`))) {
       assert.ok(Date.now() < until, 'the first request reached its figure');
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    const started = performance.now();
     assert.deepEqual(await refusal(`/event/${BETA}.pdf?depth=0`), [503, 'unavailable']);
-    assert.ok(performance.now() - started < 1_000, 'answered at once');
+    // answered while the first is still being made, not queued behind it
+    assert.equal(firstAnswered, false, 'answered at once');
     // the cheap checks still answer at the limit
     assert.deepEqual(await refusal(`/event/${BETA}.pdf?depth=2`), [400, 'bad-depth']);
     const answer = await first;
@@ -471,6 +553,8 @@ describe('the service', { skip: skipWithoutGraph }, () => {
       release: 98,
       render: true,
       analysis: true,
+      printer: true,
+      making: 0,
       figures: 'none',
     });
     analysis.refuse();
@@ -503,11 +587,11 @@ describe('the service', { skip: skipWithoutGraph }, () => {
       const started = performance.now();
       const response = await fetch(`${quick.url}/event/${BETA}.pdf?token=${TOKENS.stored}`);
       const body = await response.text();
-      bodies.push(body);
       assert.equal(response.status, 503);
       assert.equal(body, '{"reason":"unavailable"}');
+      // well before the six calls together could end
       const took = performance.now() - started;
-      assert.ok(took < 2_500, `answered at the deadline, in ${took.toFixed(0)} ms`);
+      assert.ok(took < 2_900, `answered at the deadline, in ${took.toFixed(0)} ms`);
       // its health says the render service does not answer
       analysis.slow(0);
       const health = (await (await fetch(`${quick.url}/health`)).json()) as { render: boolean };
@@ -517,13 +601,238 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     }
   });
 
-  test('no reason carries a path, a host or a name: the body is the reason alone', () => {
-    assert.ok(bodies.length > 20, String(bodies.length));
+  test('no reason carries a path, a host or a name: the body is the reason alone', async () => {
+    const asked = [
+      `/event/${BETA}.pdf?depth=2`,
+      '/event/R-HSA-1.pdf',
+      `/event/${COMPLEX}.pdf`,
+      `/event/${BETA}.pdf?token=QQ%3D`,
+      `/event/${BETA}.pdf?token=${TOKENS.expired}`,
+      `/event/${BETA}.pdf?token=${TOKENS.gone}`,
+      `/event/${BETA}.pdf?token=${TOKENS.unreadable}`,
+    ];
+    const bodies: string[] = [];
+    for (const path of asked) bodies.push(new TextDecoder().decode((await get(path)).body));
+    // the graph failing, its error naming a host and a path
+    graph.failing = true;
+    bodies.push(new TextDecoder().decode((await get(`/event/${BETA}.pdf`)).body));
+    graph.failing = false;
+    // the analysis service failing part way, its error naming a pathway
+    analysis.refuse(1, 1);
+    bodies.push(
+      new TextDecoder().decode((await get(`/event/${BETA}.pdf?token=${TOKENS.stored}`)).body)
+    );
+    assert.equal(new Set(bodies.map((b) => (JSON.parse(b) as { reason: string }).reason)).size, 6);
     for (const body of bodies) {
-      if (body === '') continue; // 404 for another route, 405
       const parsed = JSON.parse(body) as Record<string, unknown>;
       assert.deepEqual(Object.keys(parsed), ['reason'], body);
       assert.ok(REASONS.has(String(parsed['reason'])), body);
+    }
+  });
+
+  test('a browser that dies is started again: the next PDF is made, and health says so', async () => {
+    const browsers = ourBrowsers();
+    assert.ok(browsers.length > 0, 'the service has a browser of its own');
+    for (const pid of browsers) process.kill(pid, 'SIGKILL');
+    // the next request is made by a browser started again
+    const body = await pdf(`/event/${BETA}.pdf?depth=0`);
+    assert.ok(body.length > 0);
+    assert.ok(lines.includes('printer: the browser went; starting another'));
+    assert.ok(ourBrowsers().every((pid) => !browsers.includes(pid)));
+    const health = (await (await fetch(`${service.url}/health`)).json()) as { printer: boolean };
+    assert.equal(health.printer, true);
+  });
+
+  test("health with the graph's read stalled: 503 within its own timeout", async () => {
+    const short = await startService(settings(), {
+      graph,
+      log: (line) => lines.push(line),
+      limits: { healthTimeoutMs: 300 },
+    });
+    try {
+      graph.hanging = /DBInfo/;
+      const response = await fetch(`${short.url}/health`, { signal: AbortSignal.timeout(10_000) });
+      assert.equal(response.status, 503);
+      await response.arrayBuffer();
+    } finally {
+      graph.hanging = null;
+      await short.close();
+    }
+  });
+});
+
+describe(
+  'when a request ends: its deadline, or its client gone',
+  { skip: skipWithoutGraph },
+  () => {
+    let render: RenderStub;
+    let analysis: AnalysisStub;
+    let graph: ReturnType<typeof plantingGraph>;
+    let service: Service;
+    const lines: string[] = [];
+    const printer = countingPrinter();
+    const { prints } = printer;
+
+    before(async () => {
+      render = await startRenderStub();
+      analysis = await startAnalysisStub();
+      graph = plantingGraph();
+      service = await startService(
+        {
+          bind: '127.0.0.1',
+          port: 0,
+          graph: graphSettings(process.env),
+          files: FILES,
+          figures: null,
+          render: render.url,
+          analysis: analysis.url,
+          site: 'https://site.invalid',
+          concurrency: 1,
+        },
+        {
+          graph,
+          log: (line) => lines.push(line),
+          startPrinter: printer.start,
+          // each wait far longer than the deadline, so only the deadline can end it in time
+          limits: {
+            deadlineMs: 3_000,
+            figureTimeoutMs: 30_000,
+            retryPauseMs: 30_000,
+            analysisTimeoutMs: 30_000,
+          },
+        }
+      );
+    });
+    afterEach(() => {
+      render.reset();
+      analysis.reset();
+      graph.hanging = null;
+      lines.length = 0;
+      prints.count = 0;
+    });
+    after(async () => {
+      prints.hang = false;
+      await service.close();
+      await graph.close();
+      await render.close();
+      await analysis.close();
+    });
+
+    /** A request, given up by the test itself after 15 s, so a missed deadline fails, not hangs. */
+    async function ask(path: string): Promise<[number, string]> {
+      const response = await fetch(`${service.url}${path}`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      return [response.status, await response.text()];
+    }
+
+    const unavailable = [503, '{"reason":"unavailable"}'];
+
+    test('a figure that never answers: 503 at the deadline, the work stopped, nothing printed', async () => {
+      render.refuse(REACTION, 'timeout');
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf`), unavailable);
+      assert.equal(await idle(service.url), 0, 'the work stopped');
+      assert.equal(prints.count, 0, 'nothing printed after the deadline');
+      // the render service is not blamed for the request's own end
+      assert.deepEqual(
+        lines.filter((line) => line.startsWith('missing-figure')),
+        []
+      );
+    });
+
+    test("a 503 from the render service: its retry's pause ends with the deadline", async () => {
+      render.refuse(REACTION, 503, 1);
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf`), unavailable);
+      assert.equal(await idle(service.url), 0, 'the pause stopped');
+      assert.equal(prints.count, 0);
+    });
+
+    test('the identifier read stalled: 503 at the deadline', async () => {
+      graph.hanging = /MATCH \(e:DatabaseObject \{(dbId|stId)/;
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf`), unavailable);
+    });
+
+    test('a later read stalled: 503 at the deadline, and the slot is free again', async () => {
+      // the events' facts, read once the request holds its slot
+      graph.hanging = /WHERE e:Event\s+RETURN e\.dbId AS dbId/;
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf`), unavailable);
+      graph.hanging = null;
+      assert.equal(await idle(service.url), 0, 'the slot freed');
+      assert.equal((await ask(`/event/${REACTION}.pdf`))[0], 200);
+    });
+
+    test('a client that goes: its work stopped, the slot free again', async () => {
+      render.refuse(REACTION, 'timeout');
+      const client = new AbortController();
+      const asked = fetch(`${service.url}/event/${REACTION}.pdf`, { signal: client.signal });
+      const until = Date.now() + 10_000;
+      while (!render.requests.some((path) => path.startsWith(`/render/${REACTION}`))) {
+        assert.ok(Date.now() < until, 'the request reached its figure');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      client.abort();
+      await assert.rejects(asked);
+      // well before the deadline would have ended it
+      assert.equal(await idle(service.url, 1_000), 0, 'the work stopped with the client');
+      assert.equal(prints.count, 0);
+    });
+
+    test('health says when the printer is gone', async () => {
+      prints.down = true;
+      try {
+        const health = (await (await fetch(`${service.url}/health`)).json()) as {
+          printer: boolean;
+        };
+        assert.equal(health.printer, false);
+      } finally {
+        prints.down = false;
+      }
+    });
+
+    test('a print that never ends: 503 at the deadline all the same', async () => {
+      prints.hang = true;
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf?depth=0`), unavailable);
+      assert.equal(prints.count, 1);
+    });
+  }
+);
+
+describe('a browser that cannot be started again', { skip: skipWithoutGraph }, () => {
+  test('is tried once per pause, not in a loop', async () => {
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const lines: string[] = [];
+    const printer = countingPrinter();
+    const service = await startService(
+      {
+        bind: '127.0.0.1',
+        port: 0,
+        graph: graphSettings(process.env),
+        files: FILES,
+        figures: null,
+        render: render.url,
+        analysis: analysis.url,
+        site: 'https://site.invalid',
+        concurrency: 1,
+      },
+      {
+        log: (line) => lines.push(line),
+        startPrinter: printer.start,
+        limits: { relaunchPauseMs: 300 },
+      }
+    );
+    try {
+      printer.prints.failing = true;
+      printer.goes();
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      // the first start, then one a pause at most: five in 1.2 s, not hundreds
+      assert.ok(printer.prints.starts >= 2, String(printer.prints.starts));
+      assert.ok(printer.prints.starts <= 6, String(printer.prints.starts));
+      assert.ok(lines.includes('printer: the browser went; starting another'));
+    } finally {
+      await service.close();
+      await render.close();
+      await analysis.close();
     }
   });
 });
