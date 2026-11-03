@@ -263,6 +263,7 @@ describe("an illustration's lettering", () => {
   test('many comments, or tags never closed, are read in linear time', () => {
     const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
     for (const filler of [
+      '<a "' + '<a '.repeat(20_000) + "'>",
       '<!-- x -->'.repeat(40_000),
       '<![CDATA[x]]>'.repeat(40_000),
       '<a '.repeat(20_000),
@@ -274,6 +275,23 @@ describe("an illustration's lettering", () => {
         performance.now() - started < 250,
         `${filler.slice(0, 12)}: ${String(performance.now() - started)} ms`
       );
+    }
+  });
+
+  test('a close tag that skips open elements leaves the labels after it unread', () => {
+    const d = word(0, 20, 10);
+    const svg = illustration([]).replace(
+      '</g></svg>',
+      `<g></svg><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    assert.deepEqual(lettering(svg), { smallest: null, unread: 1 });
+  });
+
+  test('a label in a title, a description or metadata is unread', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const name of ['title', 'desc', 'metadata']) {
+      const svg = illustration([]).replace('</g></svg>', `<${name}>${label}</${name}></g></svg>`);
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, name);
     }
   });
 
