@@ -128,5 +128,4 @@ The single-event service (contracts/service.md).
 | `--figures`                    |                    | as for `book`: the release's figures' folder, read for a PDF without an analysis while it passes `book`'s folder checks, ignored otherwise (contracts/service.md) |
 | `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                                                                           |
 | `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                                                                                   |
-| `--retention`                  | `TOKEN_RETENTION`  | how long an analysis token is kept, in days; must match the analysis service's own setting (research R6)                                                          |
 | `--concurrency`                |                    | PDFs made at once; default 2                                                                                                                                      |

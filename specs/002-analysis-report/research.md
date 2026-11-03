@@ -306,6 +306,15 @@ fetch: a reader who closes the waiting page and comes back finds it made.
 **Decision.** A stub analysis service, extending spec 001's (T010), answers R1's
 calls for made-up tokens on the fixture graph, with made-up identifiers (FR-213): an
 over-representation result, an expression result with two columns, one with
-interactors, one with nothing found for a species, and one past retention (410). The
-render stub answers the overview. The fixture graph's placeholder people serve the
-edit history.
+interactors, one with nothing found for a species, and one gone (410: no result, though
+dated within the service's 7 days; spec 001 research R6). The render stub answers the
+overview. The fixture graph's placeholder people serve the edit history.
+
+**Open, for the tasks:** a malformed token is the analysis service's catch-all 500 (spec
+001 research R6), so call 1 reads it as "any other failure" and the report answers 503,
+where spec 001 answers 404 `unknown-token` after checking the token's form itself
+(R6's rule). Whether the report takes the same check is decided with its first token
+task. Spec 001 also sends only the canonical token (R6): sent as given, one nested in
+`%25` layers or holding `%2F` reaches the servlet container's HTML 400, and a decoded
+`/` reaches another route, whose 404 would pass on as the token's; and it names each
+call's `Accept`, as the CSV endpoint answers a 406 to the wrong one.

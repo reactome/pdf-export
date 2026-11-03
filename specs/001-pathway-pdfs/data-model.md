@@ -139,13 +139,15 @@ From the analysis service's API (research R6).
 - `token`, `type`, `species`, `resource` (`TOTAL`), `projection`, `interactors`.
 - **Requested with FR-006's defaults:** all resources together, no expression column, all
   identifiers rather than only importable ones.
-- `identifiersFound`, `identifiersTotal`, `pathwaysHit`. Found from the summary if it
-  carries it, otherwise from the result file (research R6).
+- `identifiersFound`, `identifiersTotal`, `pathwaysHit`. Found is the count of distinct
+  submitted identifiers in the found identifiers' CSV (header skipped), as
+  `/token/{token}` carries none; the total adds its `identifiersNotFound`; the pathways
+  hit are its `pathwaysFound`, asked for with `includeDisease=true` (research R6).
 - `found(pathwayStId)`: the entities and interactors found. A reaction uses its first
   parent pathway's, filtered to the reaction's own identifiers.
-- **Errors:** checked here before the service is asked (research R6): a malformed token
-  or one past the retention period is unknown; the service's 404 is unknown, its 410
-  gone. The identifier is checked first.
+- **Errors:** the token's form is checked here before the service is asked (research
+  R6): a malformed token is unknown; the service's 404 is unknown, its 410 gone, and
+  whether a token has expired is the service's to say. The identifier is checked first.
 
 ## Run report
 

@@ -15,15 +15,16 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 | 200    | the PDF is made                                                                                     | `application/pdf`, with the stable identifier in the `Content-Disposition` file name |
 | 400    | `depth` is not 0 or 1, or the identifier names something that is not a pathway or reaction          | JSON `{ "reason": "not-an-event" \| "bad-depth" }`                                   |
 | 404    | the identifier names nothing in the graph                                                           | JSON `{ "reason": "no-event" }`                                                      |
-| 404    | the token is unknown, malformed, or older than the retention period                                 | JSON `{ "reason": "unknown-token" }`                                                 |
-| 410    | the token's result is gone within the retention period                                              | JSON `{ "reason": "gone-token" }`                                                    |
+| 404    | the token is malformed, or the analysis service answers 404 for it                                  | JSON `{ "reason": "unknown-token" }`                                                 |
+| 410    | the analysis service answers 410 for it: no result, though dated within its 7 days or in the future | JSON `{ "reason": "gone-token" }`                                                    |
 | 503    | the graph, the render service or the analysis service cannot answer, or the service is at its limit | JSON `{ "reason": "unavailable" }`                                                   |
 
 - **The order of checks:** the depth, then the identifier, then the token. An unknown or
   non-event identifier is answered as such whatever the token.
-- **The token** is checked here before the analysis service is asked (research R6): its
-  form, and its date against the retention period. A malformed or expired token is
-  `unknown-token`; the service's 404 is `unknown-token` and its 410 `gone-token`.
+- **The token's form** is checked here before the analysis service is asked (research
+  R6): a malformed token is `unknown-token`. Whether it has expired is the service's to
+  say: its 404 is `unknown-token`, its 410 `gone-token`, and any other failure
+  `unavailable`.
 - **The reasons** are for the content service, which writes WebsiteAngular's envelope.
   They never carry a path, a host or a name.
 - **Where a figure comes from:** without a token, from the release's figures' folder

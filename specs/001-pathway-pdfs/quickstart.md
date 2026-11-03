@@ -34,7 +34,7 @@ research R7.
 - **Then, first of the new work** (research R7): the render service's throughput at the
   book's scale against the 44-minute figures budget, go or no-go (T005: a no-go, and the
   figures moved to a step of their own, T006); the analysis service's
-  answers for an expired and a malformed token on a private instance (R6); the join's
+  answers for an expired and a malformed token on a non-production instance (R6); the join's
   memory and stamping after it (R4).
 
 ## 2. CI's own runs
@@ -72,7 +72,7 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
   pdf.js at the same scale (research R8): no more than 1% of pixels differ.
 
 - **The errors:** an unknown identifier, a non-event, a bad depth, an unknown token, a
-  malformed token, an expired token and a token gone within the period each give
+  malformed token, a token the service answers 404 and one it answers 410 each give
   contracts/service.md's answer, and a bad identifier with a bad token gives the
   identifier's.
 
