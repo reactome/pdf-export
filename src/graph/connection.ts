@@ -24,25 +24,58 @@ export function graphSettings(env: Readonly<Record<string, string | undefined>>)
 
 /** A read-only view of the graph: one query, its rows as plain objects. */
 export interface Graph {
-  read<T>(query: string, params?: Record<string, unknown>): Promise<T[]>;
+  read<T>(query: string, params?: Record<string, unknown>, options?: ReadOptions): Promise<T[]>;
   close(): Promise<void>;
 }
 
-export function openGraph(settings: GraphSettings): Graph {
+export interface ReadOptions {
+  /** How long this read may run in the database, in place of the graph's own timeout. */
+  timeoutMs?: number;
+}
+
+export interface GraphOptions {
+  /**
+   * How long one read may run in the database before Neo4j ends it (the driver's transaction
+   * timeout); none without it.
+   */
+  transactionTimeoutMs?: number;
+  /**
+   * How long the driver waits to open a connection, and for one from its pool. The driver
+   * offers no bound on a read from an open connection (only the server's own receive-timeout
+   * hint): a caller that must not wait on a silent one bounds its own wait.
+   */
+  connectionTimeoutMs?: number;
+}
+
+export function openGraph(settings: GraphSettings, options: GraphOptions = {}): Graph {
   // Integers as JavaScript numbers: Reactome's ids are well below 2^53.
   const driver: Driver = neo4j.driver(
     settings.uri,
     neo4j.auth.basic(settings.user, settings.password),
-    { disableLosslessIntegers: true }
+    {
+      disableLosslessIntegers: true,
+      ...(options.connectionTimeoutMs === undefined
+        ? {}
+        : {
+            connectionTimeout: options.connectionTimeoutMs,
+            connectionAcquisitionTimeout: options.connectionTimeoutMs,
+          }),
+    }
   );
   return {
-    async read<T>(query: string, params: Record<string, unknown> = {}): Promise<T[]> {
+    async read<T>(
+      query: string,
+      params: Record<string, unknown> = {},
+      { timeoutMs = options.transactionTimeoutMs }: ReadOptions = {}
+    ): Promise<T[]> {
+      // the driver's transaction timeout: Neo4j ends the read there, whoever still waits
+      const config = timeoutMs === undefined ? {} : { timeout: Math.max(1, Math.ceil(timeoutMs)) };
       const session = driver.session({
         database: settings.database,
         defaultAccessMode: neo4j.session.READ,
       });
       try {
-        const result = await session.executeRead((tx) => tx.run(query, params));
+        const result = await session.executeRead((tx) => tx.run(query, params), config);
         return result.records.map((record) => record.toObject() as T);
       } finally {
         await session.close();

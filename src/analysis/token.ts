@@ -1,17 +1,18 @@
 // Analysis tokens (spec 001 T020 and T021, research R6). The service reads a token
 // URL-decoded until it no longer changes, so a token encoded once or many times names the
 // same result; what is sent is that token in one canonical form, its value's padded Base64
-// with its `=` as `%3D`, never the input as given. Only the form the service issues is sent: anything
-// else is `unknown-token` before any request, as the service's answers to one (its
+// with its `=` as `%3D`, never the input as given. Only the form the service issues is
+// sent: anything else is `unknown-token` before any request, as the service's answers to one (its
 // catch-all 500, the servlet container's HTML 400, another route) would read as
 // `unavailable` or worse.
 import { AnalysisError } from './error.ts';
 
 /**
  * The longest token read, as given. Each `%25` layer is decoded over the whole token, so the
- * time grows with the square of its length: a token of this length is read within tens of
- * milliseconds (a 32 KiB one took a third of a second, a 200 KiB one half a minute), and one
- * the service issues, 48 characters at most, can still be nested in a thousand layers.
+ * time grows with the square of its length: a token of this length is read in about a tenth
+ * of a second in the worst shape (a 32 KiB one takes nearer a second than a third, a 200 KiB
+ * one about 38 s), and one the service issues, 48 characters at most, can still be nested in
+ * a thousand layers.
  */
 export const MAX_TOKEN_LENGTH = 8 * 1024;
 /** Base64's letters and digits, and at most two `=` of padding. */
@@ -21,8 +22,9 @@ const DECODED = /^[0-9]{14}_[0-9]{1,19}$/;
 
 /**
  * The token to send, checked against the form the service issues: no longer than
- * `MAX_TOKEN_LENGTH` as given, URL-decoded until it no longer changes, non-empty Base64 letters and digits with at most two `=`, its length then a
- * multiple of 4 and not 1 modulo 4 without them, decoding to `{14 digits}_{1 to 19 digits}`.
+ * `MAX_TOKEN_LENGTH` as given, URL-decoded until it no longer changes, non-empty Base64
+ * letters and digits with at most two `=`, its length then a multiple of 4 and not 1 modulo
+ * 4 without them, decoding to `{14 digits}_{1 to 19 digits}`.
  * Anything else is `unknown-token`. Its date is not judged: that is the service's to say.
  */
 export function canonicalToken(token: string): string {

@@ -9,6 +9,8 @@ import {
   eventByIdentifier,
   eventFacts,
   literature,
+  parentPathways,
+  reactionIdentifiers,
   release,
   topLevelPathways,
 } from '../../src/graph/queries.ts';
@@ -172,5 +174,21 @@ describe('the graph reader', { skip }, () => {
       first?.authors.map((a) => a.surname),
       ['Placeholder01', 'Placeholder02']
     );
+  });
+
+  test("reads a reaction's own identifiers: every participant's, through complexes and sets", async () => {
+    const read = await reactionIdentifiers(graph, [id(211), id(212), id(200), id(211)]);
+    // an input complex's component (an isoform, with its variant), an input candidate set's
+    // candidate and polymer's unit, an output, a catalyst's set's member and a regulator; a
+    // reaction with no participants and a pathway, none
+    assert.deepEqual(
+      [...read],
+      [[id(211), ['X00001', 'X00002', 'X00003', 'X00003-1', 'X00005', 'X00006', 'X00009']]]
+    );
+  });
+
+  test("reads a reaction's parent pathways, by database id", async () => {
+    assert.deepEqual(await parentPathways(graph, id(211)), ['R-HSA-90000210']);
+    assert.deepEqual(await parentPathways(graph, id(220)), ['R-HSA-90000100', 'R-HSA-90000200']);
   });
 });

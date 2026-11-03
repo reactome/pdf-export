@@ -620,8 +620,10 @@ own source, and the answers agree with them.
     one path segment. The counter's bound is on the decoded form, so a token wrapped in
     many `%25` layers passes the rule; sent as given, it too would reach the servlet
     container's HTML 400. Each layer is decoded over the whole token, so the time grows
-    with the square of its length: a token longer than 8 KiB as given is refused before it
-    is decoded, which still reads one the service issues nested in a thousand layers.
+    with the square of its length (about a tenth of a second at 8 KiB in the worst shape,
+    nearer a second than a third at 32 KB, and about 38 s at 200 KB): a token longer than
+    8 KiB as given is refused before it is decoded, which still reads one the service issues
+    nested in a thousand layers.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
