@@ -39,13 +39,17 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   drawn on request by another render build; contracts/figures.md lists what the
   fingerprint cannot see.
 - **The limit and the deadline:** a request beyond the concurrency limit is answered
-  503 at once, not queued; it is counted only once its depth, identifier and token's
-  form are checked, so those answers come whatever the load. A PDF holds its place
-  until its work has stopped, not only until it is answered. Each request has a
-  deadline across everything it waits for, the analysis service's calls together among
-  them (each of which also has its own timeout); past it, or once the client has gone, the
-  work stops and nothing more is printed, and the answer is 503. A browser that goes is
-  started again.
+  503 at once, not queued. It is counted before its first read of the graph, so the
+  depth and an identifier of no known form are answered whatever the load, and a lookup
+  at the limit is 503: the reads in flight never outnumber the places. A PDF holds its
+  place until its work has ended and every graph read it began has ended, each given the
+  time left before the deadline as its transaction timeout, so the database ends it
+  there; not only until it is answered. Each request has a deadline across everything
+  it waits for, the analysis service's calls together among them (each of which also
+  has its own timeout); past it, or once the client has gone, the request's reads and
+  calls are given up on, its print under way is stopped, nothing more is printed, and
+  the answer is 503. A browser that goes is started again; while none is up, a PDF is
+  answered 503 at once.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's
@@ -57,5 +61,8 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 ## `GET /health`
 
 200 with the package's version, the graph's release, whether the render and analysis
-services answer, whether its browser is up, how many PDFs are being made, and the figures' folder: `ready` (its release and checksum),
-`stale`, `incomplete` or `none`. Used by the container's health check.
+services answer, whether its browser is up, how many PDFs are being made, and the figures'
+folder: `ready` (its release and checksum), `stale`, `incomplete` or `none`. Used by the
+container's health check. 503 with the same body once three starts of the browser in a row
+have failed (the service cannot print, and is to be replaced), or when the graph does not
+answer its release within the health check's own timeout (then the body is the reason).

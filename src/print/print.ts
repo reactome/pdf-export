@@ -57,11 +57,20 @@ export class Printer {
     this.#browser.once('disconnected', listener);
   }
 
-  /** A page of HTML, printed once from a file: tagged with an outline, or not. */
-  async print(html: string, tagged: boolean): Promise<Uint8Array> {
+  /**
+   * A page of HTML, printed once from a file: tagged with an outline, or not. When `signal`
+   * ends, the page is closed, which stops its print at once; one that has ended prints nothing.
+   */
+  async print(html: string, tagged: boolean, signal?: AbortSignal): Promise<Uint8Array> {
+    signal?.throwIfAborted();
     const file = join(this.#folder, `${String(++this.#count)}.html`);
     const page = await this.#browser.newPage();
+    const stop = () => {
+      void page.close().catch(() => undefined);
+    };
+    signal?.addEventListener('abort', stop, { once: true });
     try {
+      signal?.throwIfAborted();
       writeFileSync(file, html);
       await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
       // Every face the page declares is loaded, not only those its body uses: text only in
@@ -79,22 +88,30 @@ export class Printer {
       return new Uint8Array(
         await page.pdf({ preferCSSPageSize: true, printBackground: true, tagged, outline: tagged })
       );
+    } catch (error) {
+      // a print stopped by its signal fails with the signal's reason, not the page's
+      signal?.throwIfAborted();
+      throw error;
     } finally {
-      await page.close();
+      signal?.removeEventListener('abort', stop);
+      await page.close().catch(() => undefined);
       rmSync(file, { force: true });
     }
   }
 
   /**
    * A single event's PDF. With a contents list, the first print gives each entry's page,
-   * and the second prints them; the two must have the same pages.
+   * and the second prints them; the two must have the same pages. Each print stops when
+   * `signal` ends, and the second is not begun after it.
    */
-  async single(html: string): Promise<Uint8Array> {
-    const first = await this.print(html, true);
+  async single(html: string, signal?: AbortSignal): Promise<Uint8Array> {
+    const first = await this.print(html, true, signal);
     const targets = contentsTargets(html);
     if (targets.length === 0) return first;
     const { pages, pageCount } = await landed(first, targets);
-    const second = await this.print(fillContents(html, pages), true);
+    // the second print is not begun once the signal has ended
+    signal?.throwIfAborted();
+    const second = await this.print(fillContents(html, pages), true, signal);
     const problem = movedPages({ pages, pageCount }, await landed(second, targets), targets);
     if (problem) throw new Error(`The contents' numbers moved the pages: ${problem}`);
     return second;

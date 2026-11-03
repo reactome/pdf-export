@@ -171,7 +171,8 @@ export interface Service {
 
 /** What prints the PDFs: T019's `Printer`, or a test's. */
 export interface ServicePrinter {
-  single(html: string): Promise<Uint8Array>;
+  /** The PDF; its print stops when `signal` ends. */
+  single(html: string, signal?: AbortSignal): Promise<Uint8Array>;
   readonly connected: boolean;
   onDisconnected(listener: () => void): void;
   close(): Promise<void>;
@@ -213,6 +214,20 @@ class Refusal extends Error {
   }
 }
 
+/** A request whose client went before its answer. */
+class ClientGone extends Refusal {
+  constructor() {
+    super('unavailable', 'the client went');
+  }
+}
+
+/**
+ * Starts that may fail in a row before `/health` answers 503: three, a quarter of a minute at
+ * the default pause, is past a crash's single restart and a slow start's retry, and soon
+ * enough for a container's health check to replace a service that cannot print.
+ */
+const DEAD_AFTER = 3;
+
 /** A stable identifier, a versioned one, or a database id: anything else names nothing. */
 const IDENTIFIER = /^(?:R-[A-Z]{3}-[0-9]{1,12}(?:\.[0-9]{1,6})?|[0-9]{1,15})$/;
 
@@ -239,6 +254,8 @@ export async function startService(
   let printer: ServicePrinter | null = null;
   let launching: Promise<ServicePrinter> | null = null;
   let lastLaunch = -Infinity;
+  /** Starts failed since a browser was last up: past DEAD_AFTER, the service is unhealthy. */
+  let failedStarts = 0;
   /** A browser; `retry` keeps trying after a failed start (the first start does not). */
   function launch(retry = true): Promise<ServicePrinter> {
     launching ??= (async () => {
@@ -258,8 +275,10 @@ export async function startService(
             void launch().catch(() => undefined);
           });
           printer = started;
+          failedStarts = 0;
           return started;
         } catch (error) {
+          failedStarts += 1;
           log(`printer: the browser could not start (${describe(error)})`);
           if (!retry || closing()) throw error;
         }
@@ -289,17 +308,31 @@ export async function startService(
       });
     });
 
-  /** The graph as one request reads it: each read given up when the request ends. */
-  const graphFor = (signal: AbortSignal): Graph => ({
-    read: (query, params) => within(graph.read(query, params), signal),
+  /**
+   * The graph as one request reads it: each read given up when the request ends, and given
+   * the time left before its deadline as its transaction timeout, so the database ends it
+   * there too. Each read under way is kept in `reads`: the request's slot is held until they
+   * have settled, so the reads in flight never outnumber the slots.
+   */
+  const graphFor = (signal: AbortSignal, endsAt: number, reads: Set<Promise<unknown>>): Graph => ({
+    read: <T>(query: string, params?: Record<string, unknown>) => {
+      if (signal.aborted) return Promise.reject(stopReason(signal));
+      const read = graph.read<T>(query, params, { timeoutMs: Math.max(1, endsAt - Date.now()) });
+      const settled = read.then(
+        () => undefined,
+        () => undefined
+      );
+      reads.add(settled);
+      void settled.then(() => reads.delete(settled));
+      return within(read, signal);
+    },
     close: () => Promise.resolve(),
   });
 
-  async function identify(identifier: string, signal: AbortSignal): Promise<Child> {
-    if (!IDENTIFIER.test(identifier)) throw new Refusal('no-event');
+  async function identify(identifier: string, reading: Graph): Promise<Child> {
     let found;
     try {
-      found = await eventByIdentifier(graphFor(signal), identifier);
+      found = await eventByIdentifier(reading, identifier);
     } catch (error) {
       if (error instanceof Refusal) throw error;
       throw new Refusal('unavailable', `the graph: ${describe(error)}`);
@@ -314,13 +347,13 @@ export async function startService(
     root: Child,
     depth: 0 | 1,
     token: string | null,
-    deadline: AbortSignal
+    deadline: AbortSignal,
+    reading: Graph
   ): Promise<Uint8Array> {
     // between stages: a request that has ended goes no further
     const going = () => {
       if (deadline.aborted) throw stopReason(deadline);
     };
-    const reading = graphFor(deadline);
     const doc = await buildSingle(reading, root, {
       depth,
       illustrated,
@@ -361,7 +394,7 @@ export async function startService(
     const printing = await within(currentPrinter(), deadline);
     // never printed once the request has ended
     going();
-    return printing.single(laid.html);
+    return printing.single(laid.html, deadline);
   }
 
   /** Each figure the document draws, once, at most FIGURES_AT_ONCE at a time. */
@@ -405,13 +438,14 @@ export async function startService(
     // the request's end: its deadline, or its client gone before it is answered
     const ending = new AbortController();
     const deadline = ending.signal;
+    const endsAt = Date.now() + limits.deadlineMs;
     const timer = setTimeout(() => {
       ending.abort(new Refusal('unavailable', 'the deadline passed'));
     }, limits.deadlineMs);
     timer.unref();
     res.once('close', () => {
       clearTimeout(timer);
-      if (!res.writableFinished) ending.abort(new Refusal('unavailable', 'the client went'));
+      if (!res.writableFinished) ending.abort(new ClientGone());
     });
     const query = new URL(req.url ?? '/', 'http://service').searchParams;
     // the depth first
@@ -429,10 +463,41 @@ export async function startService(
       refuse(res, 'no-event');
       return;
     }
+    if (!IDENTIFIER.test(identifier)) {
+      refuse(res, 'no-event');
+      return;
+    }
+    // then the limit, before the first read of the graph, so the reads in flight never
+    // outnumber the slots: a request beyond it is not queued; nor is one while no browser is up
+    if (active >= settings.concurrency) {
+      log(`unavailable ${identifier}: ${String(active)} PDFs already being made`);
+      refuse(res, 'unavailable');
+      return;
+    }
+    if (!printer?.connected) {
+      log(`unavailable ${identifier}: no browser is up`);
+      if (!closing()) void launch().catch(() => undefined);
+      refuse(res, 'unavailable');
+      return;
+    }
+    active += 1;
+    // the slot is held until the request's work has ended and every read it began has
+    // settled, each bounded by its transaction timeout, not only until the answer
+    const reads = new Set<Promise<unknown>>();
+    let held = true;
+    const release = (): void => {
+      if (!held) return;
+      held = false;
+      void Promise.allSettled([...reads]).then(() => {
+        active -= 1;
+      });
+    };
+    const reading = graphFor(deadline, endsAt, reads);
     let root: Child;
     try {
-      root = await identify(identifier, deadline);
+      root = await identify(identifier, reading);
     } catch (error) {
+      release();
       fail(res, error, identifier);
       return;
     }
@@ -444,25 +509,13 @@ export async function startService(
         if (tokens.length > 1) throw new AnalysisError('unknown-token', 'two tokens given');
         token = canonicalToken(tokens[0] ?? '');
       } catch (error) {
+        release();
         fail(res, error, root.stId);
         return;
       }
     }
-    // then the limit: a request beyond it is not queued
-    if (active >= settings.concurrency) {
-      log(`unavailable ${root.stId}: ${String(active)} PDFs already being made`);
-      refuse(res, 'unavailable');
-      return;
-    }
-    active += 1;
-    // the slot is held until the work ends, not only until the answer: work past the
-    // deadline still runs until its calls are stopped
-    const work = make(root, depth, token, deadline);
-    void work
-      .catch(() => undefined)
-      .finally(() => {
-        active -= 1;
-      });
+    const work = make(root, depth, token, deadline, reading);
+    void work.catch(() => undefined).finally(release);
     let pdf: Uint8Array;
     try {
       pdf = await within(work, deadline);
@@ -483,7 +536,9 @@ export async function startService(
   function fail(res: ServerResponse, error: unknown, subject: string) {
     const reason: Reason =
       error instanceof Refusal || error instanceof AnalysisError ? error.reason : 'unavailable';
-    if (reason === 'unavailable') log(`unavailable ${subject}: ${describe(error)}`);
+    // a client that went is no failure of the service: logged as such, and not answered
+    if (error instanceof ClientGone) log(`client-gone ${subject}`);
+    else if (reason === 'unavailable') log(`unavailable ${subject}: ${describe(error)}`);
     refuse(res, reason);
   }
 
@@ -503,7 +558,12 @@ export async function startService(
     const base = (url: string) => (url.endsWith('/') ? url : `${url}/`);
     let graphRelease: number;
     try {
-      graphRelease = await within(release(graph), AbortSignal.timeout(limits.healthTimeoutMs));
+      // its own short time, in the database too
+      const quick: Graph = {
+        read: (query, params) => graph.read(query, params, { timeoutMs: limits.healthTimeoutMs }),
+        close: () => Promise.resolve(),
+      };
+      graphRelease = await within(release(quick), AbortSignal.timeout(limits.healthTimeoutMs));
     } catch (error) {
       log(`unavailable health: the graph: ${describe(error)}`);
       refuse(res, 'unavailable');
@@ -514,7 +574,9 @@ export async function startService(
       // any answer of its own: the service has no health endpoint of its own to ask
       answers(new URL('database/version', base(settings.analysis)).href, (status) => status < 500),
     ]);
-    json(res, 200, {
+    // a browser that cannot be started again leaves the service unable to print: 503, so a
+    // health check that reads only the status replaces it
+    json(res, failedStarts >= DEAD_AFTER ? 503 : 200, {
       version: VERSION,
       release: graphRelease,
       render,

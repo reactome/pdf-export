@@ -226,7 +226,11 @@ describe('the analysis client, given answers the service should not give', () =>
       const json = (body: unknown) =>
         res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
       if (url.startsWith('/hang/')) hanging.add(res);
-      else if (url.startsWith('/redirect/'))
+      else if (url.startsWith('/stall-body/')) {
+        // a summary whose body stops part way
+        res.writeHead(200, { 'Content-Type': 'application/json' }).write('{"summary":');
+        hanging.add(res);
+      } else if (url.startsWith('/redirect/'))
         res.writeHead(302, { Location: `${stub.url}/${url.replace(/^\/redirect\//, '')}` }).end();
       else if (url.startsWith('/summary/')) json({ summary: {}, pathwaysFound: '6' });
       else if (!url.includes('/found/')) json(summary);
@@ -257,15 +261,17 @@ describe('the analysis client, given answers the service should not give', () =>
     {
       timeoutMs = 2_000,
       events = [{ kind: 'pathway', stId: PARENT }],
+      signal,
     }: {
       timeoutMs?: number;
       events?: AnalysedEvent[];
+      signal?: AbortSignal;
     } = {}
   ) =>
     readAnalysis(
       `${base}/${path}`,
       { token: TOKENS.stored, species: 'Homo sapiens', events },
-      { timeoutMs }
+      signal ? { timeoutMs, signal } : { timeoutMs }
     );
   const unavailable = (error: unknown) =>
     error instanceof AnalysisError && error.reason === 'unavailable';
@@ -302,6 +308,22 @@ describe('the analysis client, given answers the service should not give', () =>
   test('a call with no answer within its time is unavailable', { timeout: 2_000 }, async () => {
     await assert.rejects(read('hang', { timeoutMs: 100 }), unavailable);
   });
+
+  // the caller's own end (its deadline, its client gone) is its own, not the service failing
+  test(
+    "the caller's end, waiting for an answer or for its body, is thrown as it is",
+    { timeout: 2_000 },
+    async () => {
+      const ended = new Error('the caller ended');
+      for (const path of ['hang', 'stall-body']) {
+        const ending = new AbortController();
+        setTimeout(() => {
+          ending.abort(ended);
+        }, 100);
+        await assert.rejects(read(path, { signal: ending.signal }), (error) => error === ended);
+      }
+    }
+  );
 
   test('a redirect is unavailable, and the token is not sent on', async () => {
     await assert.rejects(read('redirect'), unavailable);
