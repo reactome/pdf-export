@@ -231,40 +231,63 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     }
   });
 
-  test("a figure's link is as wide as the figure, not the text", async () => {
-    // Reaction one's figure, narrower than the text: its link's rectangle is the figure's,
-    // told from the name's link to the same page by its height
+  test("a figure's link is as wide as the figure, not the text, and centred", async () => {
+    // Reaction one's figure, narrower than the text, in portrait, and drawn again 1,000 by
+    // 900 with 8 px labels, which prints on a landscape page narrower than its text: each
+    // link's rectangle is its figure's, centred on the page, told from the name's link to
+    // the same page by its height
     const alpha = bookPdf(built, 'Alpha pathway');
     const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
-    assert.ok(place);
+    assert.ok(place?.full && place.section.figure);
+    const key = figureKey(place.section.figure);
     const printer = started;
     assert.ok(printer);
-    const html = layoutBookPart(alpha, [place], options).html;
-    const figure =
-      /<a class="figure-link" href="([^"]*)"><svg\b[^>]*\swidth="([\d.]+)pt" height="([\d.]+)pt"/.exec(
-        html
-      );
-    assert.ok(figure?.[1] && figure[2] && figure[3], 'no figure link');
-    const href = figure[1].replace(/&amp;/g, '&');
-    const width = Number(figure[2]);
-    const height = Number(figure[3]);
-    assert.ok(width < PORTRAIT.width - 50, String(width));
-    const task = getDocument({ data: (await printer.part(html)).slice() });
-    try {
-      const doc = await task.promise;
-      const rects: number[][] = [];
-      for (let i = 1; i <= doc.numPages; i++) {
-        for (const a of await (await doc.getPage(i)).getAnnotations()) {
-          const { url, rect } = a as { url?: unknown; rect?: number[] };
-          const [, y1 = 0, , y2 = 0] = rect ?? [];
-          if (url === href && Math.abs(y2 - y1 - height) < 2 && rect) rects.push(rect);
+    const wide = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900"><rect width="1000" height="900" fill="#eee"/><text x="20" y="40" font-size="8">wide figure</text></svg>`;
+    for (const [figures, landscape] of [
+      [options.figures, false],
+      [new Map(options.figures).set(key, wide), true],
+    ] as const) {
+      assert.equal(figureSizes(figures)(place.section.figure)?.landscape, landscape);
+      const html = layoutBookPart(alpha, [place], { ...options, figures }).html;
+      const figure =
+        /<a class="figure-link" href="([^"]*)"><svg\b[^>]*\swidth="([\d.]+)pt" height="([\d.]+)pt"/.exec(
+          html
+        );
+      assert.ok(figure?.[1] && figure[2] && figure[3], 'no figure link');
+      const href = figure[1].replace(/&amp;/g, '&');
+      const width = Number(figure[2]);
+      const height = Number(figure[3]);
+      const text = landscape ? PORTRAIT.height : PORTRAIT.width;
+      assert.ok(width < text - 50, String(width));
+      const task = getDocument({ data: (await printer.part(html)).slice() });
+      try {
+        const doc = await task.promise;
+        const rects: { rect: number[]; pageWidth: number }[] = [];
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const [left = 0, , right = 0] = page.view;
+          for (const a of await page.getAnnotations()) {
+            const { url, rect } = a as { url?: unknown; rect?: number[] };
+            const [, y1 = 0, , y2 = 0] = rect ?? [];
+            if (url === href && Math.abs(y2 - y1 - height) < 2 && rect) {
+              rects.push({ rect, pageWidth: right - left });
+            }
+          }
         }
+        assert.equal(rects.length, 1, href);
+        const { rect, pageWidth } = rects[0] ?? { rect: [], pageWidth: 0 };
+        const [x1 = 0, , x2 = 0] = rect;
+        assert.ok(Math.abs(x2 - x1 - width) < 2, `${String(x2 - x1)} for ${String(width)}`);
+        // landscape on a landscape page; centred, as the margins are the same each side
+        assert.equal(pageWidth > 800, landscape, String(pageWidth));
+        const centre = (x1 + x2) / 2;
+        assert.ok(
+          Math.abs(centre - pageWidth / 2) < 2,
+          `centred at ${String(centre)} on a page ${String(pageWidth)} wide`
+        );
+      } finally {
+        await task.destroy();
       }
-      assert.equal(rects.length, 1, href);
-      const [x1 = 0, , x2 = 0] = rects[0] ?? [];
-      assert.ok(Math.abs(x2 - x1 - width) < 2, `${String(x2 - x1)} for ${String(width)}`);
-    } finally {
-      await task.destroy();
     }
   });
 

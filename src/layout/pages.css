@@ -41,11 +41,13 @@ p {
   margin: 0 0 6pt;
 }
 
-/* The book's probes: a 1 px link inside each target, removed after the join (research R4). */
+/* The book's probes: a 1 px link inside each target, removed after the join (research R4).
+   At the top of its line, so a link landing at the probe shows the whole heading. */
 .probe {
   display: inline-block;
   width: 1px;
   height: 1px;
+  vertical-align: top;
 }
 
 /* The cover: a page of its own, with no header or number. */
