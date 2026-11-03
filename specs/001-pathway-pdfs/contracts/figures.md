@@ -56,6 +56,13 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
 
   - **Its last line, when every figure has its line:** `complete`, whose fingerprint
     fields equal the first line's.
+- **The lines' form** (T024, `src/preflight/folder.ts`, which T046 writes with): each a JSON
+  object with a `type`. The fingerprint and `complete`: `release` (a number), `checksum`
+  (the `DBInfo` checksum's decimal digits, a string, as a long can exceed what a JSON
+  reader's number holds whole), `summary` (`sha256:` and the hex digest of the summary
+  file's bytes), `content` (a number) and `build` (a string). A figure: `stId`, `kind`
+  (`diagram`, `ancestor`, `ehld` or `reaction`), `source` and `highlight` (sorted; empty
+  but for `ancestor`).
 - **A deployment changed, a service gone, or the breaker tripped, during a run** stops it
   at once with exit 1 and no `complete` line.
   Figures still being drawn when it stops get no line. The report is written either way,

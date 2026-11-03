@@ -93,6 +93,25 @@ export async function release(graph: Graph): Promise<number> {
   return row.release;
 }
 
+/** The release's number and checksum, from its `DBInfo` (spec 001 T024). */
+export interface ReleaseInfo {
+  release: number;
+  /**
+   * The graph's `DBInfo.checksum`, as its decimal digits: a long, which a JavaScript number
+   * cannot hold whole past 2^53. Null where the graph has none.
+   */
+  checksum: string | null;
+}
+
+/** The release's number and checksum, for the figures' folder's fingerprint (T024, T046). */
+export async function releaseInfo(graph: Graph): Promise<ReleaseInfo> {
+  const [row] = await graph.read<{ release: number | null; checksum: string | null }>(
+    'MATCH (d:DBInfo) RETURN d.releaseNumber AS release, toString(d.checksum) AS checksum LIMIT 1'
+  );
+  if (row?.release == null) throw new Error('The graph has no DBInfo.releaseNumber');
+  return { release: row.release, checksum: row.checksum ?? null };
+}
+
 /** A species' top-level pathways, by database id: the book orders them by name (FR-002). */
 export async function topLevelPathways(graph: Graph, species: string): Promise<EventRef[]> {
   return graph.read<EventRef>(
@@ -425,3 +444,43 @@ export async function parentPathways(graph: Graph, id: number): Promise<string[]
 }
 
 const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The names each reaction's figure labels (spec 001 T024, FR-017): its participants, the
+ * inputs, outputs, catalysts and regulators it draws, each by its display name and its
+ * names, and their compartments. Sorted, each once. The participants' compartments are read
+ * here, as no event's section names them.
+ */
+export async function figureNames(
+  graph: Graph,
+  ids: readonly number[]
+): Promise<Map<number, string[]>> {
+  const rows = await graph.read<{ id: number; names: (string | null)[] }>(
+    `UNWIND $ids AS id
+     MATCH (r:DatabaseObject {dbId: id})
+     WHERE r:ReactionLikeEvent
+     CALL {
+       WITH r
+       MATCH (r)-[:input|output]->(pe:PhysicalEntity) RETURN pe
+       UNION
+       WITH r
+       MATCH (r)-[:catalystActivity]->(:CatalystActivity)-[:physicalEntity]->(pe:PhysicalEntity)
+       RETURN pe
+       UNION
+       WITH r
+       MATCH (r)-[:regulatedBy]->(:Regulation)-[:regulator]->(pe:PhysicalEntity) RETURN pe
+     }
+     OPTIONAL MATCH (pe)-[:compartment]->(c)
+     WITH id, pe, collect(c.displayName) AS compartments
+     WITH id, [pe.displayName] + coalesce(pe.name, []) + compartments AS names
+     UNWIND names AS name
+     RETURN id, collect(DISTINCT name) AS names`,
+    { ids: unique(ids) }
+  );
+  return new Map(
+    rows.map(({ id, names }) => [
+      id,
+      names.filter((name): name is string => typeof name === 'string').sort(byCodeUnit),
+    ])
+  );
+}

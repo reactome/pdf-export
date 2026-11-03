@@ -8,10 +8,12 @@ import {
   edits,
   eventByIdentifier,
   eventFacts,
+  figureNames,
   literature,
   parentPathways,
   reactionIdentifiers,
   release,
+  releaseInfo,
   topLevelPathways,
 } from '../../src/graph/queries.ts';
 
@@ -30,6 +32,32 @@ describe('the graph reader', { skip }, () => {
 
   test('reads the release from DBInfo.releaseNumber', async () => {
     assert.equal(await release(graph), 98);
+  });
+
+  test("reads the release's checksum whole, as its digits, beyond what a number holds", async () => {
+    // the fixture's checksum is 2^53 + 1, which a JavaScript number reads as 2^53
+    assert.deepEqual(await releaseInfo(graph), { release: 98, checksum: '9007199254740993' });
+  });
+
+  test("reads the names a reaction's figure labels: its participants and their compartments", async () => {
+    const names = await figureNames(graph, [id(211), id(211), id(220)]);
+    assert.deepEqual(names.get(id(211)), [
+      'Placeholder candidate set',
+      'Placeholder candidate set [cytosol]',
+      'Placeholder complex',
+      'Placeholder complex [cytosol]',
+      'Placeholder polymer',
+      'Placeholder polymer [cytosol]',
+      'Placeholder protein 1',
+      'Placeholder protein 1 [cytosol]',
+      'Placeholder protein 2',
+      'Placeholder protein 2 [cytosol]',
+      'Placeholder set',
+      'Placeholder set [cytosol]',
+      'placeholder membrane',
+    ]);
+    // a reaction with no participants has no names
+    assert.equal(names.get(id(220)), undefined);
   });
 
   test("reads a species' top-level pathways, and only its own", async () => {

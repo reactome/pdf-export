@@ -184,3 +184,92 @@ export function onRequestStrings<T>(value: T, log: CharacterLog): T {
   };
   return visit(value, false) as T;
 }
+
+/**
+ * FR-017 in the book (spec 001 T024): the substitutions made, each counted by code point for
+ * the run report, and any other character no font draws a fault,
+ * `uncovered-character <U+XXXX> <stId>`, naming the subject given with its text, never the
+ * text. Such a character is left as it is: the book is not written while there is a fault.
+ * One instance per purpose: the preflight's own counts are not the run report's.
+ */
+export class BookCharacters {
+  readonly #faults = new Set<string>();
+  readonly #replaced = new Map<number, number>();
+  readonly #covered: ReadonlySet<number>;
+
+  constructor(covered: ReadonlySet<number> = coveredCodePoints()) {
+    this.#covered = covered;
+  }
+
+  /** The faults met so far, each once, in the order met. */
+  get faults(): string[] {
+    return [...this.#faults];
+  }
+
+  /** How often each listed character was replaced. */
+  get replaced(): ReadonlyMap<number, number> {
+    return this.#replaced;
+  }
+
+  /** A character as the book prints it; `null` when it is printed as it is. */
+  #char(char: string, subject: string): string | null {
+    const point = char.codePointAt(0) ?? 0;
+    const substitute = SUBSTITUTIONS.get(point);
+    if (substitute !== undefined) {
+      this.#replaced.set(point, (this.#replaced.get(point) ?? 0) + 1);
+      return substitute;
+    }
+    if (!this.#covered.has(point) && !NEVER_DRAWN.test(char)) {
+      this.#faults.add(`uncovered-character ${codePointName(point)} ${subject}`);
+    }
+    return null;
+  }
+
+  /** A plain text as the book prints it. */
+  text(text: string, subject: string): string {
+    if (PLAIN.test(text)) return text;
+    let out = '';
+    for (const char of text) out += this.#char(char, subject) ?? char;
+    return out;
+  }
+
+  /** A run of markup's text as the book prints it, its numeric references included. */
+  markupText(text: string, subject: string): string {
+    const referenced = text.includes('&#')
+      ? text.replace(REFERENCE, (whole, hex: string | undefined, dec: string | undefined) => {
+          const point = hex === undefined ? Number(dec) : parseInt(hex, 16);
+          if (point > 0x10ffff) return whole;
+          return this.#char(String.fromCodePoint(point), subject) ?? whole;
+        })
+      : text;
+    return this.text(referenced, subject);
+  }
+
+  /** Markup (a summation, a figure's SVG) as the book prints it: its text alone changed. */
+  markup(markup: string, subject: string): string {
+    return markupText(markup, (text) => this.markupText(text, subject));
+  }
+
+  /**
+   * Every string in a value as the book prints it: a summation's as markup, every other as
+   * plain text. Objects, lists and maps are copied.
+   */
+  strings<T>(value: T, subject: string): T {
+    const visit = (item: unknown, markup: boolean): unknown => {
+      if (typeof item === 'string') {
+        return markup ? this.markup(item, subject) : this.text(item, subject);
+      }
+      if (Array.isArray(item)) return item.map((element: unknown) => visit(element, markup));
+      if (item instanceof Map) {
+        return new Map([...item].map(([key, element]) => [key, visit(element, false)]));
+      }
+      if (item !== null && typeof item === 'object') {
+        return Object.fromEntries(
+          Object.entries(item).map(([key, element]) => [key, visit(element, key === 'summations')])
+        );
+      }
+      return item;
+    };
+    return visit(value, false) as T;
+  }
+}
