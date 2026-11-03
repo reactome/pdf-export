@@ -198,7 +198,8 @@ synthetic documents, on this host under load.
     pathway's PDF is one part and the largest today (3,760 pages) about 19;
   - printed untagged, a few parts at a time, the largest PDFs first and each PDF's parts
     before the next's, then each PDF's parts joined, the PDFs' joins independent of one
-    another and at most two at once by default (T011, below);
+    another and one at a time by default, raised by T029 only if two real joins fit
+    (T011, below);
   - links rewritten, and the outline written by pdf-export, which it needs anyway: an
     event's later places in a PDF point at its one section (FR-004), which Chromium's
     headings would not do. An event held only by another of the book's PDFs is, as
@@ -217,7 +218,7 @@ synthetic documents, on this host under load.
   - **the join's memory** re-measured at the largest PDF's size (pdf-lib holds the whole
     file): 120 MB for 4,930 synthetic pages, and today's 3,760-page file is 383 MB from
     another producer, so perhaps near 400 MB (inference). Joining in groups is kept only
-    as a fallback, if T011 finds even one PDF's join does not fit. T011 measured it
+    as a fallback, if T029 finds one real PDF's join does not fit beside printing. T011 measured it
     (below): about 0.5 GiB a join on synthetic files, more on real ones, and several of
     the largest at once do not fit in 4 GiB, so joins have a limit of their own;
   - **Measured (T011), 3 Nov 2026: one PDF's join fits; several of the largest at once
@@ -326,8 +327,9 @@ synthetic documents, on this host under load.
       off saves five to eight times faster for 6% more file, but may cost memory.
     - **Joining in groups (T012) stays the fallback:** one PDF's join adds about 0.5
       GiB on these files, but a real one (roughly 1.7–2.1 GiB, inference) beside
-      printing (1.4–1.5 GiB at four prints alone, before page cache) may exceed 4 GiB even
-      with one join at a time. If T029 finds that one real join does not fit beside
+      printing (1.4–1.5 GiB at four prints alone, before page cache) comes to about 3.1–3.6
+      GiB, up to about 3.9 with page cache (inference): under 4 GiB, but the scaling is
+      untested at that size, so it may not fit. If T029 finds that one real join does not fit beside
       printing, T012 is done; otherwise it is not needed.
 - **A single-event PDF:** printed tagged, with Chromium's own bookmarks and page numbers
   from its margin boxes. Where it has a contents list (a pathway at depth 1), its pages
@@ -913,8 +915,8 @@ is ignored, not a missing file.
 
 - **Parts:** the largest top-level pathway is 3,760 pages today. At about 200 pages a
   part (R4), its PDF is split at section boundaries and joined; the 29 PDFs are made
-  several at a time, the largest first, so the joins overlap the printing and at most
-  two run at once by default (T011, R4).
+  several at a time, the largest first, so the joins overlap the printing, one at a time
+  by default (T011, R4; T029 raises it only if two real joins fit).
 
 ## R8. The checks: by meaning, with tools under loose licences
 

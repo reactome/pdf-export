@@ -56,7 +56,8 @@ the figures already drawn by `figures`.
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                       |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                    |
 | `--out`      |                                | the folder written; default `TheReactomeBook`                                      |
-| `--parallel` |                                | parts printed and PDFs joined at once, across the PDFs; default 4                  |
+| `--parallel` |                                | parts printed and PDFs joined at once, the largest PDFs first; default 4           |
+| `--joins`    |                                | of those, PDFs joined at once; default 1 (research R4: T029 raises it if 2 fit)    |
 | `--report`   |                                | where the run report (data-model.md) is written, as JSON                           |
 
 - **The preflight,** before anything is printed (and the character check's second half,
