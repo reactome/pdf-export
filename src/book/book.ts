@@ -20,7 +20,9 @@ import { rewriteLinks } from '../print/links.ts';
 import { writeOutline } from '../print/outline.ts';
 import { joinParts, printBook, type PartPrinter, type PartsSettings } from '../print/parts.ts';
 import { stampPages } from '../print/stamp.ts';
-import { FolderFigures } from './figures.ts';
+import { BookFaults, FolderFigures } from './figures.ts';
+
+export { BookFaults } from './figures.ts';
 
 /**
  * pdf-lib's object streams, off unless memory binds (research R4, T011): on synthetic files
@@ -29,17 +31,6 @@ import { FolderFigures } from './figures.ts';
  * measured with both in T031, which settles this, as it settles `--joins`' default of 1.
  */
 export const OBJECT_STREAMS = false;
-
-/** Faults found while the book is printed, each a line as the preflight's are. */
-export class BookFaults extends Error {
-  override name = 'BookFaults';
-  readonly faults: readonly string[];
-
-  constructor(faults: readonly string[]) {
-    super(`The book's faults: ${faults.join(', ')}`);
-    this.faults = faults;
-  }
-}
 
 /**
  * A book's PDF as it is printed: FR-017's substitutions made in every text the layout

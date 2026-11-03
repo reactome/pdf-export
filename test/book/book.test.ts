@@ -7,23 +7,31 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, test } from 'node:test';
 
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-import { bookCommand, type BookIo, type RunReport } from '../../src/book/command.ts';
+import {
+  bookCommand,
+  outProblem,
+  type BookIo,
+  type BookPrinter,
+  type RunReport,
+} from '../../src/book/command.ts';
 import {
   graphSettings,
   openGraph,
@@ -190,6 +198,61 @@ describe('pdf-export book', { skip }, () => {
 
   const readReport = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as RunReport;
 
+  /** A printer that keeps each part's HTML as it is printed, and runs `after` once it is. */
+  const counting =
+    (printed: string[], after: () => void = () => undefined) =>
+    async (): Promise<BookPrinter> => {
+      const printer = await Printer.start();
+      return {
+        part: async (html) => {
+          const pdf = await printer.part(html);
+          printed.push(html);
+          after();
+          return pdf;
+        },
+        close: () => printer.close(),
+      };
+    };
+
+  /**
+   * `book` run as a child process, sent SIGTERM once `ready` holds (polled without pause, so it is sent within a moment):
+   * how it exited, and its folders, which should be empty.
+   */
+  const signalled = async (ready: (run: { parent: string; temporary: string }) => boolean) => {
+    const { parent, report, args } = place();
+    const temporary = scratch();
+    const child = spawn(process.execPath, [CLI, 'book', ...args, '--parallel', '1'], {
+      env: { ...process.env, TMPDIR: temporary, NEO4J_URI: process.env['NEO4J_URI'] },
+      stdio: 'ignore',
+    });
+    const ended = new Promise<void>((resolve) =>
+      child.once('exit', () => {
+        resolve();
+      })
+    );
+    try {
+      const deadline = Date.now() + 60_000;
+      while (!ready({ parent, temporary })) {
+        assert.ok(child.exitCode === null, 'the run ended before it was signalled');
+        assert.ok(Date.now() < deadline, 'never ready to be signalled');
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      child.kill('SIGTERM');
+      const kill = setTimeout(() => child.kill('SIGKILL'), 30_000);
+      await ended;
+      clearTimeout(kill);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }
+    return {
+      code: child.exitCode,
+      signal: child.signalCode,
+      parent: readdirSync(parent),
+      temporary: readdirSync(temporary),
+      report: existsSync(report) ? readReport(report) : null,
+    };
+  };
+
   before(async () => {
     stub = await startRenderStub();
     const graph = openGraph(graphSettings(process.env));
@@ -321,15 +384,82 @@ describe('pdf-export book', { skip }, () => {
     assert.match(run.err, /is not empty/);
     assert.deepEqual(readdirSync(parent), ['TheReactomeBook']);
     assert.deepEqual(readdirSync(out), ['old.pdf']);
-    rmSync(out, { recursive: true });
-    writeFileSync(out, 'a file');
-    assert.equal((await book(args)).code, 2);
-    assert.deepEqual(readdirSync(parent), ['TheReactomeBook']);
-    assert.equal(readFileSync(out, 'utf8'), 'a file');
+    const file = place();
+    writeFileSync(file.out, 'a file');
+    const notAFolder = await book(file.args);
+    assert.equal(notAFolder.code, 2);
+    assert.match(notAFolder.err, /is not a folder/);
+    assert.deepEqual(readdirSync(file.parent), ['TheReactomeBook']);
+    assert.equal(readFileSync(file.out, 'utf8'), 'a file');
+  });
+
+  test('exit 2 on an --out whose folder cannot be written, said in the report, nothing left', async () => {
+    const { parent, report, args } = place();
+    chmodSync(parent, 0o555);
+    let run;
+    try {
+      run = await book(args);
+    } finally {
+      chmodSync(parent, 0o755);
+    }
+    assert.equal(run.code, 2);
+    assert.match(run.err, /cannot be written/);
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.deepEqual(readdirSync(parent), []);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'error');
+    assert.match(written.error ?? '', /cannot be written/);
+  });
+
+  test('an --out on another device than its folder (a mount point) is refused', () => {
+    const { out } = place();
+    mkdirSync(out);
+    const real = (path: string) => statSync(path);
+    assert.equal(outProblem(out, real), null);
+    // the same folder, as if mounted: another device than its parent's
+    const mounted = (path: string) => {
+      const stat = statSync(path);
+      return path === out ? { dev: stat.dev + 1, isDirectory: () => stat.isDirectory() } : stat;
+    };
+    assert.match(outProblem(out, mounted) ?? '', /is a mount point/);
+  });
+
+  test('--report: an existing one refused untouched, its folder made, or refused before the run if it cannot be', async () => {
+    let opened = 0;
+    const counting = (settings: GraphSettings, options?: GraphOptions): Graph => {
+      opened += 1;
+      return openGraph(settings, options);
+    };
+    // an earlier run's report is never replaced, and nothing else is done
+    const existing = place();
+    writeFileSync(existing.report, 'an earlier report');
+    const refused = await book(existing.args, { open: counting });
+    assert.equal(refused.code, 2);
+    assert.match(refused.err, /--report must not exist/);
+    assert.equal(readFileSync(existing.report, 'utf8'), 'an earlier report');
+    // a folder that cannot be made (a file in its way): refused before the graph is read
+    const blocked = place();
+    const file = join(scratch(), 'a file');
+    writeFileSync(file, '');
+    const args = [...blocked.args.slice(0, -1), join(file, 'report.json')];
+    const unmade = await book(args, { open: counting });
+    assert.equal(unmade.code, 2);
+    assert.match(unmade.err, /its folder cannot be written/);
+    assert.equal(opened, 0);
+    assert.deepEqual(readdirSync(blocked.parent), []);
+    // a folder not there yet is made, and the report written in it
+    const nested = place();
+    const report = join(scratch(), 'not', 'yet', 'report.json');
+    mkdirSync(nested.out);
+    writeFileSync(join(nested.out, 'old.pdf'), '');
+    const made = await book([...nested.args.slice(0, -1), report]);
+    assert.equal(made.code, 2);
+    assert.equal(readReport(report).outcome, 'error');
   });
 
   test('exit 2 on bad arguments, and on the graph unreachable at the start', async () => {
-    const { parent, args } = place();
+    const figures = folder();
+    const { parent, args } = place(figures);
     const bad = [
       [...args, '--render', stub.url],
       args.filter((_, i) => i !== 2 && i !== 3),
@@ -343,15 +473,15 @@ describe('pdf-export book', { skip }, () => {
     assert.equal((await book(args.filter((_, i) => i !== 4 && i !== 5))).code, 2);
     assert.equal((await book(args, {}, {})).code, 2);
     // an address that cannot be parsed (never one that could reach another database), and a
-    // graph whose reads fail
-    const unparsable = await book(args, {}, { NEO4J_URI: '127.0.0.1:17700' });
+    // graph whose reads fail, each with a report of its own (a report is never replaced)
+    const unparsable = await book(place(figures).args, {}, { NEO4J_URI: '127.0.0.1:17700' });
     assert.equal(unparsable.code, 2);
     assert.match(unparsable.err, /the graph cannot be read/);
     const failing = (): Graph => ({
       read: () => Promise.reject(new Error('the planted failure')),
       close: () => Promise.resolve(),
     });
-    const unreachable = await book(args, { open: failing });
+    const unreachable = await book(place(figures).args, { open: failing });
     assert.equal(unreachable.code, 2);
     assert.deepEqual(unreachable.left, []);
     assert.match(unreachable.err, /the graph cannot be read: the planted failure/);
@@ -409,24 +539,16 @@ describe('pdf-export book', { skip }, () => {
       stId === 'R-HSA-90000132' ? svg.replace(/(<text\b[^>]*>)/, '$1\uE000') : svg
     );
     const { parent, report, args } = place(figures);
-    let printed = 0;
+    const printed: string[] = [];
     const run = await book([...args, '--parallel', '1'], {
       threshold: 1,
-      startPrinter: async () => {
-        const printer = await Printer.start();
-        return {
-          part: async (html) => {
-            const pdf = await printer.part(html);
-            printed += 1;
-            return pdf;
-          },
-          close: () => printer.close(),
-        };
-      },
+      startPrinter: counting(printed),
     });
     assert.equal(run.code, 1, run.err);
     assert.equal(run.out, 'fault uncovered-character U+E000 R-HSA-90000132\n');
-    assert.ok(printed >= 3, `${String(printed)} parts printed before it`);
+    assert.ok(printed.length >= 3, `${String(printed.length)} parts printed before it`);
+    // and its own part never printed
+    assert.ok(!printed.some((html) => html.includes('id="s-R-HSA-90000132"')));
     assert.deepEqual(readdirSync(parent), []);
     // nor the printer's pages, nor Chromium's profile, in the run's temporary folder
     assert.deepEqual(run.left, []);
@@ -451,30 +573,138 @@ describe('pdf-export book', { skip }, () => {
     assert.equal(readReport(report).outcome, 'error');
     assert.ok(!existsSync(join(parent, 'TheReactomeBook')));
   });
-  test('a run stopped by a signal while printing leaves no folder, temporary or not', async () => {
+  test('a run stopped by SIGTERM, as the browser launches and after a part has printed: exit 143, its report written, nothing left', async () => {
+    const begun = (dir: string, prefix: string) =>
+      readdirSync(dir).some((name) => name.startsWith(prefix));
+    const moments: Record<string, (run: { parent: string; temporary: string }) => boolean> = {
+      // the printer's pages' folder, made just before the browser is launched
+      'as the launch begins': ({ temporary }) => begun(temporary, 'pdf-export-'),
+      // the launcher's folders, made before it has registered them for removal
+      'as the browser launches': ({ temporary }) => begun(temporary, 'playwright-artifacts-'),
+      'as its profile is made': ({ temporary }) =>
+        begun(temporary, 'playwright_chromiumdev_profile-'),
+      // a PDF written into the book's folder, its parts printed
+      'after a part has printed': ({ parent }) =>
+        readdirSync(parent).some(
+          (name) =>
+            name.startsWith('.TheReactomeBook-') &&
+            readdirSync(join(parent, name)).some((file) => file.endsWith('.pdf'))
+        ),
+    };
+    for (const [moment, ready] of Object.entries(moments)) {
+      const run = await signalled(ready);
+      assert.deepEqual([run.code, run.signal], [143, null], moment);
+      assert.deepEqual(run.parent, [], moment);
+      assert.deepEqual(run.temporary, [], moment);
+      assert.equal(run.report?.outcome, 'error', moment);
+      assert.equal(run.report.error, 'stopped by SIGTERM', moment);
+    }
+  });
+
+  test('a run stopped by SIGTERM before its preflight ends writes its report too', async () => {
+    // the report's folder is made at the start, the moment the run's handlers are set
     const { parent, args } = place();
+    const report = join(scratch(), 'made', 'report.json');
     const temporary = scratch();
-    const child = spawn(process.execPath, [CLI, 'book', ...args, '--parallel', '1'], {
+    const child = spawn(process.execPath, [CLI, 'book', ...args.slice(0, -1), report], {
       env: { ...process.env, TMPDIR: temporary },
       stdio: 'ignore',
     });
-    const ended = new Promise<number | null>((resolve) => child.once('exit', resolve));
-    try {
-      // stopped once its folder is there, beside the book's name, while it prints
-      const deadline = Date.now() + 60_000;
-      while (!readdirSync(parent).some((name) => name.startsWith('.TheReactomeBook-'))) {
-        assert.ok(Date.now() < deadline, 'the run never began printing');
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      child.kill('SIGTERM');
-      const stop = setTimeout(() => child.kill('SIGKILL'), 30_000);
-      await ended;
-      clearTimeout(stop);
-    } finally {
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    const ended = new Promise<void>((resolve) =>
+      child.once('exit', () => {
+        resolve();
+      })
+    );
+    const deadline = Date.now() + 60_000;
+    while (!existsSync(dirname(report))) {
+      assert.ok(Date.now() < deadline, 'the run never began');
+      await new Promise((resolve) => setTimeout(resolve, 2));
     }
-    assert.notEqual(child.exitCode, 0);
+    child.kill('SIGTERM');
+    await ended;
+    assert.deepEqual([child.exitCode, child.signalCode], [143, null]);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'error');
+    assert.equal(written.error, 'stopped by SIGTERM');
+    assert.deepEqual(written.pdfs, []);
     assert.deepEqual(readdirSync(parent), []);
     assert.deepEqual(readdirSync(temporary), []);
+  });
+
+  test("every text and label the book prints has FR-017's substitutions made", async () => {
+    // a character planted in each field the layout prints from the graph, each to be printed
+    // as its substitute and never as itself (U+05F3, as pdf.js reads a U+2011 printed back
+    // as a hyphen, so a U+2011 left unsubstituted could not be told from one substituted): events before and after, inferred from,
+    // diseases, compartments, edits; and a figure's label
+    const plants: [string, string][] = [
+      ['Shared reaction', 'Shared\u05F3reaction'],
+      ['Black box two', 'Black box\u05F3two'],
+      ['Mouse source', 'Mouse\u05F3source'],
+      ['placeholder infectious disease', 'placeholder infectious\u05F3disease'],
+      ['nucleoplasm', 'nucleo\u05F3plasm'],
+      ['Placeholder08', 'Placeholder\u05F308'],
+    ];
+    let label = '';
+    const figures = folder((stId, svg) =>
+      stId === 'R-HSA-90000132'
+        ? svg.replace(/(<text\b[^>]*>)([^<]*)/, (_, tag: string, text: string) => {
+            label = text.trim();
+            return `${tag}\u02D9${text}`;
+          })
+        : svg
+    );
+    assert.ok(label.length > 0, 'no label to plant in');
+    const { out, args } = place(figures);
+    const run = await book([...args, '--parallel', '1'], { open: planting(plants) });
+    assert.equal(run.code, 0, run.err);
+    let all = '';
+    for (const file of readdirSync(out)) {
+      all += (await bodyText(join(out, file))).join('\n');
+    }
+    assert.equal(occurrences(all, '\u05F3'), 0, 'U+05F3 printed');
+    assert.equal(occurrences(all, '\u02D9'), 0, 'U+02D9 printed');
+    // each field: the followed and preceding reactions' lists, inferred from, diseases,
+    // compartments and the edit history's names, beside their own headings
+    for (const printed of [
+      'Preceded by',
+      'Followed by',
+      'Inferred from',
+      'Diseases',
+      'Compartments',
+    ]) {
+      assert.ok(all.includes(printed), printed);
+    }
+    for (const printed of [
+      'Shared\u2032reaction',
+      'Black box\u2032two',
+      'Mouse\u2032source',
+      'infectious\u2032disease',
+      'nucleo\u2032plasm',
+      'Placeholder\u203208',
+      `\u2022${label}`,
+    ]) {
+      assert.ok(all.includes(printed), printed);
+    }
+  });
+
+  test('a figure file removed while the book prints is a missing-file fault, nothing left', async () => {
+    const figures = folder();
+    const { parent, report, args } = place(figures);
+    const printed: string[] = [];
+    // removed once the first part is printed, Gamma's front part, whose cover drew Gamma's
+    // figure, which its labels' check then passed: Gamma's section, and its cover's second
+    // print, would draw it without its file
+    const gone = ['R-HSA-90000300.svg'];
+    const run = await book([...args, '--parallel', '1'], {
+      threshold: 1,
+      startPrinter: counting(printed, () => {
+        if (printed.length === 1) for (const name of gone) unlinkSync(join(figures, name));
+      }),
+    });
+    assert.equal(run.code, 1, run.err);
+    assert.equal(run.out, 'fault missing-file R-HSA-90000300.svg\n');
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.deepEqual(readdirSync(parent), []);
+    assert.equal(readReport(report).outcome, 'faults');
   });
 });

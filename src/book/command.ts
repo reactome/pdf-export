@@ -4,12 +4,17 @@
 // printed into a folder beside `--out`'s name, moved into place only once every PDF is
 // written, so a failed run leaves no book, part or temporary folder. Exit 0 with the book
 // written, 1 on faults (the preflight's, or a figure's labels before its part is printed),
-// 2 on bad arguments, an `--out` that is not absent or empty, a graph that cannot be read
-// at the start, or any other error, after printing the faults found before it. The run
-// report (data-model.md) is written to `--report` however the run ends, once its arguments
-// are read. FR-011's check (`check-book`, T030) is not yet run: exit 0 is provisional.
+// 2 on bad arguments, a `--report` that exists or cannot be written, an `--out` that is not
+// absent or empty, in a folder the run cannot write, or a mount point, a graph that cannot
+// be read at the start, or any other error, after printing the faults found before it; a
+// signal is 128 and its number. The run report (data-model.md) is written to `--report`
+// however the run ends once its arguments and report are accepted, a signal's included.
+// FR-011's check (`check-book`, T030) is not yet run: exit 0 is provisional.
 import {
+  accessSync,
+  constants as fsConstants,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   renameSync,
@@ -117,16 +122,52 @@ export function bookSettings(
   };
 }
 
-/** Why `--out` cannot be written, or null: it must be absent or an empty folder. */
-export function outProblem(out: string): string | null {
-  const parent = dirname(resolve(out));
-  if (!existsSync(parent) || !statSync(parent).isDirectory()) {
+/**
+ * Why `--out` cannot be written, or null: it must be absent or an empty folder, in a folder
+ * the run can write (the book is written beside it and renamed into place), and not a mount
+ * point (on another device than its parent), which a rename cannot replace.
+ *
+ * @param stat how a path is read (a test gives one that puts `--out` on another device)
+ */
+export function outProblem(
+  out: string,
+  stat: (path: string) => { dev: number; isDirectory(): boolean } = statSync
+): string | null {
+  const target = resolve(out);
+  const parent = dirname(target);
+  if (!existsSync(parent) || !stat(parent).isDirectory()) {
     return `--out ${out}: its folder ${parent} does not exist`;
   }
-  if (!existsSync(out)) return null;
-  if (!statSync(out).isDirectory()) return `--out ${out} is not a folder`;
-  if (readdirSync(out).length > 0) {
+  try {
+    accessSync(parent, fsConstants.W_OK | fsConstants.X_OK);
+  } catch {
+    return `--out ${out}: its folder ${parent} cannot be written`;
+  }
+  if (!existsSync(target)) return null;
+  const folder = stat(target);
+  if (!folder.isDirectory()) return `--out ${out} is not a folder`;
+  if (folder.dev !== stat(parent).dev) {
+    return `--out ${out} is a mount point, which the finished book cannot be moved onto`;
+  }
+  if (readdirSync(target).length > 0) {
     return `--out ${out} is not empty: an old book is never replaced in place`;
+  }
+  return null;
+}
+
+/**
+ * Why `--report` cannot be written, or null, its folder made if need be: an earlier run's
+ * report is never replaced, as `figures` refuses one (T046), and a report whose folder
+ * cannot be made is found before the book is made, not after.
+ */
+export function reportProblem(report: string): string | null {
+  if (existsSync(report)) return `--report must not exist: ${report}`;
+  const folder = dirname(resolve(report));
+  try {
+    mkdirSync(folder, { recursive: true });
+    accessSync(folder, fsConstants.W_OK | fsConstants.X_OK);
+  } catch (error) {
+    return `--report ${report}: its folder cannot be written: ${message(error)}`;
   }
   return null;
 }
@@ -208,26 +249,62 @@ export async function bookCommand(
     err(`${error.message}\n`);
     return 2;
   }
+  // an earlier run's report is never replaced, and no report is written for the refusal
+  const unreportable = settings.report === null ? null : reportProblem(settings.report);
+  if (unreportable) {
+    err(`${unreportable}\n`);
+    return 2;
+  }
   const started = performance.now();
   const report = emptyReport(settings);
+  const writeReport = (): boolean => {
+    report.seconds = seconds(performance.now() - started);
+    if (settings.report === null) return true;
+    try {
+      writeAtomically(settings.report, `${JSON.stringify(report, null, 2)}\n`);
+      return true;
+    } catch (failure) {
+      err(`The run report was not written: ${message(failure)}\n`);
+      return false;
+    }
+  };
   const end = (code: number, error: unknown = null): number => {
+    for (const signal of SIGNALS) process.off(signal, onSignal);
     for (const fault of report.faults) out(`fault ${fault}\n`);
     if (error !== null) {
       report.error = message(error);
       err(`The book was not written: ${report.error}\n`);
     }
     report.outcome = code === 0 ? 'written' : code === 1 ? 'faults' : 'error';
-    report.seconds = seconds(performance.now() - started);
-    if (settings.report !== null) {
-      try {
-        writeAtomically(settings.report, `${JSON.stringify(report, null, 2)}\n`);
-      } catch (failure) {
-        err(`The run report was not written: ${message(failure)}\n`);
-        return 2;
-      }
-    }
-    return code;
+    return writeReport() ? code : 2;
   };
+
+  // A signal stops the run from its start: the book's folder removed, the report written
+  // naming it, and the process exited as one the signal stopped (128 and its number), so
+  // the exit handlers run: the printer's, which removes its pages' folder
+  // (src/print/print.ts), and the browser launcher's, which ends the browser and removes its
+  // profile. A signal while the browser is launching is held until the launch ends, as the
+  // launcher registers its folders for removal only once the browser has started.
+  let folder: string | null = null;
+  // set by the handler, read after the launch: an object, as a closure sets it
+  const signals: { held: boolean; signalled: NodeJS.Signals | null } = {
+    held: false,
+    signalled: null,
+  };
+  const stop = (signal: NodeJS.Signals): void => {
+    if (folder !== null) rmSync(folder, { recursive: true, force: true });
+    report.outcome = 'error';
+    report.error = `stopped by ${signal}`;
+    err(`The book was not written: ${report.error}\n`);
+    writeReport();
+    process.exit(128 + osConstants.signals[signal]);
+  };
+  const onSignal = (signal: NodeJS.Signals): void => {
+    if (signals.signalled !== null) return;
+    signals.signalled = signal;
+    if (!signals.held) stop(signal);
+  };
+  for (const signal of SIGNALS) process.on(signal, onSignal);
 
   const problem = outProblem(settings.out);
   if (problem) return end(2, problem);
@@ -273,22 +350,20 @@ export async function bookCommand(
 
   // the book, printed into a folder beside its name and moved into place at the end
   const target = resolve(settings.out);
-  const folder = mkdtempSync(join(dirname(target), `.${basename(target)}-`));
   let printer: BookPrinter | undefined;
-  // a run stopped by a signal removes its folder too, and exits as one stopped by it does
-  // (128 and its number), so the exit handlers run: the printer's, which removes its pages'
-  // folder (src/print/print.ts), and the browser's launcher's, which ends the browser
-  const stop = (signal: NodeJS.Signals) => {
-    rmSync(folder, { recursive: true, force: true });
-    process.exit(128 + osConstants.signals[signal]);
-  };
-  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
-  for (const signal of signals) process.once(signal, stop);
   let written: Written | undefined;
   let failure: unknown = null;
   const characters = new BookCharacters();
   try {
-    printer = await (io.startPrinter ?? startPrinter)();
+    folder = mkdtempSync(join(dirname(target), `.${basename(target)}-`));
+    signals.held = true;
+    try {
+      printer = await (io.startPrinter ?? startPrinter)();
+    } finally {
+      // a signal held through the launch acts now, whether it began the browser or not
+      signals.held = false;
+      if (signals.signalled !== null) stop(signals.signalled);
+    }
     written = await writeBook(docs, characters, {
       figures: settings.figures,
       site: settings.site,
@@ -310,8 +385,7 @@ export async function bookCommand(
     } catch (error) {
       err(`The printer did not close: ${message(error)}\n`);
     }
-    if (failure !== null) rmSync(folder, { recursive: true, force: true });
-    for (const signal of signals) process.off(signal, stop);
+    if (failure !== null && folder !== null) rmSync(folder, { recursive: true, force: true });
   }
   report.characters.replaced = counts(written?.replaced ?? characters.replaced);
   if (failure !== null) {
@@ -346,6 +420,9 @@ export async function bookCommand(
   );
   return end(0);
 }
+
+/** The signals a run is stopped by, its folder removed and its report written first. */
+const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 
 const startPrinter = async (): Promise<BookPrinter> => {
   // loaded only here: it starts a browser

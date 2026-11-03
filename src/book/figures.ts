@@ -6,13 +6,24 @@
 // (FR-017, src/figures/labels.ts); the second half of the character check, over its labels'
 // text, is made before each part that draws it is printed (contracts/cli.md), a fault
 // there naming the event the file is named for.
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { labelsInBook } from '../figures/labels.ts';
 import { BookCharacters } from '../layout/characters.ts';
 import { figureKey, type FigureSvgs } from '../layout/figure.ts';
 import type { Document } from '../model/types.ts';
+
+/** Faults found while the book is printed, each a line as the preflight's are. */
+export class BookFaults extends Error {
+  override name = 'BookFaults';
+  readonly faults: readonly string[];
+
+  constructor(faults: readonly string[]) {
+    super(`The book's faults: ${faults.join(', ')}`);
+    this.faults = faults;
+  }
+}
 
 /** What one drawing of a figure gives: its faults, and the substitutions it makes. */
 export interface FigureCheck {
@@ -38,7 +49,7 @@ export class FolderFigures implements FigureSvgs {
     }
   }
 
-  /** Milliseconds spent reading and checking the folder's files, summed. */
+  /** Milliseconds spent reading the folder's files and making their labels' substitutions. */
   get ms(): number {
     return this.#ms;
   }
@@ -49,8 +60,11 @@ export class FolderFigures implements FigureSvgs {
     if (stId === undefined) return undefined;
     const started = performance.now();
     try {
-      const path = join(this.#folder, `${stId}.svg`);
-      return { stId, svg: existsSync(path) ? readFileSync(path, 'utf8') : null };
+      return { stId, svg: readFileSync(join(this.#folder, `${stId}.svg`), 'utf8') };
+    } catch (error) {
+      // a file gone since the preflight (deleted by hand) is a fault, not an error
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { stId, svg: null };
+      throw error;
     } finally {
       this.#ms += performance.now() - started;
     }
@@ -81,11 +95,21 @@ export class FolderFigures implements FigureSvgs {
     return checked;
   }
 
-  /** A figure's SVG as the book prints it, read from its file; none for one not given. */
+  /**
+   * A figure's SVG as the book prints it, read from its file; none for a key no event of the
+   * book has. A file gone since the preflight throws its `missing-file` fault, so a section
+   * or a cover is never printed without its figure.
+   */
   get(key: string): string | undefined {
     const read = this.#read(key);
-    if (!read || read.svg === null) return undefined;
-    // the counts are the run's, made by check() for each drawing, so these are let go
-    return labelsInBook(read.svg, read.stId, new BookCharacters());
+    if (!read) return undefined;
+    if (read.svg === null) throw new BookFaults([`missing-file ${read.stId}.svg`]);
+    const started = performance.now();
+    try {
+      // the counts are the run's, made by check() for each drawing, so these are let go
+      return labelsInBook(read.svg, read.stId, new BookCharacters());
+    } finally {
+      this.#ms += performance.now() - started;
+    }
   }
 }
