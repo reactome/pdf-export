@@ -21,7 +21,7 @@ import {
 import { PAGE, figureKey } from '../../src/layout/figure.ts';
 import { PROBE } from '../../src/layout/html.ts';
 import type { Document } from '../../src/model/types.ts';
-import { buildFixture, fixtureFigures, skipWithoutGraph, type Built } from './fixture.ts';
+import { bookPdf, buildFixture, fixtureFigures, skipWithoutGraph, type Built } from './fixture.ts';
 
 interface Item {
   text: string;
@@ -101,7 +101,7 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
     built = await buildFixture();
     browser = await chromium.launch();
     folder = mkdtempSync(join(tmpdir(), 'pdf-export-layout-'));
-    const figures = fixtureFigures(built.book, built.pathway);
+    const figures = fixtureFigures(...built.book, built.pathway);
     // the pathway's own figure taller than what is left of its page after its heading, and
     // a reaction's too wide for legible labels in portrait
     figures.set(figureKey(figureOf(built.pathway, 'R-HSA-90000100')), marked(400, 1200, 'TALL'));
@@ -231,9 +231,10 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
   });
 
   test("the book's probes print as links, one for each target; a single PDF has none", async () => {
-    const { html } = layoutBookPart(built.book, built.book.places, options);
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const { html } = layoutBookPart(alpha, alpha.places, options);
     const probes = [...html.matchAll(/<a class="probe" href="([^"]+)"><\/a>/g)].map((m) => m[1]);
-    assert.ok(probes.length > 10);
+    assert.ok(probes.length > 5);
     const printed = (await print(html, false)).pages
       .flatMap((page) => page.links)
       .filter((url) => url.startsWith(PROBE));

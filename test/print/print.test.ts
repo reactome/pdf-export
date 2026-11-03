@@ -19,7 +19,13 @@ import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { contentsTargets } from '../../src/print/contents.ts';
 import { Printer, movedPages } from '../../src/print/print.ts';
-import { buildFixture, fixtureFigures, skipWithoutGraph, type Built } from '../layout/fixture.ts';
+import {
+  bookPdf,
+  buildFixture,
+  fixtureFigures,
+  skipWithoutGraph,
+  type Built,
+} from '../layout/fixture.ts';
 
 /** A page's text, each piece with where it starts. */
 async function textOf(page: { getTextContent(): Promise<{ items: unknown[] }> }) {
@@ -169,7 +175,8 @@ describe('printing', { skip: skipWithoutGraph }, () => {
   });
 
   test("a part of the book is printed untagged, its links the layout's placeholders", async () => {
-    const part = layoutBookPart(built.book, built.book.places, options).html;
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const part = layoutBookPart(alpha, alpha.places, options).html;
     const printed = await printer.part(part);
     const task = getDocument({ data: printed.slice() });
     try {

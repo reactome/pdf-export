@@ -1,5 +1,5 @@
 // The document model (spec 001 T015, data-model.md): what the graph's rows become, before
-// any layout. The book and a single event's PDF are both made of these.
+// any layout. The book's PDFs and a single event's PDF are all made of these.
 import type { EventFacts, EventRef, Reference } from '../graph/queries.ts';
 
 export interface Release {
@@ -56,9 +56,9 @@ export type Place =
 
 export interface Cover {
   title: string;
-  /** The book's release, or none for a single event. */
+  /** The release, on each of the book's PDFs; none for a single event. */
   release: number | null;
-  /** A single pathway's diagram. */
+  /** The PDF's pathway's diagram: a single pathway's, or a book's PDF's top-level pathway's. */
   figure: Figure | null;
   /** Whether it notes that the PDF is an excerpt of the book. */
   excerpt: boolean;
@@ -74,10 +74,11 @@ export interface ContentsEntry {
 }
 
 export interface Document {
+  /** One of the book's PDFs, one per top-level pathway (FR-001), or a single event's. */
   kind: 'book' | 'single';
   release: Release;
   cover: Cover;
-  /** Every place in document order; a book's chapters are its top-level pathways. */
+  /** Every place in document order; a book's PDF has its top-level pathway at depth 0. */
   places: Place[];
   /** A single event's PDF at depth 0, or a reaction alone, has none (the Background). */
   contents: ContentsEntry[] | null;
