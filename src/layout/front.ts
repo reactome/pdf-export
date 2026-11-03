@@ -26,6 +26,13 @@ export const FRONT = {
   contents: 'contents',
 } as const;
 
+/** Each front part's name, as its running header gives it (FR-016). */
+export const FRONT_NAMES: Readonly<Record<keyof typeof FRONT, string>> = {
+  introduction: 'Introduction',
+  analysis: 'Analysis properties',
+  contents: 'Contents',
+};
+
 /**
  * Reactome's logo, the website's positive imagotype (content/about/logo.mdx, which invites
  * its use), with its own colours (FR-015).
