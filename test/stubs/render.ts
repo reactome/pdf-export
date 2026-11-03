@@ -4,11 +4,12 @@
 // given twice, a JSON error body, and Retry-After on a 503. It answers 400 to a query
 // parameter the contract does not name, so a wrongly named one fails a test instead of
 // passing silently, and refuses on request: 404, 500, 503, 504, a timeout, a body that stops
-// part way, or an answer that is not SVG, for one figure or every one. A test can also plant
-// text in a figure's first label, slow every answer, or silence the stub (every request held
-// unanswered, `/health`'s too). Its `/health` answers as the service's does, its `build` and
-// `files` settable, also from a hook run as each figure request is answered (T046), so a test can
-// change the deployment between a figure's render and the read after it.
+// part way (held, or its connection closed), or an answer that is not SVG, for one figure or
+// every one. A test can also plant text in a figure's first label, slow every answer, or
+// silence the stub (every request held unanswered, `/health`'s too). Its `/health` answers as
+// the service's does, its `build` and `files` settable, also from a hook run as each figure
+// request is answered (T046), so a test can change the deployment between a figure's render
+// and the read after it.
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -26,7 +27,7 @@ const PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
  * How to refuse: a status, no answer at all, an answer whose body stops part way, or an
  * answer that is not SVG.
  */
-export type Refusal = 404 | 500 | 503 | 504 | 'timeout' | 'stall-body' | 'not-svg';
+export type Refusal = 404 | 500 | 503 | 504 | 'timeout' | 'stall-body' | 'cut-body' | 'not-svg';
 
 /** The service's health answer (contracts/render.md). */
 export interface Health {
@@ -39,6 +40,8 @@ export interface RenderStub {
   url: string;
   /** Every request's path and query, in order. */
   requests: string[];
+  /** When each request came, by `Date.now()`, beside `requests`. */
+  times: number[];
   /** Refuse requests for a stable id, `times` times (every time without it). */
   refuse(stId: string, how: Refusal, times?: number): void;
   /** Refuse requests for every figure, `times` times in all (every time without it). */
@@ -91,6 +94,7 @@ function figure(
 
 export async function startRenderStub(): Promise<RenderStub> {
   const requests: string[] = [];
+  const times: number[] = [];
   const refusals = new Map<string, { how: Refusal; left: number }>();
   let every: { how: Refusal; left: number } | null = null;
   const labels = new Map<string, string>();
@@ -104,6 +108,7 @@ export async function startRenderStub(): Promise<RenderStub> {
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub');
     requests.push(url.pathname + url.search);
+    times.push(Date.now());
     if (silent) {
       hanging.add(res);
       return;
@@ -187,6 +192,12 @@ export async function startRenderStub(): Promise<RenderStub> {
         hanging.add(res);
         return;
       }
+      if (refusal.how === 'cut-body') {
+        // the connection closed part way through the body
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' });
+        res.write('<svg', () => res.destroy());
+        return;
+      }
       if (refusal.how === 'not-svg') {
         res.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
         return;
@@ -212,6 +223,7 @@ export async function startRenderStub(): Promise<RenderStub> {
   return {
     url: `http://127.0.0.1:${String(port)}`,
     requests,
+    times,
     refuse(stId, how, times = -1) {
       refusals.set(stId, { how, left: times });
     },
@@ -241,6 +253,7 @@ export async function startRenderStub(): Promise<RenderStub> {
       delayMs = 0;
       Object.assign(health, { build: '000000000000', files: 'local' });
       requests.length = 0;
+      times.length = 0;
     },
     async close() {
       // A timed-out request's response is held open; close it with the connections, so the

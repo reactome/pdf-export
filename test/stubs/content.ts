@@ -14,7 +14,7 @@ export interface ContentStub {
   release: number;
   /** Hold every request from now on unanswered. */
   silence(): void;
-  /** The release back to 98, the silence ended and the requests forgotten. */
+  /** The release back to 98, the silence ended, held answers dropped, the requests forgotten. */
   reset(): void;
   close(): Promise<void>;
 }
@@ -30,6 +30,8 @@ export async function startContentStub(): Promise<ContentStub> {
       silent = true;
     },
     reset() {
+      for (const res of hanging) res.destroy();
+      hanging.clear();
       silent = false;
       stub.release = 98;
       stub.requests.length = 0;

@@ -4,6 +4,7 @@
 // a planted character comes from a graph that rewrites its rows.
 import assert from 'node:assert/strict';
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdtempSync,
@@ -155,7 +156,9 @@ describe('pdf-export figures', { skip }, () => {
       out,
       err,
       dir,
-      report: JSON.parse(readFileSync(settings['--report'] ?? '', 'utf8')) as FiguresReport,
+      report: existsSync(settings['--report'] ?? '')
+        ? (JSON.parse(readFileSync(settings['--report'] ?? '', 'utf8')) as FiguresReport)
+        : ({} as FiguresReport),
       lines: existsSync(manifest)
         ? readFileSync(manifest, 'utf8')
             .split('\n')
@@ -284,6 +287,17 @@ describe('pdf-export figures', { skip }, () => {
     assert.ok(!run.files.includes(`${first ?? ''}.svg`));
   });
 
+  test('files no longer local, read after a figure, stop the run likewise', async () => {
+    render.onRender((stId) => {
+      if (stId === REACTION) render.health.files = 'download';
+    });
+    const run = await figures({ '--parallel': '1' });
+    assert.equal(run.code, 1);
+    assert.ok(!run.files.includes(`${REACTION}.svg`));
+    assert.ok(!figureLines(run).includes(REACTION));
+    assert.equal(run.report.stopped?.reason, 'deployment-changed');
+  });
+
   test('a content release changed likewise stops the run', async () => {
     render.onRender((stId) => {
       if (stId === REACTION) content.release = 99;
@@ -333,6 +347,22 @@ describe('pdf-export figures', { skip }, () => {
     );
   });
 
+  test('a figure unanswered after its retry, health unchanged, is named and leaves no complete', async () => {
+    render.refuse(REACTION, 504);
+    const run = await figures();
+    assert.equal(run.code, 1);
+    assert.equal(run.report.stopped, null);
+    assert.deepEqual(
+      run.report.missing.map(({ stId, cause }) => [stId, cause]),
+      [[REACTION, 'unanswered']]
+    );
+    assert.match(run.out, new RegExp(`^fault missing-figure ${REACTION} unanswered$`, 'm'));
+    assert.ok(!hasComplete(run));
+    assert.ok(!run.files.includes(`${REACTION}.svg`));
+    const rest = [...expected.keys()].filter((stId) => stId !== REACTION);
+    assert.deepEqual(figureLines(run).sort(), rest.sort());
+  });
+
   test('a content service not answering the read after a figure stops the run', async () => {
     render.onRender((stId) => {
       if (stId === REACTION) content.silence();
@@ -362,13 +392,29 @@ describe('pdf-export figures', { skip }, () => {
 
   test('a render service answering its health but 504 to every figure trips the breaker', async () => {
     render.refuseAll(504);
-    const run = await figures();
+    // one at a time: the breaker is two figures unanswered in a row, each tried twice
+    const run = await figures({ '--parallel': '1' });
     assert.equal(run.code, 1);
     assert.equal(run.report.stopped?.reason, 'breaker-unanswered');
     assert.ok(!hasComplete(run));
-    // two at once: four figures unanswered, each tried twice
-    assert.ok(run.report.missing.length <= 5, String(run.report.missing.length));
+    assert.equal(run.report.missing.length, 2);
+    assert.equal(renders().length, 4);
     assert.ok(run.report.missing.every(({ cause }) => cause === 'unanswered'));
+  });
+
+  test('figures unanswered with answers between them do not trip the breaker', async () => {
+    // one at a time, every third or so unanswered (by sources no other figure draws), never
+    // two in a row: each answer between them starts the count again
+    const sources = ['R-HSA-90000220', 'R-HSA-90000251', REACTION, 'R-HSA-90000216'];
+    for (const source of sources) render.refuse(source, 504);
+    const run = await figures({ '--parallel': '1' });
+    assert.equal(run.code, 1);
+    assert.equal(run.report.stopped, null);
+    assert.deepEqual(
+      run.report.missing.map(({ stId }) => stId),
+      sources
+    );
+    assert.equal(figureLines(run).length, expected.size - sources.length);
   });
 
   test('ten figures in a row failing (500) do not trip the breaker', async () => {
@@ -401,14 +447,28 @@ describe('pdf-export figures', { skip }, () => {
 
   test('no figure answered for five timeouts, its health answering, trips the breaker', async () => {
     // every figure slower than its timeout, ten at once (the count's 20 is never reached), a
-    // retry's pause of 1 s: no figure has an answer of any kind before 1.5 s
+    // retry's pause of 0.6 s: each figure takes 1.4 s, the eighteen 2.8 s, and the breaker's
+    // silence is 2 s (five timeouts of 0.4 s, above three and the pause, 1.8 s)
     render.slow(5000);
-    const started = Date.now();
-    const run = await figures({ '--parallel': '10', '--timeout': '0.3' }, undefined, 1000);
+    const run = await figures({ '--parallel': '10', '--timeout': '0.4' }, undefined, 600);
+    const drawing = render.times.at(render.requests.findIndex((p) => p.startsWith('/render/')));
+    const ended = Date.now();
     assert.equal(run.code, 1);
     assert.equal(run.report.stopped?.reason, 'breaker-silent');
-    assert.ok(Date.now() - started < 2500, String(Date.now() - started));
+    assert.match(run.report.stopped.detail, /for 2 s$/);
+    // timed from the drawing's start, after the preflight
+    assert.ok(drawing !== undefined && ended - drawing < 2300, String(ended - (drawing ?? 0)));
     assert.deepEqual(figureLines(run), []);
+  });
+
+  test("a healthy service's pause after a 503 does not trip the silent breaker", async () => {
+    // a timeout of 1 s, the service's own pause of 5 s: five timeouts would end the run
+    // during the first figure's pause
+    const [first] = [...expected.values()];
+    render.refuse(first?.source ?? '', 503, 1);
+    const run = await figures({ '--parallel': '1', '--timeout': '1' }, undefined, 5000);
+    assert.equal(run.code, 0, JSON.stringify(run.report.stopped));
+    assert.ok(hasComplete(run));
   });
 
   test('an unreachable content or render service is exit 2', async () => {
@@ -423,6 +483,26 @@ describe('pdf-export figures', { skip }, () => {
     assert.equal(noRender.code, 2);
     assert.match(noRender.err, /render service cannot be read/);
     assert.deepEqual(renders(), []);
+    // probed before the preflight: said at once, though the preflight would find a fault
+    const files = scratch();
+    cpSync(FILES, files, { recursive: true });
+    unlinkSync(join(files, 'diagram', `${ALPHA}.graph.json`));
+    const first = await figures({ '--render': goneRender.url, '--files': files });
+    assert.equal(first.code, 2);
+    assert.deepEqual(first.report.preflight, []);
+  });
+
+  test("the fingerprint is the deployment's after the preflight, not the probe's", async () => {
+    // a build changed while the preflight runs: the folder is the new build's, and whole
+    const run = await figures({}, (settings, options) =>
+      rewriting(openGraph(settings, options), (row, query) => {
+        if (query.includes('WHERE r:ReactionLikeEvent')) render.health.build = '222222222222';
+        return row;
+      })
+    );
+    assert.equal(run.code, 0, run.err);
+    assert.equal(run.lines[0]?.['build'], '222222222222');
+    assert.ok(hasComplete(run));
   });
 
   test('a content service answering another release is refused before any drawing', async () => {
@@ -434,7 +514,7 @@ describe('pdf-export figures', { skip }, () => {
     assert.deepEqual(run.files, []);
   });
 
-  test('a missing release file and an uncovered character each fail before any request', async () => {
+  test('a missing release file and an uncovered character each fail before any figure is asked for', async () => {
     const files = scratch();
     cpSync(FILES, files, { recursive: true });
     unlinkSync(join(files, 'diagram', `${ALPHA}.graph.json`));
@@ -449,8 +529,9 @@ describe('pdf-export figures', { skip }, () => {
     );
     assert.equal(uncovered.code, 1);
     assert.match(uncovered.out, /^fault uncovered-character U\+2030 R-HSA-90000211$/m);
-    assert.deepEqual(render.requests, []);
-    assert.deepEqual(content.requests, []);
+    // only the deployment's probes, made before the preflight
+    assert.deepEqual(render.requests, ['/health', '/health']);
+    assert.deepEqual(content.requests, ['/data/database/version', '/data/database/version']);
     assert.deepEqual(uncovered.report.preflight, ['uncovered-character U+2030 R-HSA-90000211']);
   });
 
@@ -471,7 +552,61 @@ describe('pdf-export figures', { skip }, () => {
     assert.equal(run.code, 2);
     assert.match(run.err, /the graph failed/);
     assert.match(run.out, new RegExp(`^fault missing-file diagram/${ALPHA}.graph.json$`, 'm'));
+    assert.deepEqual(renders(), []);
+  });
+
+  test("an existing --report is refused before anything else, an earlier run's report kept", async () => {
+    const work = scratch();
+    const report = join(work, 'report.json');
+    writeFileSync(report, '{"complete":true}\n');
+    const run = await figures({ '--out': join(work, 'figures'), '--report': report });
+    assert.equal(run.code, 2);
+    assert.match(run.err, /--report must not exist/);
+    assert.equal(readFileSync(report, 'utf8'), '{"complete":true}\n');
     assert.deepEqual(render.requests, []);
+    assert.deepEqual(content.requests, []);
+  });
+
+  test("a refusal writes its report, the report's folder made, its exit kept", async () => {
+    content.release = 97;
+    const work = scratch();
+    const report = join(work, 'runC', 'report.json');
+    const run = await figures({ '--out': join(work, 'runC'), '--report': report });
+    assert.equal(run.code, 2);
+    assert.match(run.report.refused ?? '', /release 97/);
+    assert.deepEqual(readdirSync(join(work, 'runC')), ['report.json']);
+  });
+
+  test('a report that cannot be written is said, and the run keeps its exit', async () => {
+    const work = scratch();
+    const notFolder = join(work, 'a-file');
+    writeFileSync(notFolder, '');
+    const run = await figures({ '--report': join(notFolder, 'report.json') });
+    assert.equal(run.code, 0, run.err);
+    assert.match(run.err, /The report could not be written/);
+    assert.ok(hasComplete(run));
+  });
+
+  test("the run's own error is exit 2, the figures' faults so far printed", async () => {
+    const work = scratch();
+    const dir = join(work, 'figures');
+    const [first] = [...expected.values()];
+    render.refuse(first?.source ?? '', 404);
+    let drawn = 0;
+    render.onRender((_stId, refused) => {
+      // the folder made read-only: the next file cannot be written
+      if (!refused && ++drawn === 2) chmodSync(dir, 0o500);
+    });
+    try {
+      const run = await figures({ '--out': dir, '--parallel': '1' });
+      assert.equal(run.code, 2);
+      assert.match(run.err, /The figures' run stopped: EACCES/);
+      assert.match(run.out, new RegExp(`^fault missing-figure ${first?.stId ?? ''} refused$`, 'm'));
+      assert.equal(run.report.stopped?.reason, 'error');
+      assert.ok(!hasComplete(run));
+    } finally {
+      chmodSync(dir, 0o700);
+    }
   });
 
   test('a figure timing out once, and one answering 504 once, are drawn on their retry', async () => {

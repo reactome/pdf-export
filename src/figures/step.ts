@@ -1,20 +1,24 @@
 // `pdf-export figures` (spec 001 T046; contracts/cli.md, contracts/figures.md, SC-010): draws
 // every figure the book needs, before the book, into a folder the book reads. In order:
-// - the settings, and an `--out` that is absent or empty (exit 2 otherwise: no resuming);
+// - the settings; a `--report` that exists already (exit 2, its file untouched); an `--out`
+//   that is absent or empty (exit 2 otherwise: no resuming);
 // - the graph's release and checksum (none, or no graph, is exit 2);
+// - a probe of the render service's health (`build` not `unknown`, `files: local`) and the
+//   content service's release, which must be the graph's (exit 2 otherwise), so a service
+//   down is said before the preflight's minutes;
 // - the book's figures by the Figure rules, built as `book` builds them (T048's `buildBook`
 //   and the EHLD summary), and T024's release-file and pre-drawing character checks, before
-//   any request is made (a fault is exit 1);
-// - the render service's health (`build` not `unknown`, `files: local`) and the content
-//   service's release, which must be the graph's (exit 2 otherwise);
+//   any figure is asked for (a fault is exit 1);
+// - the same read again, its values the folder's fingerprint;
 // - each figure drawn through T014's client, its 504s and timeouts retried once, checked for
 //   its labels' characters (T024's `labelsInBook`), written beside its name, synced and moved
 //   into place, and given its manifest line only once the render service's `build` and the
 //   content release, read again, still equal the fingerprint's.
 // A figure's own fault (missing, or failing its label check) leaves it with no file and no
 // line while the rest are drawn; a deployment changed or gone, or the breaker, stops the run at
-// once. Either way the run ends with exit 1 and no `complete` line, and its report is written
-// however it ends. One writer appends the manifest, synchronously, so lines never interleave.
+// once. Either way the run ends with exit 1 and no `complete` line. Its report is written
+// however the run ends, but for a signal and a `--report` refused. One writer appends the
+// manifest, synchronously, so lines never interleave.
 import {
   closeSync,
   existsSync,
@@ -26,9 +30,8 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-  writeSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   graphSettings,
@@ -264,9 +267,12 @@ export async function drawFigures(figures: readonly FigureRecord[], draw: Draw):
   mkdirSync(out, { recursive: true });
   const manifest = openSync(join(out, MANIFEST), 'wx');
   /** The one writer: a line written and synced before anything else runs. */
+  let lines = 0;
   const append = (line: ManifestLine): void => {
-    writeSync(manifest, manifestLine(line));
+    // writeFileSync on a descriptor writes until every byte is written, or throws (a full disk)
+    writeFileSync(manifest, manifestLine(line));
     fsyncSync(manifest);
+    if (line.type === 'figure') lines += 1;
   };
   const stop = new AbortController();
   const halt = (reason: StopReason, detail: string): void => {
@@ -274,8 +280,10 @@ export async function drawFigures(figures: readonly FigureRecord[], draw: Draw):
     report.stopped = { reason, detail };
     stop.abort(new Error(`${reason}: ${detail}`));
   };
-  // the breaker: figures unanswered in a row, or no answer of any kind for a while
-  const silence = 5 * timeoutMs;
+  // the breaker: figures unanswered in a row, or no answer of any kind for a while; never less
+  // than one figure's two tries and the pause between them, and a read, so a healthy service
+  // asking for its pause is not taken for a silent one
+  const silence = Math.max(5 * timeoutMs, 3 * timeoutMs + draw.retryPauseMs);
   let unanswered = 0;
   const breaker = setTimeout(() => {
     halt('breaker-silent', `no figure answered for ${String(silence / 1000)} s`);
@@ -360,13 +368,14 @@ export async function drawFigures(figures: readonly FigureRecord[], draw: Draw):
     const part = `${file}.part`;
     const fd = openSync(part, 'wx');
     try {
-      writeSync(fd, answer.svg);
+      writeFileSync(fd, answer.svg);
       fsyncSync(fd);
     } finally {
       closeSync(fd);
     }
     renameSync(part, file);
-    if ((await unchanged()) && !stop.signal.aborted) {
+    // unchanged() is false once the run has stopped, so no line follows a stop
+    if (await unchanged()) {
       append({ type: 'figure', ...record });
       if (times) times.written += 1;
     } else {
@@ -394,7 +403,9 @@ export async function drawFigures(figures: readonly FigureRecord[], draw: Draw):
     append({ type: 'fingerprint', ...fingerprint });
     await Promise.all(Array.from({ length: Math.min(parallel, figures.length) }, worker));
     if (failed.error) throw failed.error;
-    if (stop.signal.aborted || report.missing.length > 0) return false;
+    if (stop.signal.aborted || report.missing.length > 0 || lines !== figures.length) {
+      return false;
+    }
     append({ type: 'complete', ...fingerprint });
     return true;
   } finally {
@@ -435,6 +446,11 @@ export async function figuresCommand(
     err(`${error.message}\n`);
     return 2;
   }
+  // an earlier run's report is never overwritten: refused, and no report written
+  if (settings.report !== null && existsSync(settings.report)) {
+    err(`--report must not exist: ${settings.report}\n`);
+    return 2;
+  }
   const report: FiguresReport = {
     release: {},
     refused: null,
@@ -459,9 +475,22 @@ export async function figuresCommand(
     return 2;
   } finally {
     report.elapsedMs = Math.round(performance.now() - started);
-    if (settings.report !== null) {
-      writeFileSync(settings.report, `${JSON.stringify(report, null, 2)}\n`);
-    }
+    if (settings.report !== null) writeReport(settings.report, report, err);
+  }
+}
+
+/**
+ * The report, written beside its name and moved into place, its folder made if need be. A
+ * report that cannot be written is said on `err`, and the run keeps the exit it earned.
+ */
+function writeReport(path: string, report: FiguresReport, err: (text: string) => void): void {
+  const part = `${path}.part`;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(part, `${JSON.stringify(report, null, 2)}\n`);
+    renameSync(part, path);
+  } catch (error) {
+    err(`The report could not be written: ${describe(error)}\n`);
   }
 }
 
@@ -502,7 +531,11 @@ async function steps(
   if (release.checksum === null) return refuse('The graph has no DBInfo checksum');
   report.release.checksum = release.checksum;
 
-  // the figures by the Figure rules, and the preflight's checks, before any request
+  // the deployment probed before the preflight's minutes, so a service down is said at once
+  const probe = await readDeployment(settings, release.release, report, refuse);
+  if (typeof probe === 'number') return probe;
+
+  // the figures by the Figure rules, and the preflight's checks, before any figure is asked for
   const summary = readSummary(settings.files);
   if (!summary) report.preflight.push(`missing-file ${SUMMARY}`);
   let figures: FigureRecord[] = [];
@@ -542,7 +575,51 @@ async function steps(
     entry.needed += 1;
   }
 
-  // the deployment: its build and files, and the content service's release
+  // the deployment read again just before drawing: the fingerprint's values
+  const deployment = await readDeployment(settings, release.release, report, refuse);
+  if (typeof deployment === 'number') return deployment;
+  const { build, content } = deployment;
+
+  const fingerprint: Fingerprint = {
+    release: release.release,
+    checksum: release.checksum,
+    summary: summary?.hash ?? '',
+    content,
+    build,
+  };
+  let complete: boolean;
+  try {
+    complete = await drawFigures(figures, {
+      render: settings.render,
+      content: settings.content,
+      out: settings.out,
+      parallel: settings.parallel,
+      timeoutMs: settings.timeoutMs,
+      retryPauseMs,
+      fingerprint,
+      report,
+    });
+  } finally {
+    // the figures' own faults so far, however the drawing ended (its own error included)
+    for (const { stId, cause } of report.missing) out(`fault missing-figure ${stId} ${cause}\n`);
+  }
+  report.complete = complete;
+  if (report.stopped) err(`stopped: ${report.stopped.reason}: ${report.stopped.detail}\n`);
+  const written = Object.values(report.figures).reduce((sum, kind) => sum + kind.written, 0);
+  err(`${String(written)} of ${String(figures.length)} figures in ${settings.out}\n`);
+  return complete ? 0 : 1;
+}
+
+/**
+ * The render service's health and the content service's release, each refused as the start's
+ * check refuses them (its exit, 2), or the build and the release, recorded in the report.
+ */
+async function readDeployment(
+  settings: FiguresSettings,
+  release: number,
+  report: FiguresReport,
+  refuse: (why: string) => number
+): Promise<{ build: string; content: number } | number> {
   let health: { build: string; files: string };
   try {
     health = await readHealth(settings.render, settings.timeoutMs);
@@ -559,35 +636,12 @@ async function steps(
     return refuse(`The content service cannot be read: ${describe(error)}`);
   }
   report.release.content = content;
-  if (content !== release.release) {
+  if (content !== release) {
     return refuse(
-      `The content service answers release ${String(content)}, the graph is release ${String(release.release)}`
+      `The content service answers release ${String(content)}, the graph is release ${String(release)}`
     );
   }
-
-  const fingerprint: Fingerprint = {
-    release: release.release,
-    checksum: release.checksum,
-    summary: summary?.hash ?? '',
-    content,
-    build: health.build,
-  };
-  const complete = await drawFigures(figures, {
-    render: settings.render,
-    content: settings.content,
-    out: settings.out,
-    parallel: settings.parallel,
-    timeoutMs: settings.timeoutMs,
-    retryPauseMs,
-    fingerprint,
-    report,
-  });
-  report.complete = complete;
-  for (const { stId, cause } of report.missing) out(`fault missing-figure ${stId} ${cause}\n`);
-  if (report.stopped) err(`stopped: ${report.stopped.reason}: ${report.stopped.detail}\n`);
-  const written = Object.values(report.figures).reduce((sum, kind) => sum + kind.written, 0);
-  err(`${String(written)} of ${String(figures.length)} figures in ${settings.out}\n`);
-  return complete ? 0 : 1;
+  return { build: health.build, content };
 }
 
 const describe = (error: unknown): string =>

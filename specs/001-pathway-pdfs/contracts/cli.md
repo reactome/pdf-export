@@ -17,7 +17,7 @@ contracts/figures.md).
 | `--out`                              |                   | the folder written (contracts/figures.md)                                                                                                                            |
 | `--parallel`                         |                   | figures asked at once; default 2, the service's own default; set it to the service's `RENDER_CONCURRENCY`                                                            |
 | `--timeout`                          |                   | seconds the client waits for each attempt at a figure, and for each health or release read; default 60; above the render service's own timeout (contracts/render.md) |
-| `--report`                           |                   | where its run report is written, as JSON                                                                                                                             |
+| `--report`                           |                   | where its run report is written, as JSON; a file there already is refused (exit 2)                                                                                   |
 
 - **Which figures:** the events' Figure rules (data-model.md), from the graph and the
   EHLD summary, the same code `book` uses, so the folder holds exactly what the book
@@ -29,20 +29,25 @@ contracts/figures.md).
   must answer the graph's release (`GET /data/database/version`), the graph must carry a
   `DBInfo` checksum, and the render service's health answer a `build` other than
   `unknown` and `files: local` (contracts/render.md), or the run is refused before anything is drawn
-  (exit 2). What this cannot see is in contracts/figures.md.
+  (exit 2). Both services are probed before the preflight, so one down is said at once, and
+  read again after it for the folder's fingerprint; the preflight asks for no figure. What
+  this cannot see is in contracts/figures.md.
 - **One run, one folder:** `--out` must be empty or absent (exit 2 otherwise); a
   stopped run is not resumed. The manifest (contracts/figures.md) records the folder's
   fingerprint and what each file draws.
 - **Exit 0:** every figure is in the folder. **Exit 1:** a preflight fault
   (`missing-file`, `uncovered-character`, `bad-file`), a label fault after drawing, or a figure that
   could not be drawn, each named by stable identifier or file name. **Exit 2:** bad
-  arguments; the render or content service unreachable at the start; another release
+  arguments; a `--report` file that exists already (the earlier run's report kept, and none
+  written); the render or content service unreachable at the start; another release
   at `--content`; no graph checksum, no render `build`, or a render service not reading local files; or an `--out` that is not
   empty. A `build` or content release that changes during the run, a render or content
   service that stops answering, or the breaker, is exit 1 (contracts/figures.md).
   Any other error (the graph failing during the checks, a file that cannot be written) is
-  exit 2, its error on stderr, the run stopped and its report written. The output's lines
-  and the report are in contracts/figures.md.
+  exit 2, its error on stderr, the figures' own faults so far printed, the run stopped and
+  its report written. The report is written however the run ends but two: a signal, and a
+  `--report` refused; one that cannot be written is said on stderr, and the run keeps its
+  exit. The output's lines and the report are in contracts/figures.md.
 
 ## `pdf-export book`
 

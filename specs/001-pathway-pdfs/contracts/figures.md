@@ -65,8 +65,8 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   but for `ancestor`).
 - **A deployment changed, a service gone, or the breaker tripped, during a run** stops it
   at once with exit 1 and no `complete` line.
-  Figures still being drawn when it stops get no line. The report is written either way,
-  naming the reason it stopped and each figure's own fault so far.
+  Figures still being drawn when it stops get no line. The report is written either way
+  (not on a signal), naming the reason it stopped and each figure's own fault so far.
 - **What the fingerprint cannot see** (research R10):
   - the render service's `build` hashes its own code, not the website's built page it
     loads, which is what draws;
@@ -102,7 +102,11 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
   holding no names, only stable identifiers, kinds, times and counts. Any other file
   is ignored, so a folder drawn for a release can be read again by a book made from the
   same graph.
-- **The run report** (`--report`, JSON; T046), written however the run ends: `release`
+- **The run report** (`--report`, JSON; T046), written beside its name and moved into
+  place, its folder made if need be, however the run ends but on a signal; a `--report`
+  that exists already is refused (exit 2) and no report is written, so an earlier run's
+  is never replaced; a report that cannot be written is said on stderr, the run keeping
+  its exit. Its fields: `release`
   (the fingerprint, as far as it was read), `refused` (why the run was refused before
   drawing, exit 2), `preflight` (its faults, exit 1), `figures` (for each kind: `needed`,
   `drawn` by the render service, with `totalMs` and `maxMs`, retries included, and

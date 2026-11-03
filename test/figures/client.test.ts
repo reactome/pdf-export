@@ -116,6 +116,12 @@ describe('the figures client', () => {
       assert.deepEqual(await tries(how, true), { drawn: false, requests: 2 }, String(how));
       assert.deepEqual(await tries(how, true, 1), { drawn: true, requests: 2 }, String(how));
     }
+    // a body cut off by its connection closing is gone, not slow: not retried
+    assert.deepEqual(await tries('cut-body', true), { drawn: false, requests: 1 });
+    stub.reset();
+    stub.refuse(ALPHA, 'cut-body');
+    const cut = await ask({ kind: 'diagram', stId: ALPHA });
+    assert.deepEqual('missing' in cut && cut.cause, 'unanswered');
     // a 500 or a 404 is the figure's own: never retried
     assert.deepEqual(await tries(500, true), { drawn: false, requests: 1 });
     assert.deepEqual(await tries(404, true), { drawn: false, requests: 1 });
