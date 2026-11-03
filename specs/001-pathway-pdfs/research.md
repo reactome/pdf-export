@@ -253,11 +253,19 @@ synthetic documents, on this host under load.
     A letter's holes (the counters of B, O, d) lie within its outline and are left out
     before the vote, or a short label's holes could set its baseline. A line with
     ascenders (l, d, G) reads a little tall, by up to the ascender's height over the
-    capitals' (about 8% in Roboto), which errs large; a long name, which each
-    illustration's smallest label is, reads within a few percent. The cap height is taken
-    as a font's of the same cap height (0.71 of its size, Roboto's 0.711, Arial's 0.716).
-    A label transformed, or in a transformed group other than the render service's
-    viewport, is not read and leaves the figure unmeasured. Release 98's 221 illustrations, every one with labels, none
+    capitals' (about 8% in Roboto), which errs large; a line with neither capitals nor
+    ascenders reads its x-height, which errs small; a long name, which each illustration's
+    smallest label is, reads within a few percent. A line is the letters whose heights
+    overlap, directly or through others, so a dot or an accent does not split one; on a
+    tied vote the lower bottom is the baseline, so a mark set high is not. The cap height
+    is taken as a font's of the same cap height (0.71 of its size, Roboto's 0.711, Arial's
+    0.716). A label transformed (by attribute or style), or inside an element so
+    transformed other than the render service's viewport, inside a nested `<svg>`, or in
+    content not drawn where it stands (`<defs>`), is not read and leaves the figure
+    unmeasured. The viewport writes its scale twice, by attribute and by style to six
+    figures; the two must agree. Only the pathways' labels (`PATHWAY TEXT`) are read: the
+    illustrations' other lettering (`LABEL_TEXT`, and paths in groups named `TEXT`) is
+    about the same size at release 98, as #107's review measured. Release 98's 221 illustrations, every one with labels, none
     transformed:
     - every label's cap height is 8.49–8.94 of the file's units, a font of about 12 px,
       as the diagrams' labels are;

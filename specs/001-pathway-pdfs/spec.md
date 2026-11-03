@@ -330,7 +330,7 @@ of pages with today's book.
   - each event's name to its page on the website;
   - each figure to its interactive form on the website (user's decision, 3 Nov 2026): a
     pathway's diagram or illustration in the Pathway Browser, the event selected where an
-    ancestor's diagram draws it, and a reaction's figure to its page, which opens it there.
+    ancestor's diagram or illustration draws it, and a reaction's figure to its page, which opens it there.
 - **FR-004**: An event held by more than one pathway MUST be written in full once in a
   PDF, at its first place in document order. In the book, its later places MUST show a
   short entry (name and stable identifier) linked to that section.

@@ -25,12 +25,16 @@ function word(x: number, baseline: number, cap: number): string {
   ].join('');
 }
 
-/** An illustration as the render service gives one: its viewport scaled, its labels paths. */
+/**
+ * An illustration as the render service gives one: its viewport scaled, by attribute and again
+ * by style (to six significant figures, as the browser writes it), its labels paths.
+ */
 function illustration(labels: string[], viewport = 'matrix(0.5,0,0,0.5,0,10)'): string {
   const paths = labels
     .map((d, i) => `<path d="${d}" fill="white" id="PATHWAY TEXT${i ? `_${String(i)}` : ''}"/>`)
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000"><g id="R-HSA-1" class="svg-pan-zoom_viewport" transform="${viewport}"><g id="BG"><path d="M0 0H9V9Z"/></g>${paths}</g></svg>`;
+  const style = `transform: ${viewport.replace(/[\d.]+/g, (n) => String(Number(Number(n).toPrecision(6)))).replaceAll(',', ', ')};`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000"><g id="R-HSA-1" class="svg-pan-zoom_viewport" transform="${viewport}" style="${style}"><g id="BG"><path d="M0 0H9V9Z"/></g>${paths}</g></svg>`;
 }
 
 describe("an illustration's lettering", () => {
@@ -165,6 +169,112 @@ describe("an illustration's lettering", () => {
       `<g transform="scale(0.25)"><path d="M0 0H1V1Z"/></g><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
     );
     assert.deepEqual(lettering(before), { smallest: (10 * 0.5) / CAP_HEIGHT, unread: 0 });
+  });
+
+  test('lines are found whatever order their letters come in: dots do not split one', () => {
+    // v, two dotted letters (i) and f: the dots overlap only f, which overlaps the rest; met
+    // first, the dots and f would make a line of their own, and the dots outvote f there
+    const i = (at: number) => letter(at, 11.5, at + 1.5, 13) + letter(at, 14, at + 1.5, 20);
+    const vif = letter(0, 14, 5, 20) + i(6) + i(8) + letter(10, 10.8, 14, 20);
+    const svg = illustration([vif], 'matrix(1,0,0,1,0,0)');
+    assert.ok(Math.abs((smallest(svg) ?? 0) - 9.2 / CAP_HEIGHT) < 1e-9);
+  });
+
+  test('on a tied vote the lower bottom is the baseline: a mark set high is not', () => {
+    // the prime written first, so the order of the letters cannot settle the tie
+    const primeFive = letter(7, 11, 8.5, 14.5) + letter(0, 11, 6, 20);
+    assert.equal(smallest(illustration([primeFive], 'matrix(1,0,0,1,0,0)')), 9 / CAP_HEIGHT);
+  });
+
+  test('two identical subpaths do not hide each other', () => {
+    // two lower-case letters and a capital drawn twice, the only one: the cap height is its
+    const x = (at: number) => letter(at, 13, at + 5, 20);
+    const twice = x(0) + x(6) + letter(12, 10, 17, 20) + letter(12, 10, 17, 20);
+    assert.equal(smallest(illustration([twice], 'matrix(1,0,0,1,0,0)')), 10 / CAP_HEIGHT);
+  });
+
+  test('markup that hides or changes a label’s scale leaves it unread', () => {
+    const d = word(0, 20, 10);
+    const label = `<path d="${d}" id="PATHWAY TEXT"/>`;
+    const inViewport = (inner: string) =>
+      illustration([]).replace('</g></svg>', `${inner}</g></svg>`);
+    for (const [name, svg] of [
+      ['single-quoted transform', inViewport(`<g transform='scale(0.25)'>${label}</g>`)],
+      ['a link transformed', inViewport(`<a transform="scale(0.25)">${label}</a>`)],
+      ['a styled transform', inViewport(`<g style="transform: scale(0.25)">${label}</g>`)],
+      ['a nested svg', inViewport(`<svg width="25" viewBox="0 0 100 100">${label}</svg>`)],
+      [
+        'in defs, drawn by use',
+        inViewport(`<defs>${label}</defs><use href="#x" transform="scale(2)"/>`),
+      ],
+    ] as const) {
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, name);
+    }
+  });
+
+  test('a comment, character data or a self-closing group does not end or open a group', () => {
+    const d = word(0, 20, 10);
+    const svg = illustration([]).replace(
+      '</g></svg>',
+      `<!-- </g> --><![CDATA[ </g> ]]><g/><g /><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    assert.deepEqual(lettering(svg), { smallest: (10 * 0.5) / CAP_HEIGHT, unread: 0 });
+  });
+
+  test('the viewport’s scale, by attribute and by style, must agree to the style’s six figures', () => {
+    const d = word(0, 20, 10);
+    const viewport = (style: string) =>
+      `<svg width="1600" height="1000"><g class="svg-pan-zoom_viewport" transform="matrix(1.17130307,0,0,1.17130307,0,0)" style="${style}"><path d="${d}" id="PATHWAY TEXT"/></g></svg>`;
+    const agrees = lettering(viewport('transform: matrix(1.1713, 0, 0, 1.1713, 0, 0);'));
+    assert.equal(agrees.unread, 0);
+    assert.ok(Math.abs((agrees.smallest ?? 0) - (10 * 1.17130307) / CAP_HEIGHT) < 1e-9);
+    for (const style of ['transform: matrix(1.2, 0, 0, 1.2, 0, 0);', 'transform: scale(1.1713)']) {
+      assert.deepEqual(lettering(viewport(style)), { smallest: null, unread: 1 }, style);
+    }
+  });
+
+  test('a close tag ends only the element it names: a stray one does not end the viewport', () => {
+    const d = word(0, 20, 10);
+    const stray = illustration([]).replace(
+      '</g></svg>',
+      `</text></path><path d="${d}" id="PATHWAY TEXT"/></g></svg>`
+    );
+    assert.deepEqual(lettering(stray), { smallest: (10 * 0.5) / CAP_HEIGHT, unread: 0 });
+  });
+
+  test('the viewport is its class exactly, not one that begins with it', () => {
+    const d = word(0, 20, 10);
+    const svg = `<svg width="9" height="9"><g class="svg-pan-zoom_viewport-x" transform="matrix(2,0,0,2,0,0)"><path d="${d}" id="PATHWAY TEXT"/></g></svg>`;
+    assert.deepEqual(lettering(svg), { smallest: null, unread: 1 });
+  });
+
+  test('elements are known with a namespace prefix or in capitals', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const wrap of [
+      `<svg:defs>${label}</svg:defs>`,
+      `<DEFS>${label}</DEFS>`,
+      `<svg:svg>${label}</svg:svg>`,
+    ]) {
+      const svg = illustration([]).replace('</g></svg>', `${wrap}</g></svg>`);
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, wrap);
+    }
+  });
+
+  test('many comments, or tags never closed, are read in linear time', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const filler of [
+      '<!-- x -->'.repeat(40_000),
+      '<![CDATA[x]]>'.repeat(40_000),
+      '<a '.repeat(20_000),
+    ]) {
+      const svg = `<svg width="9" height="9">${label}${filler}`;
+      const started = performance.now();
+      lettering(svg);
+      assert.ok(
+        performance.now() - started < 250,
+        `${filler.slice(0, 12)}: ${String(performance.now() - started)} ms`
+      );
+    }
   });
 
   test('an illustration with no label path is still unmeasured', () => {
