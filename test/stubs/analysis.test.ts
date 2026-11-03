@@ -197,6 +197,15 @@ describe('the analysis stub', () => {
     assert.equal((await get(`/token/${TOKENS.stored}?${SUMMARY}`)).status, 200);
   });
 
+  test('answers 503 on request after a given number of requests are answered', async () => {
+    stub.refuse(1, 2);
+    const statuses = [];
+    for (let i = 0; i < 4; i++) {
+      statuses.push((await get(`/token/${TOKENS.stored}?${SUMMARY}`)).status);
+    }
+    assert.deepEqual(statuses, [200, 200, 503, 200]);
+  });
+
   test('answers 400 to a parameter pdf-export never sends, a bad value or a repeat', async () => {
     for (const query of [
       'includedisease=true',

@@ -74,6 +74,8 @@ export async function readAnalysis(
     try {
       response = await fetch(new URL(path, root), {
         headers: { Accept: accept },
+        // a redirect is the service failing, and the token is never sent on elsewhere
+        redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
@@ -127,8 +129,9 @@ export async function readAnalysis(
       // a 404 is none found, or the result gone since: the CSV, read last, tells them apart
       const response = await get(what, path, JSON_TYPE);
       if (!response) continue;
-      const json = await body(what, response, (r) => r.json());
-      found[kind] = kind === 'entities' ? entityRows(json) : interactorRows(json);
+      found[kind] = await body(what, response, async (r) =>
+        kind === 'entities' ? entityRows(await r.json()) : interactorRows(await r.json())
+      );
     }
     byPathway.set(pathway, found);
   }
@@ -211,9 +214,36 @@ function checkSummary(json: unknown): Summary {
   return answer as Summary;
 }
 
+/** Whether a value is a list of strings. */
+const strings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+/** Whether a value is an identifier map: a resource and its identifiers. */
+const idMap = (value: unknown): value is { resource: string; ids: string[] } =>
+  typeof (value as { resource?: unknown } | null)?.resource === 'string' &&
+  strings((value as { ids?: unknown }).ids);
+
+/** A found list's identifiers, each checked by `valid`: anything else is not the answer. */
+function identifiersOf<T>(json: unknown, valid: (identifier: T) => boolean): T[] {
+  const identifiers = (json as { identifiers?: unknown } | null)?.identifiers;
+  if (
+    !Array.isArray(identifiers) ||
+    !identifiers.every(
+      (identifier: unknown) =>
+        typeof (identifier as { id?: unknown } | null)?.id === 'string' && valid(identifier as T)
+    )
+  ) {
+    throw new Error('not a found list');
+  }
+  return identifiers as T[];
+}
+
 /** A row per identifier and resource it maps to in. */
 function entityRows(json: unknown): FoundRow[] {
-  const { identifiers } = json as FoundEntities;
+  type Identifier = FoundEntities['identifiers'][number];
+  const identifiers = identifiersOf<Identifier>(
+    json,
+    (identifier) => Array.isArray(identifier.mapsTo) && identifier.mapsTo.every(idMap)
+  );
   return identifiers.flatMap((identifier) =>
     identifier.mapsTo.map((to) => ({
       identifier: identifier.id,
@@ -225,7 +255,10 @@ function entityRows(json: unknown): FoundRow[] {
 
 /** A row per interactor: the event's identifiers it interacts with, and their resource. */
 function interactorRows(json: unknown): FoundRow[] {
-  const { identifiers } = json as FoundInteractors;
+  type Identifier = FoundInteractors['identifiers'][number];
+  const identifiers = identifiersOf<Identifier>(json, (identifier) =>
+    idMap(identifier.interactsWith)
+  );
   return identifiers.map((identifier) => ({
     identifier: identifier.id,
     mapsTo: identifier.interactsWith.ids,

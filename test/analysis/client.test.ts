@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createServer, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { after, afterEach, before, describe, test } from 'node:test';
 
 import {
@@ -139,6 +141,113 @@ describe('the analysis client', () => {
       fails('unknown-token')
     );
     assert.match(paths().at(-1) ?? '', /^download\//);
+  });
+
+  test('a 503 from found/… or from the CSV, after the summary, is unavailable, not none found', async () => {
+    const events: AnalysedEvent[] = [{ kind: 'pathway', stId: PARENT }];
+    stub.refuse(1, 1);
+    await assert.rejects(read(TOKENS.stored, events), fails('unavailable'));
+    assert.match(paths().at(-1) ?? '', /\/found\/entities\//);
+    stub.reset();
+    // the summary and both found lists answered: the CSV is the 503
+    stub.refuse(1, 3);
+    await assert.rejects(read(TOKENS.stored, events), fails('unavailable'));
+    assert.match(paths().at(-1) ?? '', /^download\//);
+  });
+});
+
+/**
+ * A service answering what the stub never does, each under its own base path: a summary
+ * and found lists of the wrong shape, no answer at all, and a redirect to the stub.
+ */
+describe('the analysis client, given answers the service should not give', () => {
+  let stub: AnalysisStub;
+  let odd: ReturnType<typeof createServer>;
+  let base = '';
+  const hanging = new Set<ServerResponse>();
+  /** A summary of the right shape, so that the found lists are asked for. */
+  const summary = {
+    summary: { token: 'x', type: 'OVERREPRESENTATION', projection: true, interactors: true },
+    identifiersNotFound: 0,
+    pathwaysFound: 1,
+  };
+  before(async () => {
+    stub = await startAnalysisStub();
+    odd = createServer((req, res) => {
+      const url = req.url ?? '/';
+      const json = (body: unknown) =>
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+      if (url.startsWith('/hang/')) hanging.add(res);
+      else if (url.startsWith('/redirect/'))
+        res.writeHead(302, { Location: `${stub.url}/${url.replace(/^\/redirect\//, '')}` }).end();
+      else if (url.startsWith('/summary/')) json({ summary: {}, pathwaysFound: '6' });
+      else if (!url.includes('/found/')) json(summary);
+      // under /entities/ the entities are odd, under /interactors… the interactors; the other 404
+      else if (!url.startsWith(url.includes('/found/entities/') ? '/entities/' : '/interactor'))
+        res.writeHead(404).end();
+      else if (url.includes('/found/entities/')) {
+        json({ identifiers: [{ id: 'X00001', mapsTo: ['X00001'] }] });
+      } else if (url.startsWith('/interactors/')) {
+        json({ identifiers: [{ id: 'X00002', exp: [], mapsTo: ['X00002'] }] });
+      } else {
+        json({
+          identifiers: [{ id: 'X00002', interactsWith: { resource: 'UNIPROT', ids: 'X9' } }],
+        });
+      }
+    });
+    await new Promise<void>((resolve) => odd.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${String((odd.address() as AddressInfo).port)}`;
+  });
+  after(async () => {
+    for (const res of hanging) res.destroy();
+    odd.closeAllConnections();
+    await new Promise<void>((resolve) =>
+      odd.close(() => {
+        resolve();
+      })
+    );
+    await stub.close();
+  });
+
+  const read = (
+    path: string,
+    {
+      timeoutMs = 2_000,
+      events = [{ kind: 'pathway', stId: PARENT }],
+    }: {
+      timeoutMs?: number;
+      events?: AnalysedEvent[];
+    } = {}
+  ) =>
+    readAnalysis(
+      `${base}/${path}`,
+      { token: TOKENS.stored, species: 'Homo sapiens', events },
+      { timeoutMs }
+    );
+  const unavailable = (error: unknown) =>
+    error instanceof AnalysisError && error.reason === 'unavailable';
+
+  test('a summary of another shape is unavailable', async () => {
+    // no events, so that nothing but the summary's check stops it
+    await assert.rejects(read('summary', { events: [] }), unavailable);
+  });
+
+  test('found lists of another shape are unavailable', async () => {
+    // entities mapping to bare strings; interactors with nothing they interact with, or
+    // interacting with a string where a list belongs
+    await assert.rejects(read('entities'), unavailable);
+    await assert.rejects(read('interactors'), unavailable);
+    await assert.rejects(read('interactor-ids'), unavailable);
+  });
+
+  // bounded, so that a client with no timeout fails the test rather than hanging it
+  test('a call with no answer within its time is unavailable', { timeout: 2_000 }, async () => {
+    await assert.rejects(read('hang', { timeoutMs: 100 }), unavailable);
+  });
+
+  test('a redirect is unavailable, and the token is not sent on', async () => {
+    await assert.rejects(read('redirect'), unavailable);
+    assert.deepEqual(stub.requests, []);
   });
 });
 
