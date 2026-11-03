@@ -295,6 +295,20 @@ describe("an illustration's lettering", () => {
     }
   });
 
+  test('a < that starts no tag leaves the labels after it unread', () => {
+    const label = `<path d="${word(0, 20, 10)}" id="PATHWAY TEXT"/>`;
+    for (const inner of [
+      `<g transform="scale(0.1)" data-x="a<b">${label}</g>`,
+      `<defs data-x="a<b">${label}</defs>`,
+      `<g style="transform: scale(0.1); --x: '<'">${label}</g>`,
+    ]) {
+      const svg = illustration([]).replace('</g></svg>', `${inner}</g></svg>`);
+      assert.deepEqual(lettering(svg), { smallest: null, unread: 1 }, inner);
+    }
+    const viewport = `<svg width="9" height="9"><g class="svg-pan-zoom_viewport" data-x="a<b" transform="matrix(0.5,0,0,0.5,0,0)">${label}</g></svg>`;
+    assert.deepEqual(lettering(viewport), { smallest: null, unread: 1 });
+  });
+
   test('an illustration with no label path is still unmeasured', () => {
     assert.equal(place(measure(illustration([]))).unmeasured, true);
   });
