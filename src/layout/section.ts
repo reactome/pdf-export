@@ -80,7 +80,12 @@ export function sectionHtml(section: Section, input: SectionInput): string {
     if (svg === undefined) {
       input.report.missing.push(event.stId);
     } else {
-      const { html, placement } = figureHtml(svg, section.anchor, `${event.name}: figure`);
+      const { html, placement } = figureHtml(
+        svg,
+        section.anchor,
+        `${event.name}: figure`,
+        links.figure(section.figure, event.stId)
+      );
       noteFloor(input.report, event.stId, placement);
       parts.push(html);
     }

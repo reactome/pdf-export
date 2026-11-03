@@ -327,7 +327,10 @@ of pages with today's book.
     to its page on the website;
   - for a reaction, the events before and after it (only those the PDF holds) to their
     sections;
-  - each event's name to its page on the website.
+  - each event's name to its page on the website;
+  - each figure to its interactive form on the website (user's decision, 3 Nov 2026): a
+    pathway's diagram or illustration in the Pathway Browser, the event selected where an
+    ancestor's diagram draws it, and a reaction's figure to its page, which opens it there.
 - **FR-004**: An event held by more than one pathway MUST be written in full once in a
   PDF, at its first place in document order. In the book, its later places MUST show a
   short entry (name and stable identifier) linked to that section.
@@ -419,9 +422,11 @@ of pages with today's book.
   - a running header naming the top-level pathway (in the book) or the event (in a
     single-event PDF), or on front pages (introduction, analysis properties,
     contents) that part's name, and a page number on every page but the cover;
-  - no figure split across pages, and none shrunk below the legibility size the plan
-    sets, unless it is already at the largest a landscape page of its own allows, in
-    which case it is listed in the run report;
+  - no figure split across pages, and each printed as large as the page allows: in the
+    portrait text, or on a landscape page of its own where that prints it larger (user's
+    decision, 3 Nov 2026: at release 98 most diagrams' labels print below 5 pt on any page,
+    as today's book's do, and are read by zooming or on the website); a figure whose labels
+    print below the size the plan sets for the run report is listed there;
   - a cover in the website's style (User Story 6, scenario 3).
 - **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026), in
   the text the layout writes and in the figures' labels alike:

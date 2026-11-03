@@ -186,7 +186,7 @@ Dockerfile
      (R7), on the machine the release would use (if it is not this host, `event-pdf`'s
      baseline is run again there);
    - a single-event PDF's stages, with the render service's cache off (R7, SC-005);
-   - the diagrams' widths against FR-016's floor (R4);
+   - the diagrams' widths against FR-016's floor (R4; measured by T008, which replaced the floor);
    - what the analysis service answers for an expired and a malformed token, and its
      retention period, on a private instance (R6);
    - the join's memory, and stamping page numbers after it (R4).

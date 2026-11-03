@@ -197,7 +197,7 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     figures.set(figureKey(root.figure), '<svg width="1600" height="1000"><path d="M0 0"/></svg>');
     figures.set(
       figureKey(child.figure),
-      '<svg width="4000" height="600"><text font-size="12">a</text></svg>'
+      '<svg width="9000" height="600"><text font-size="12">a</text></svg>'
     );
     const { report } = layoutSingle(built.pathway, { ...options, figures });
     assert.deepEqual(report, {
@@ -243,7 +243,7 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     const { html } = layoutSingle(built.pathway, options);
     assert.match(
       sectionOf(html, 'R-HSA-90000100'),
-      /<div class="figure"><svg [^>]*width="[\d.]+pt"/
+      /<div class="figure(?: landscape)?"><a class="figure-link" href="[^"]*\/PathwayBrowser\/#\/R-HSA-90000100[^"]*"><svg [^>]*width="[\d.]+pt"/
     );
     assert.match(sectionOf(html, 'R-HSA-90000100'), /id="s-R-HSA-90000100-clip-1"/);
     const root = fullSection(built.pathway, 'R-HSA-90000100');

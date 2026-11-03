@@ -69,8 +69,9 @@ the short entry alone, pointing at the full section, and not its subtree again.
   after FR-017: the list substituted, and in a PDF made on request any other character
   no font draws replaced by U+FFFD (in the book, such a character is a fault).
 - `scale`: its size on the page, from which its labels' size follows (12 px for node labels in the SVG; the smallest sets it).
-  At least 5 pt, or a landscape page of its own; below that only for a diagram too large
-  for any page, listed in the run report (research R4).
+  As large as the page allows: the portrait text, or a landscape page of its own where that
+  prints it larger. Below 1 pt even so, it is listed in the run report (research R4).
+- `link`: its interactive form on the website (FR-003).
 - `overlay`: the analysis token, when there is one.
 
 **Choosing a pathway's figure** (research R2, as graph-core does today):
@@ -154,7 +155,7 @@ cause (`unanswered`, `failed`, `refused`, `invalid` or `label`, contracts/figure
 
 - `release`, the time taken, the page count and the size.
 - Figures by kind, and those missing or stale in the figures' folder, by stable identifier.
-- Figures below the legibility floor, by stable identifier.
+- Figures whose labels print below 1 pt, by stable identifier (research R4).
 - Release files missing, by name, from the preflight.
 - Characters FR-017's list replaced, by code point and count; characters off the list, by
   code point and stable identifier (a fault in the book, U+FFFD in a PDF made on request).

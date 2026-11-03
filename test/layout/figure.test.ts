@@ -216,7 +216,7 @@ describe("a figure's size", () => {
   test('one with no label to measure, as an illustration, is placed by its size and reported', () => {
     const placed = place(measure('<svg width="1600" height="1000"><path d="M0 0"/></svg>'));
     assert.equal(placed.unmeasured, true);
-    assert.equal(placed.landscape, false);
+    assert.equal(placed.landscape, true);
     assert.equal(place(measure(svg(300, 200))).unmeasured, false);
   });
 
@@ -227,46 +227,53 @@ describe("a figure's size", () => {
       belowFloor: false,
       unmeasured: false,
     });
-    const wide = place(measure(svg(1000, 200)));
-    assert.equal(wide.landscape, false);
-    assert.ok(Math.abs(wide.scale - PORTRAIT.width / 1000) < 1e-9);
-    assert.ok(wide.scale * 12 >= FLOOR_PT);
   });
 
-  test('one whose labels would print below 5 pt in the text gets a landscape page', () => {
-    // 12 px labels allow about 1,155 px in portrait and 1,750 px in landscape (research R4)
-    const placed = place(measure(svg(1500, 400)));
-    assert.equal(placed.landscape, true);
-    assert.equal(placed.belowFloor, false);
-    assert.ok(Math.abs(placed.scale - LANDSCAPE.width / 1500) < 1e-9);
-    assert.ok(placed.scale * 12 >= FLOOR_PT);
-  });
-
-  test('one still below the floor there is at the largest the page allows, and reported', () => {
-    const placed = place(measure(svg(4000, 600)));
-    assert.deepEqual(
-      { landscape: placed.landscape, belowFloor: placed.belowFloor },
-      { landscape: true, belowFloor: true }
-    );
-    assert.ok(Math.abs(placed.scale - LANDSCAPE.width / 4000) < 1e-9);
-  });
-
-  test('a tall one that landscape would print smaller stays in portrait, reported', () => {
+  test('a tall one stays in portrait, at the text area’s height', () => {
     const placed = place(measure(svg(600, 3000)));
     assert.equal(placed.landscape, false);
-    assert.equal(placed.belowFloor, true);
     assert.ok(Math.abs(placed.scale - PORTRAIT.height / 3000) < 1e-9);
   });
 
-  test('its HTML: ids prefixed, sized in points, the landscape class where it goes', () => {
-    const { html } = figureHtml(svg(300, 200), 's-R-HSA-1', 'Event: figure');
-    assert.match(html, /^<div class="figure"><svg /);
+  test('a wide one gets a landscape page, where it prints larger', () => {
+    // 1,000 px fits the portrait text at 0.48 pt a pixel and a landscape page at 0.73
+    const placed = place(measure(svg(1000, 200)));
+    assert.equal(placed.landscape, true);
+    assert.ok(Math.abs(placed.scale - LANDSCAPE.width / 1000) < 1e-9);
+    assert.equal(placed.belowFloor, false);
+  });
+
+  test('one that prints the same either way, at its own size, stays in portrait', () => {
+    assert.equal(place(measure(svg(600, 400))).landscape, false);
+  });
+
+  test('one whose labels print below FLOOR_PT even at its largest is reported', () => {
+    assert.equal(FLOOR_PT, 1);
+    // 12 px labels at the landscape width: 728.5 pt over 8,000 px gives 1.09 pt, over 9,000 0.97
+    const above = place(measure(svg(8000, 600)));
+    const below = place(measure(svg(9000, 600)));
+    assert.deepEqual([above.landscape, above.belowFloor], [true, false]);
+    assert.deepEqual([below.landscape, below.belowFloor], [true, true]);
+    assert.ok(Math.abs(below.scale - LANDSCAPE.width / 9000) < 1e-9);
+  });
+
+  test('its HTML: ids prefixed, sized in points, linked, the landscape class where it goes', () => {
+    const href = 'https://site.example/PathwayBrowser/#/R-HSA-1&SEL=R-HSA-2';
+    const { html } = figureHtml(svg(300, 200), 's-R-HSA-1', 'Event: figure', href);
+    assert.match(
+      html,
+      /^<div class="figure"><a class="figure-link" href="https:\/\/site\.example\/PathwayBrowser\/#\/R-HSA-1&amp;SEL=R-HSA-2"><svg /
+    );
+    assert.match(html, /<\/svg><\/a><\/div>$/);
     assert.match(html, / width="225\.00pt" height="150\.00pt"/);
     assert.match(html, /id="s-R-HSA-1-clip-1"/);
     assert.match(html, /url\(#s-R-HSA-1-clip-1\)/);
     assert.match(html, /aria-label="Event: figure"/);
     assert.doesNotMatch(html, /width="300"/);
-    assert.match(figureHtml(svg(1500, 400), 'p', 'x').html, /^<div class="figure landscape">/);
+    assert.match(
+      figureHtml(svg(1500, 400), 'p', 'x', href).html,
+      /^<div class="figure landscape">/
+    );
   });
 
   test("its key: an ancestor's diagram is keyed by what it selects", () => {

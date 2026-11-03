@@ -215,19 +215,63 @@ synthetic documents, on this host under load.
   are numbered as the book's are: a first print with placeholders, its anchors' pages
   read back, and a second print. A reaction alone, or depth 0, has no contents list and
   is printed once. The second print is in SC-005's budget (R7).
-- **The legibility floor** (FR-016): a diagram's node labels, 12 px in the render
-  service's SVG (measured in its cache on 30 Oct 2026: 140–165 labels a diagram at 12 px,
-  compartments' at 80 px, a few at 16 px), never below 5 pt on the page. The smallest
-  label in the figure sets its scale, not the first. The figure's scale on the page gives its
-  labels' size. A figure that would fall below the floor at the text width gets a
-  landscape page of its own, at the largest size the page allows. A diagram so large
-  that even that is below the floor is accepted at that size (the PDF's vector drawing
-  can still be zoomed) and listed in the run report; FR-016 is amended to say so ("5 pt,
-  or the largest a landscape page allows"). A figure is never split across pages.
-  - At 12 px labels, 5 pt allows a figure about 1,155 of the SVG's pixels wide in
-    portrait and about 1,750 on an A4 landscape page with 20 mm margins (inference,
-    from the page sizes: 481.9 and 728.5 pt of text width, at 5/12 pt a pixel). Many diagrams are wider, so the exception may be common. The
-    first tasks count the release's diagram widths (R7, to measure).
+- **Figure size** (FR-016, T008): a figure prints as large as the page allows, never
+  split: in the portrait text, or on a landscape page of its own where that prints it
+  larger. Its labels' size follows from its scale (the smallest label, not the first); one
+  whose labels print below 1 pt even so is listed in the run report.
+  - **Planned first:** a 5 pt floor, diagrams' node labels being 12 px in the render
+    service's SVG (measured in its cache on 30 Oct 2026: 140–165 labels a diagram at 12 px,
+    compartments' at 80 px, a few at 16 px). 5 pt allows about 1,155 of the SVG's pixels
+    in portrait and 1,750 on a landscape page (481.9 and 728.5 pt of text width).
+  - **Measured (T008):** release 98's 1,170 human diagrams, each drawn by the render
+    service from the release's files (its `RENDER_FILES`, WebsiteAngular #777–#779),
+    measured and placed by `measure()` and `place()`; none failed. Their sizes cannot be
+    read from the files: the render draws at twice the files' coordinates, with margins
+    of −10 to +478 px. 1,168 have 12 px labels, two 6 px. The median is 3,654 px wide,
+    the widest 19,652. Even on its best page, only 80 (7%) print labels at 5 pt, 311 at
+    3 pt, 652 at 2 pt and 1,070 at 1 pt; the median prints at 2.1 pt.
+  - **Today's book has no floor.** `event-pdf` (2c070d5) scales each diagram, a vector
+    drawing from the Java DiagramExporter, to the portrait text's width and at most half
+    the page's height (40% for a reaction), whatever its labels' size. The old exporter's
+    labels are 8 units of the diagram files' coordinates (Arial Bold, `FontProperties`,
+    shrunk further to fit a node); the render service's are 6 (12 px at twice the
+    coordinates), 25% smaller beside their diagram. From the files' sizes (inference, the
+    book's pages not measured; its margins taken as 20 mm), today's labels print at a
+    median of 1.85 pt (10% under 0.93, 10% over 3.8), and 51 diagrams reach 5 pt. The
+    rule above prints a median of 2.14 pt (1.08 and 4.36), at least today's size for
+    1,143 of the 1,170.
+  - **So 1,060 diagrams (91%) print on a landscape page**, being wider than tall, about
+    1.5 times as large as in the portrait text; 110 stay in portrait; 100 are
+    listed below 1 pt (the widest, at 0.44 pt).
+  - **Illustrations, measured from their outlines.** Their lettering is drawn as
+    outlines, so no font size can be read. Each pathway's label is one path
+    (`id="PATHWAY TEXT…"`), each letter a closed subpath of absolute commands. A label's
+    letters are measured as their cap height: from a line's baseline (the bottom most of its
+    letters share) to the top of the letters standing on it, the label taken at its tallest
+    line, since one label is one text layer at one size and a dash set apart on a line of
+    its own would otherwise pass for small letters (five illustrations have such lines).
+    The cap height is taken as a font's of the same cap height (0.71 of its size, Roboto's
+    0.711, Arial's 0.716). Release 98's 221 illustrations, every one with labels, none
+    transformed:
+    - every label's cap height is 8.49–8.94 of the file's units, a font of about 12 px,
+      as the diagrams' labels are;
+    - the render service fits each into its 1,600 × 1,000 frame (its viewport's
+      `matrix(a,0,0,a,e,f)`, 1.17 for the usual 1,366 × 768), so in the figure the
+      lettering is 13.9–14.8 px, except R-HSA-5619102 (2,664 × 1,230, fitted at 0.60), at
+      7.2 px. The reading from the render service's SVG and from the file agree, checked on
+      two (13.92 and 7.18 px);
+    - in the portrait text that prints at 4.2–4.5 pt; on a landscape page, larger, at
+      6.3–6.7 pt (R-HSA-5619102 at 3.3 pt), so every illustration prints landscape.
+  - **Decision** (user, 3 Nov 2026), for the reader, who reads the book on a screen: most
+    screens are wider than tall, so a wide figure on a landscape page fills more of one;
+    no page makes most diagrams' labels readable unzoomed, so every figure links to its
+    interactive form on the website (FR-003), where they are. The rule is two constants
+    in `src/layout/figure.ts`, `FLOOR_PT` (the report's threshold) and the comparison in
+    `place()`, so curators who prefer another, such as portrait unless the labels would
+    fall below a size, change it there. `measure()` reads an illustration's lettering
+    (`src/layout/lettering.ts`) as it reads text's sizes, the smaller of the two counting;
+    a label whose outlines are not read (a relative command, an arc, a viewport that is
+    not a plain scale) counts as unread, so the figure is reported as unmeasured.
 - **pdf-lib:** the maintained MIT fork `@cantoo/pdf-lib`, if it passes the same tests;
   otherwise pdf-lib 1.17.
 
@@ -646,8 +690,9 @@ dependencies, though a person may use them to look.
     output path in, `TheReactomeBook.pdf` and a run report out;
   - `pdf-export serve`, an HTTP service for the website: `GET /event/{stId}.pdf` with
     depth and token, answering a PDF or the errors of Story 2's scenario 4. Its bind
-    address is a setting, loopback by default: in its own container it binds where the
-    content service can reach it.
+    address is a setting, loopback by default: in its own container it binds where its
+    two callers can reach it, the content service (these PDFs) and the analysis gateway
+    (spec 002's reports, served by the same process), and nothing else can.
 - **The website's address** for FR-003's links to its pages is a setting (`--site`),
   written into the links and never fetched.
 - **WebsiteAngular's content service calls it** as it calls the Java library service
