@@ -1,7 +1,8 @@
 // The single-event service (spec 001 T022, contracts/service.md, User Story 2): `GET
 // /event/{stId}.pdf?depth&token` answers one event's PDF, `GET /health` the service's state.
-// The checks go in the contract's order, the depth, then the identifier, then the token's
-// form, then the concurrency limit, and only then is anything made. Every figure is drawn on
+// The checks go in this order: the depth and an identifier of no known form, whatever the
+// load; then the concurrency limit (and a browser being up); then the identifier's lookup in
+// the graph; then the token's form; only then is anything made. Every figure is drawn on
 // request, with the token where there is one; one that cannot be drawn leaves its section
 // without it, logged. Characters no font draws print as U+FFFD (FR-017), logged once per PDF.
 // Each request has a deadline across everything it waits for, the graph's reads and the
@@ -76,6 +77,11 @@ export interface ServeLimits {
   healthTimeoutMs: number;
   /** The least time between two starts of the browser, so a crashing one is not restarted in a loop. */
   relaunchPauseMs: number;
+  /**
+   * How long past its deadline a request's slot waits for its graph reads to settle: a read
+   * on a connection that went silent never does, and its slot is freed then all the same.
+   */
+  graceMs: number;
 }
 
 export const LIMITS: ServeLimits = {
@@ -85,7 +91,15 @@ export const LIMITS: ServeLimits = {
   retryPauseMs: 5_000,
   healthTimeoutMs: 5_000,
   relaunchPauseMs: 5_000,
+  graceMs: 5_000,
 };
+
+/**
+ * A browser gone sooner than this after its start, having printed no PDF, counts as a start
+ * that failed: one that starts and dies at once is as unable to print as one that never
+ * starts. Once it has printed, or lived this long, the failed starts are forgotten.
+ */
+const PROVEN_AFTER_MS = 30_000;
 
 /** Figures asked of the render service at once: its own default concurrency. */
 const FIGURES_AT_ONCE = 2;
@@ -228,6 +242,9 @@ class ClientGone extends Refusal {
  */
 const DEAD_AFTER = 3;
 
+/** How long the graph's driver waits to connect: a silent server is not waited on longer. */
+const CONNECTION_TIMEOUT_MS = 5_000;
+
 /** A stable identifier, a versioned one, or a database id: anything else names nothing. */
 const IDENTIFIER = /^(?:R-[A-Z]{3}-[0-9]{1,12}(?:\.[0-9]{1,6})?|[0-9]{1,15})$/;
 
@@ -240,11 +257,17 @@ export async function startService(
   const illustrated = readIllustrated(settings.files);
   // a read the database runs longer than a request may wait is ended there too
   const graph =
-    options.graph ?? openGraph(settings.graph, { transactionTimeoutMs: limits.deadlineMs });
+    options.graph ??
+    openGraph(settings.graph, {
+      transactionTimeoutMs: limits.deadlineMs,
+      connectionTimeoutMs: CONNECTION_TIMEOUT_MS,
+    });
   const ownGraph = options.graph === undefined;
   const startPrinter = options.startPrinter ?? (() => Printer.start());
   const styles = pageStyles();
   let active = 0;
+  /** Requests whose graph reads were still unsettled past their deadline and grace. */
+  let stuck = 0;
   const state = { closing: false };
   // read through a call: a check before an await does not hold after it
   const closing = () => state.closing;
@@ -256,6 +279,12 @@ export async function startService(
   let lastLaunch = -Infinity;
   /** Starts failed since a browser was last up: past DEAD_AFTER, the service is unhealthy. */
   let failedStarts = 0;
+  /** Whether the browser up has printed a PDF, or lived PROVEN_AFTER_MS. */
+  let proven = false;
+  const prove = (): void => {
+    proven = true;
+    failedStarts = 0;
+  };
   /** A browser; `retry` keeps trying after a failed start (the first start does not). */
   function launch(retry = true): Promise<ServicePrinter> {
     launching ??= (async () => {
@@ -266,16 +295,24 @@ export async function startService(
         lastLaunch = Date.now();
         try {
           const started = await startPrinter();
+          const startedAt = Date.now();
+          proven = false;
+          const lived = setTimeout(() => {
+            if (printer === started && started.connected) prove();
+          }, PROVEN_AFTER_MS);
+          lived.unref();
           started.onDisconnected(() => {
+            clearTimeout(lived);
             if (printer !== started) return;
             printer = null;
+            // gone soon after its start, having printed nothing: a start that failed
+            if (!proven && Date.now() - startedAt < PROVEN_AFTER_MS) failedStarts += 1;
             void started.close().catch(() => undefined);
             if (closing()) return;
             log('printer: the browser went; starting another');
             void launch().catch(() => undefined);
           });
           printer = started;
-          failedStarts = 0;
           return started;
         } catch (error) {
           failedStarts += 1;
@@ -394,7 +431,9 @@ export async function startService(
     const printing = await within(currentPrinter(), deadline);
     // never printed once the request has ended
     going();
-    return printing.single(laid.html, deadline);
+    const pdf = await printing.single(laid.html, deadline);
+    if (printing === printer) prove();
+    return pdf;
   }
 
   /** Each figure the document draws, once, at most FIGURES_AT_ONCE at a time. */
@@ -485,11 +524,24 @@ export async function startService(
     // settled, each bounded by its transaction timeout, not only until the answer
     const reads = new Set<Promise<unknown>>();
     let held = true;
+    // ... or until its deadline and a grace have passed, whichever comes first: a read on a
+    // silent connection never settles, and is then counted as stuck, which /health reports
     const release = (): void => {
       if (!held) return;
       held = false;
-      void Promise.allSettled([...reads]).then(() => {
+      const pending = [...reads];
+      const settled = Promise.allSettled(pending).then(() => true);
+      const grace = pause(Math.max(0, endsAt + limits.graceMs - Date.now()), false, {
+        ref: false,
+      });
+      void Promise.race([settled, grace]).then((allSettled) => {
         active -= 1;
+        if (allSettled) return;
+        stuck += 1;
+        log(`stuck ${identifier}: a graph read unsettled past its deadline`);
+        void settled.then(() => {
+          stuck -= 1;
+        });
       });
     };
     const reading = graphFor(deadline, endsAt, reads);
@@ -576,13 +628,15 @@ export async function startService(
     ]);
     // a browser that cannot be started again leaves the service unable to print: 503, so a
     // health check that reads only the status replaces it
-    json(res, failedStarts >= DEAD_AFTER ? 503 : 200, {
+    // ... and while a graph read is stuck past its deadline: its connection has gone silent
+    json(res, failedStarts >= DEAD_AFTER || stuck > 0 ? 503 : 200, {
       version: VERSION,
       release: graphRelease,
       render,
       analysis,
       printer: printer?.connected === true,
       making: active,
+      stuck,
       figures: 'none',
     });
   }

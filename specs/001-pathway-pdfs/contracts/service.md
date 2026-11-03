@@ -44,7 +44,8 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   at the limit is 503: the reads in flight never outnumber the places. A PDF holds its
   place until its work has ended and every graph read it began has ended, each given the
   time left before the deadline as its transaction timeout, so the database ends it
-  there; not only until it is answered. Each request has a deadline across everything
+  there, or until its deadline and a grace of 5 s have passed, whichever is first (a read
+  on a connection gone silent never ends); not only until it is answered. Each request has a deadline across everything
   it waits for, the analysis service's calls together among them (each of which also
   has its own timeout); past it, or once the client has gone, the request's reads and
   calls are given up on, its print under way is stopped, nothing more is printed, and
@@ -64,5 +65,8 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 services answer, whether its browser is up, how many PDFs are being made, and the figures'
 folder: `ready` (its release and checksum), `stale`, `incomplete` or `none`. Used by the
 container's health check. 503 with the same body once three starts of the browser in a row
-have failed (the service cannot print, and is to be replaced), or when the graph does not
-answer its release within the health check's own timeout (then the body is the reason).
+have failed (the service cannot print, and is to be replaced; a browser gone within 30 s
+of its start, having printed nothing, counts as a start that failed), or while a graph read
+is unsettled past its request's deadline and grace (its connection gone silent), or when the
+graph does not answer its release within the health check's own timeout (then the body is
+the reason).

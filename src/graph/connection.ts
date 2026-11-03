@@ -39,6 +39,12 @@ export interface GraphOptions {
    * timeout); none without it.
    */
   transactionTimeoutMs?: number;
+  /**
+   * How long the driver waits to open a connection, and for one from its pool. The driver
+   * offers no bound on a read from an open connection (only the server's own receive-timeout
+   * hint): a caller that must not wait on a silent one bounds its own wait.
+   */
+  connectionTimeoutMs?: number;
 }
 
 export function openGraph(settings: GraphSettings, options: GraphOptions = {}): Graph {
@@ -46,7 +52,15 @@ export function openGraph(settings: GraphSettings, options: GraphOptions = {}): 
   const driver: Driver = neo4j.driver(
     settings.uri,
     neo4j.auth.basic(settings.user, settings.password),
-    { disableLosslessIntegers: true }
+    {
+      disableLosslessIntegers: true,
+      ...(options.connectionTimeoutMs === undefined
+        ? {}
+        : {
+            connectionTimeout: options.connectionTimeoutMs,
+            connectionAcquisitionTimeout: options.connectionTimeoutMs,
+          }),
+    }
   );
   return {
     async read<T>(
