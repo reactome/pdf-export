@@ -10,9 +10,9 @@ import { Links, attribute, text } from './html.ts';
 
 /** What laying out sections reports, for the run report and the service's log. */
 export interface Report {
-  /** Figures printed below the legibility floor even on a landscape page, by stable id. */
+  /** Figures whose labels print below FLOOR_PT even at their largest, by stable id. */
   belowFloor: string[];
-  /** Figures with no label whose size can be read (illustrations), by stable id. */
+  /** Figures with no label whose size is read, or a label that cannot be read, by stable id. */
   unmeasured: string[];
   /** Sections whose figure was not given, by stable id. */
   missing: string[];

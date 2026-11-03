@@ -64,12 +64,15 @@ export class Links {
   /**
    * An event's figure in its interactive form on the website, where its labels can be read:
    * a pathway's diagram or illustration in the Pathway Browser, the event selected where it
-   * is drawn in an ancestor's; a reaction's page, which opens it in its pathway there. The
+   * is drawn in an ancestor's, or an ancestor's illustration stands in for it; a reaction's page, which opens it in its pathway there. The
    * Browser's address is its older form, which the website still reads (`#/` and `SEL`).
    */
   figure(figure: Figure, stId: string): string {
     if (figure.kind === 'reaction') return this.event(stId);
-    const select = figure.kind === 'ancestor' ? `&SEL=${encodeURIComponent(stId)}` : '';
+    // drawn in an ancestor's diagram, or its illustration standing in: the event selected
+    const drawnElsewhere =
+      figure.kind === 'ancestor' || (figure.kind === 'ehld' && figure.unselectedFor !== undefined);
+    const select = drawnElsewhere ? `&SEL=${encodeURIComponent(stId)}` : '';
     return this.website(`/PathwayBrowser/#/${encodeURIComponent(figure.stId)}${select}`);
   }
 

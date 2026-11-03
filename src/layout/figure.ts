@@ -279,8 +279,8 @@ export function figureHtml(
 
 /**
  * The cover's figure: a single pathway's diagram fitted to the cover's box. It is a
- * picture of the pathway, not where it is read (its section has it at a legible size), so
- * the floor does not apply.
+ * picture of the pathway, not where it is read (its section prints it at its largest), so
+ * it is not reported against FLOOR_PT.
  */
 export function coverFigureHtml(svg: string, label: string): string {
   const { width, height } = measure(svg);

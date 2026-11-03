@@ -10,68 +10,78 @@ export const CAP_HEIGHT = 0.71;
 /** A box: left, top, right, bottom. */
 type Box = [number, number, number, number];
 
-const TOKEN = /[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g;
+const TOKEN = /[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+
+/** The numbers each absolute command takes, a whole number of times. */
+const ARITY: Readonly<Record<string, number>> = { M: 2, L: 2, T: 2, H: 1, V: 1, S: 4, Q: 4, C: 6 };
 
 /**
  * Each subpath's box, from its points and control points (which may overshoot a curve
  * slightly: that errs large, by less than a stroke). Only absolute commands are read, as the
- * release's illustrations use: a relative command or an arc gives null, not a guess.
+ * release's illustrations use: a relative command, an arc or a command with the wrong count
+ * of numbers gives null, not a guess.
  */
 export function outlineBoxes(d: string): Box[] | null {
   const boxes: Box[] = [];
-  // whether the last box is the subpath being drawn: a move begins another
+  // whether the last box is the subpath being drawn: a move or a close ends it
   let open = false;
   let x = 0;
   let y = 0;
+  // where the subpath began, which a close returns to
+  let startX = 0;
+  let startY = 0;
   let command = '';
   let numbers: number[] = [];
   const point = (px: number, py: number) => {
+    if (!open) {
+      // a subpath begins at a move's point, or, begun without one, at the current point
+      if (command === 'M') [x, y] = [px, py];
+      [startX, startY] = [x, y];
+      boxes.push([x, y, x, y]);
+      open = true;
+    }
     x = px;
     y = py;
-    const box = open ? boxes.at(-1) : undefined;
-    if (box === undefined) boxes.push([px, py, px, py]);
-    else
-      boxes[boxes.length - 1] = [
-        Math.min(box[0], px),
-        Math.min(box[1], py),
-        Math.max(box[2], px),
-        Math.max(box[3], py),
-      ];
-    open = true;
+    const box = boxes[boxes.length - 1] as Box;
+    boxes[boxes.length - 1] = [
+      Math.min(box[0], px),
+      Math.min(box[1], py),
+      Math.max(box[2], px),
+      Math.max(box[3], py),
+    ];
   };
   const finish = (): boolean => {
-    switch (command) {
-      case '':
-      case 'Z':
-        return numbers.length === 0;
-      case 'H':
-        for (const n of numbers) point(n, y);
-        return numbers.length > 0;
-      case 'V':
-        for (const n of numbers) point(x, n);
-        return numbers.length > 0;
-      case 'M':
-      case 'L':
-      case 'C':
-      case 'S':
-      case 'Q':
-      case 'T':
-        for (let i = 0; i + 1 < numbers.length; i += 2) point(numbers[i] ?? 0, numbers[i + 1] ?? 0);
-        return numbers.length > 0 && numbers.length % 2 === 0;
-      default:
-        return false;
-    }
+    if (command === '' || command === 'Z') return numbers.length === 0;
+    const arity = ARITY[command];
+    if (arity === undefined || numbers.length === 0 || numbers.length % arity !== 0) return false;
+    if (command === 'H') for (const n of numbers) point(n, y);
+    else if (command === 'V') for (const n of numbers) point(x, n);
+    else for (let i = 0; i < numbers.length; i += 2) point(numbers[i] ?? 0, numbers[i + 1] ?? 0);
+    return true;
   };
   for (const [token] of d.matchAll(TOKEN)) {
-    if (/[A-Za-z]/.test(token)) {
+    if (/^[A-Za-z]$/.test(token)) {
       if (!finish()) return null;
       if (token === 'M') open = false;
+      if (token === 'Z') {
+        // the current point returns to the subpath's start, and the next one begins there
+        [x, y] = [startX, startY];
+        open = false;
+      }
       command = token;
       numbers = [];
     } else numbers.push(Number(token));
   }
   return finish() ? boxes : null;
 }
+
+/** Whether one box lies within another: a letter's hole (the counter of B, O or d). */
+const within = (inner: Box, outer: Box) =>
+  inner !== outer &&
+  inner[0] >= outer[0] &&
+  inner[1] >= outer[1] &&
+  inner[2] <= outer[2] &&
+  inner[3] <= outer[3];
 
 /** A label's lines: letters whose boxes overlap in height are on one line. */
 function lines(boxes: Box[]): Box[][] {
@@ -90,12 +100,16 @@ function lines(boxes: Box[]): Box[][] {
 /**
  * A label's cap height: its tallest line's. One label is one text layer, at one size, so a
  * line of punctuation alone (a dash set apart, which stands on no baseline of letters) does
- * not make it smaller. A line's baseline is the bottom most of its letters share, to half a
- * unit; its cap height runs from there to the top of the letters standing on it.
+ * not make it smaller. A letter's holes are left out first, so they do not vote for a
+ * baseline of their own. A line's baseline is the bottom most of its letters share, to half
+ * a unit; its cap height runs from there to the top of the letters standing on it, so a line
+ * with ascenders (l, d, G) reads a little tall, by up to the ascender's height over the
+ * capitals', which errs large.
  */
 export function capHeight(boxes: Box[]): number | null {
   let tallest: number | null = null;
-  for (const line of lines(boxes)) {
+  for (const all of lines(boxes)) {
+    const line = all.filter((b) => !all.some((outer) => within(b, outer)));
     const bottoms = new Map<number, number>();
     for (const b of line) {
       const at = Math.round(b[3] * 2) / 2;
@@ -112,41 +126,54 @@ export function capHeight(boxes: Box[]): number | null {
   return tallest;
 }
 
-/**
- * The scale the render service draws the illustration at: its viewport's `matrix(a 0 0 a e
- * f)`, which fits it to the figure's frame, or 1 where there is none. Anything else (a
- * rotation, a skew, unequal scales, another form) gives null.
- */
-function viewportScale(svg: string): number | null {
-  const at = svg.indexOf('svg-pan-zoom_viewport');
-  if (at < 0) return 1;
-  const start = svg.lastIndexOf('<', at);
-  const end = svg.indexOf('>', at);
-  const tag = svg.slice(start, end < 0 ? svg.length : end);
-  const matrix = /\stransform="matrix\(([^)]*)\)"/
-    .exec(tag)?.[1]
-    ?.split(/[\s,]+/)
+/** A plain scale from a `matrix(a 0 0 a e f)`, or null for anything else. */
+function plainScale(transform: string | undefined): number | null {
+  const matrix = /^\s*matrix\(([^)]*)\)\s*$/
+    .exec(transform ?? '')?.[1]
+    ?.trim()
+    .split(/[\s,]+/)
     .map(Number);
   if (matrix?.length !== 6) return null;
   const [a, b, c, d] = matrix as [number, number, number, number];
   return a > 0 && b === 0 && c === 0 && d === a ? a : null;
 }
 
+const ATTRIBUTE = (name: string) => new RegExp(`\\s${name}="([^"]*)"`);
+const TRANSFORM = ATTRIBUTE('transform');
+const CLASS = ATTRIBUTE('class');
+const ID = ATTRIBUTE('id');
+const D = ATTRIBUTE('d');
+
 /**
  * An illustration's lettering: its smallest label's size, in the SVG's pixels, as a font's of
  * the same cap height, or null where it has none read; and how many label paths could not be
- * read (outlines in a form not read here, or all of them where the viewport is not a plain
- * scale), which the caller counts as unread labels. A transform on a label, or between it and
- * the viewport, is not known here; release 98's illustrations have none.
+ * read, which the caller counts as unread labels. A label is not read when its outlines are
+ * in a form not read here, or when it, or a group it is in, is transformed (other than the
+ * render service's viewport, whose plain scale fits the illustration to the figure's frame
+ * and is applied; a viewport that is not a plain scale leaves every label inside it unread).
+ * The groups are followed through the markup in one pass of its tags.
  */
 export function lettering(svg: string): { smallest: number | null; unread: number } {
-  const scale = viewportScale(svg);
   let smallest: number | null = null;
   let unread = 0;
-  for (const id of svg.matchAll(/\sid="PATHWAY TEXT[^"]*"/g)) {
-    const start = svg.lastIndexOf('<', id.index);
-    const end = svg.indexOf('>', id.index);
-    const d = /\sd="([^"]*)"/.exec(svg.slice(start, end < 0 ? svg.length : end))?.[1];
+  // for each open group: the scale it applies, or null where it transforms otherwise
+  const groups: (number | null)[] = [];
+  for (const [tag, close, name = '', attributes = ''] of svg.matchAll(
+    /<(\/?)(g|path)\b([^>]*)>/g
+  )) {
+    if (name === 'g') {
+      if (close) groups.pop();
+      else if (!attributes.trimEnd().endsWith('/')) {
+        const transform = TRANSFORM.exec(attributes)?.[1];
+        const viewport = /\bsvg-pan-zoom_viewport\b/.test(CLASS.exec(attributes)?.[1] ?? '');
+        groups.push(transform === undefined ? 1 : viewport ? plainScale(transform) : null);
+      }
+      continue;
+    }
+    if (close || !(ID.exec(attributes)?.[1] ?? '').startsWith('PATHWAY TEXT')) continue;
+    let scale: number | null = TRANSFORM.test(tag) ? null : 1;
+    for (const g of groups) scale = scale === null || g === null ? null : scale * g;
+    const d = D.exec(attributes)?.[1];
     const boxes = d === undefined ? null : outlineBoxes(d);
     const cap = boxes === null ? null : capHeight(boxes);
     if (scale === null || cap === null || !(cap > 0)) {

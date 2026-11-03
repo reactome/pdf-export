@@ -250,8 +250,14 @@ synthetic documents, on this host under load.
     letters share) to the top of the letters standing on it, the label taken at its tallest
     line, since one label is one text layer at one size and a dash set apart on a line of
     its own would otherwise pass for small letters (five illustrations have such lines).
-    The cap height is taken as a font's of the same cap height (0.71 of its size, Roboto's
-    0.711, Arial's 0.716). Release 98's 221 illustrations, every one with labels, none
+    A letter's holes (the counters of B, O, d) lie within its outline and are left out
+    before the vote, or a short label's holes could set its baseline. A line with
+    ascenders (l, d, G) reads a little tall, by up to the ascender's height over the
+    capitals' (about 8% in Roboto), which errs large; a long name, which each
+    illustration's smallest label is, reads within a few percent. The cap height is taken
+    as a font's of the same cap height (0.71 of its size, Roboto's 0.711, Arial's 0.716).
+    A label transformed, or in a transformed group other than the render service's
+    viewport, is not read and leaves the figure unmeasured. Release 98's 221 illustrations, every one with labels, none
     transformed:
     - every label's cap height is 8.49–8.94 of the file's units, a font of about 12 px,
       as the diagrams' labels are;
@@ -265,10 +271,9 @@ synthetic documents, on this host under load.
   - **Decision** (user, 3 Nov 2026), for the reader, who reads the book on a screen: most
     screens are wider than tall, so a wide figure on a landscape page fills more of one;
     no page makes most diagrams' labels readable unzoomed, so every figure links to its
-    interactive form on the website (FR-003), where they are. The rule is two constants
-    in `src/layout/figure.ts`, `FLOOR_PT` (the report's threshold) and the comparison in
-    `place()`, so curators who prefer another, such as portrait unless the labels would
-    fall below a size, change it there. `measure()` reads an illustration's lettering
+    interactive form on the website (FR-003), where they are. The rule is in `src/layout/figure.ts`: the constant `FLOOR_PT` (the report's threshold)
+    and the orientation chosen in `place()`, so curators who prefer another, such as
+    portrait unless the labels would fall below a size, change it there. `measure()` reads an illustration's lettering
     (`src/layout/lettering.ts`) as it reads text's sizes, the smaller of the two counting;
     a label whose outlines are not read (a relative command, an arc, a viewport that is
     not a plain scale) counts as unread, so the figure is reported as unmeasured.
