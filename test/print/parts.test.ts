@@ -231,6 +231,43 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     }
   });
 
+  test("a figure's link is as wide as the figure, not the text", async () => {
+    // Reaction one's figure, narrower than the text: its link's rectangle is the figure's,
+    // told from the name's link to the same page by its height
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
+    assert.ok(place);
+    const printer = started;
+    assert.ok(printer);
+    const html = layoutBookPart(alpha, [place], options).html;
+    const figure =
+      /<a class="figure-link" href="([^"]*)"><svg\b[^>]*\swidth="([\d.]+)pt" height="([\d.]+)pt"/.exec(
+        html
+      );
+    assert.ok(figure?.[1] && figure[2] && figure[3], 'no figure link');
+    const href = figure[1].replace(/&amp;/g, '&');
+    const width = Number(figure[2]);
+    const height = Number(figure[3]);
+    assert.ok(width < PORTRAIT.width - 50, String(width));
+    const task = getDocument({ data: (await printer.part(html)).slice() });
+    try {
+      const doc = await task.promise;
+      const rects: number[][] = [];
+      for (let i = 1; i <= doc.numPages; i++) {
+        for (const a of await (await doc.getPage(i)).getAnnotations()) {
+          const { url, rect } = a as { url?: unknown; rect?: number[] };
+          const [, y1 = 0, , y2 = 0] = rect ?? [];
+          if (url === href && Math.abs(y2 - y1 - height) < 2 && rect) rects.push(rect);
+        }
+      }
+      assert.equal(rects.length, 1, href);
+      const [x1 = 0, , x2 = 0] = rects[0] ?? [];
+      assert.ok(Math.abs(x2 - x1 - width) < 2, `${String(x2 - x1)} for ${String(width)}`);
+    } finally {
+      await task.destroy();
+    }
+  });
+
   test('a portrait figure counts its margins, and a reaction its events before and after', () => {
     const alpha = bookPdf(built, 'Alpha pathway');
     const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
