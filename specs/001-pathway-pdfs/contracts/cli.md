@@ -89,11 +89,10 @@ the figures already drawn by `figures`.
 - **Exit 0:** the book is written, and `check-book` passed on it. The folder is written
   beside its name and moved into place, so a failed run never leaves a partial book. A
   run is whole: a failure in any PDF writes none, and the step is run again.
-- **`--out`** must be absent or empty (exit 2 otherwise), as for `figures`: an old book
-  is never replaced in place.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
-- **Exit 2:** bad arguments, or the graph cannot be reached at the start.
+- **Exit 2:** bad arguments; an `--out` that is not absent or empty, as for `figures`
+  (an old book is never replaced in place); or the graph cannot be reached at the start.
 
 ## `pdf-export check-book <folder>`
 
@@ -107,8 +106,9 @@ FR-011's check, alone. Also run by `book`.
 - **Exit 0:** every check passed.
 - **Exit 1:** at least one fault, one line each:
   - `fault missing-pathway <stId>`: a top-level pathway with no PDF;
-  - `fault extra-file <file name>`: a PDF in the folder that is no top-level pathway's;
-  - `fault <kind> <file name> <stId>` for the rest, naming the PDF, as an event under two
+  - `fault extra-file "<file name>"`: a PDF in the folder that is no top-level pathway's;
+  - `fault <kind> "<file name>" <stId>` for the rest (the file name quoted as a JSON
+    string, as names hold spaces), naming the PDF, as an event under two
     top-level pathways is in both: `not-in-contents`, `not-in-outline`, `no-name`,
     `no-stable-id`, `missing-figure` and `broken-link`.
 

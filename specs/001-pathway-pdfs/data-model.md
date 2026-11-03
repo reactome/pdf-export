@@ -117,7 +117,7 @@ Cases).
 
 The release's folder of PDFs, one `BookPdf` per human top-level pathway (FR-001), named
 as today's (the pathway's name and `.pdf`). A name a file system cannot hold (holding
-`/` or NUL), or two names equal ignoring case, is a preflight fault `bad-file-name
+`/` or NUL, or longer than 255 bytes with `.pdf`), or two names equal ignoring case, is a preflight fault `bad-file-name
 <stId>`; none of today's does.
 
 In the code (`src/model/types.ts`), a book's PDF and a single event's PDF are one
