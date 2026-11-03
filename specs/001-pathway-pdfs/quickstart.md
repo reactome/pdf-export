@@ -82,11 +82,11 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
 then `pdf-export book` from its folder.
 
 - `check-book` passes.
-- **SC-001:** every top-level pathway and every event, in the contents list and the
-  bookmarks.
+- **SC-001:** a PDF for every top-level pathway, and every event in its PDF's contents
+  list and bookmarks.
 - **SC-003:** `book`'s time against step 1's.
 - **SC-010:** `figures`' time, recorded for the release's owners.
-- **SC-004:** it opens in Chromium's viewer, Firefox's viewer and a Poppler-based viewer.
+- **SC-004:** each PDF opens in Chromium's viewer, Firefox's viewer and a Poppler-based viewer.
   A sample of bookmarks and links is followed in each.
 - **SC-002:** `compare` against `event-pdf`'s book shows only recorded differences.
 
@@ -103,7 +103,7 @@ then `pdf-export book` from its folder.
 
 - The image runs twice: `figures`, with the graph, the release's files, the render
   service and its content service, writing the figures' folder; then `book`, with the graph, the release's files
-  and that folder, writing one PDF.
+  and that folder, writing the book's folder of PDFs.
 - A planted fault fails the step.
 - **Story 5, scenario 3:** a release file removed from the folder fails the preflight,
   naming the file, before anything is printed, and no book is written.

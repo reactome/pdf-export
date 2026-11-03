@@ -76,9 +76,12 @@ PDFs have no bookmarks (outline) today.
 The release then checks the folder: that it exists, that every file named in the
 previous release's list is there, and that no file shrank by more than a tolerance.
 
-Four things are to change:
+Three things are to change, and one stays:
 
-- **One book:** the release's book becomes a single PDF.
+- **The book stays a folder of PDFs,** one per top-level pathway, archived as today's
+  (user's decision, 3 Nov 2026, in place of the single PDF first specified: the book is
+  large and grows with every release; separate files are printed in parallel, stay a
+  size readers can open, and fail and are remade one at a time).
 - **The new look:** figures are drawn as the new website's pathway browser draws them.
 - **Loose licences:** `event-pdf` is AGPL-3.0, depends on GPL-3.0 code, and embeds a
   proprietary font.
@@ -86,13 +89,13 @@ Four things are to change:
 
 ## User Scenarios & Testing _(mandatory)_
 
-### User Story 1 - The release's book is one PDF from the graph (Priority: P1)
+### User Story 1 - The release's book from the graph (Priority: P1)
 
-A reader downloads Reactome's book for a release and gets one PDF:
+A reader downloads Reactome's book for a release and gets, as today, one PDF for each of
+human's top-level pathways, in full depth. Each has:
 
 - a cover and an introduction;
 - a contents list;
-- each of human's top-level pathways, in full depth;
 - nested bookmarks;
 - the links of FR-003.
 
@@ -104,22 +107,22 @@ It is made from the release's graph during the release.
 **Independent Test**: make the book from a private copy of a release's graph. Then
 check that:
 
-- it opens as one PDF;
-- its contents list and bookmarks name every top-level pathway and every event beneath
-  them;
+- there is one PDF for each top-level pathway, and no other;
+- each one's contents list and bookmarks name every event beneath its pathway;
 - each event's section agrees with `event-pdf`'s by FR-012.
 
 **Acceptance Scenarios**:
 
 1. **Given** a release's graph and files, **When** the book is made, **Then** one PDF
-   is written, holding every human top-level pathway, in the order of FR-002, and every
-   event beneath them.
-2. **Given** the book, **When** a reader opens its bookmarks, **Then** they nest as the
-   events nest. Each place an event appears has an entry, pointing at its one full
-   section.
-3. **Given** an event held by several pathways, **When** the book is made, **Then** its
-   full section is at its first place in document order. Each later place shows a short
-   entry (name and stable identifier) linked to it.
+   is written for each human top-level pathway, holding every event beneath it.
+2. **Given** one of the book's PDFs, **When** a reader opens its bookmarks, **Then** they
+   nest as the events nest. Each place an event appears has an entry, pointing at its
+   one full section in that PDF.
+3. **Given** an event held by several pathways, **When** the book is made, **Then** in
+   each PDF that holds it, its full section is at its first place in document order, and
+   each later place in that PDF shows a short entry (name and stable identifier) linked
+   to it. An event under two top-level pathways is written in full in both PDFs, as
+   today.
 4. **Given** the book and `event-pdf`'s output for the same graph, **When** they are
    compared by FR-012, **Then** they agree, apart from the differences under
    Assumptions and any others recorded with their reason.
@@ -271,9 +274,9 @@ of pages with today's book.
 2. **Given** a section, **When** it is laid out, **Then** its parts are set apart by
    space, type and at most thin rules, never boxes or borders, with the margins,
    running headers, page numbers and figure sizes of FR-016.
-3. **Given** the cover, **When** it is written, **Then** it holds the parts FR-002 lists
-   (the book) or the Background lists (a single-event PDF; for a pathway, its diagram),
-   laid out in the website's style with Reactome's logo.
+3. **Given** the cover, **When** it is written, **Then** it holds the parts the
+   Background lists (for a pathway, its diagram), laid out in the website's style with
+   Reactome's logo.
 4. **Given** a new version of the website's theme, **When** this repository updates to
    it, **Then** the PDFs follow it with no colour value changed in this repository.
 
@@ -283,11 +286,12 @@ of pages with today's book.
 
 - **An event with no summation, literature or edit history:** its section leaves that
   part out, as today, and the run does not fail.
-- **An event held by many pathways:** in the book, written once with linked entries
-  elsewhere (Story 1, scenario 3). In a single-event PDF, as today: once.
-- **Very large pathways** (hundreds of events) and **the human book's size** (thousands
-  of pages): the book still completes within SC-003. It is still one file, and it opens
-  and searches in the readers of SC-004.
+- **An event held by many pathways:** in each of the book's PDFs, written once with
+  linked entries at its later places (Story 1, scenario 3). In a single-event PDF, as
+  today: once.
+- **Very large pathways** (hundreds of events, the largest of today's book's files 3,760
+  pages): the book still completes within SC-003, and each file opens and searches in
+  the readers of SC-004.
 - **Text with HTML, special characters or very long names:** written legibly, with no
   markup shown as text.
 - **A character no embedded typeface draws** (FR-017): in the book, one of a fixed list
@@ -310,16 +314,15 @@ of pages with today's book.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST produce the release's book as a single PDF holding each of
-  human's top-level pathways in full depth.
-- **FR-002**: The book MUST have:
-  - one cover: Reactome's logo, the title "The Reactome Book" and the release, no
-    diagram and no excerpt note, the names across every event in the book (sorted, each
-    once), and the institutions, licence and date of the Background's cover;
+- **FR-001**: The system MUST produce the release's book as one PDF for each of human's
+  top-level pathways, in full depth, named as today's (the pathway's name and `.pdf`),
+  in one folder.
+- **FR-002**: Each of the book's PDFs MUST have:
+  - the Background's cover, for its top-level pathway (with its diagram, the names
+    across the events in that PDF, and no excerpt note);
   - an introduction;
   - a contents list before the sections;
-  - nested bookmarks;
-  - the top-level pathways in order of their names, ignoring case.
+  - nested bookmarks.
 - **FR-003**: Each PDF MUST link:
   - each contents entry and bookmark to its section;
   - each pathway in an event's location to its section where the PDF holds it (otherwise
@@ -333,15 +336,15 @@ of pages with today's book.
     pathway's diagram or illustration in the Pathway Browser, the event selected where an
     ancestor's diagram or illustration draws it, and a reaction's figure to its page, which opens it there.
 - **FR-004**: An event held by more than one pathway MUST be written in full once in a
-  PDF, at its first place in document order. In the book, its later places MUST show a
-  short entry (name and stable identifier) linked to that section.
+  PDF, at its first place in document order. In the book's PDFs, its later places MUST
+  show a short entry (name and stable identifier) linked to that section.
 - **FR-005**: For each event, the system MUST write the parts the Background lists,
   in that order.
 - **FR-006**: The system MUST produce the PDF of one event of any species by stable
   identifier:
   - at depth 0 or 1, 1 by default;
   - with the cover and introduction of the Background; nested bookmarks; and, where the
-    Background has a contents list, that list before the sections, as in the book;
+    Background has a contents list, that list before the sections, as in the book's;
   - given an analysis token, with the analysis overlay of the Background, for the event's
     species.
 
@@ -375,22 +378,23 @@ of pages with today's book.
     and the analysis section's explanations are taken from the website's current wording,
     supplied by the release's owners, or written anew.
 - **FR-010**: The book's step MUST run as a container image with the release's graph and
-  files as inputs, as today's step does, and write the book as one PDF in place of the
-  folder. Its figures are drawn before it, by a step of the same image with the render service and its content
+  files as inputs, as today's step does, and write the book's folder of PDFs, which the
+  release archives as it does today's, its PDFs made several at a time. Its figures are drawn before it, by a step of the same image with the render service and its content
   service beside it, into a folder the book's step also takes as an input (SC-010).
 - **FR-011**: A check MUST fail the book's step on any of these:
-  - a missing top-level pathway;
-  - an event missing from the contents list or the bookmarks;
+  - a top-level pathway with no PDF, or a PDF in the folder that is no top-level
+    pathway's;
+  - an event missing from its PDF's contents list or bookmarks;
   - a section with no name or no stable identifier;
   - a pathway's or reaction's full section with no figure, where the figure's source
     exists (its own or an ancestor's diagram file, its EHLD, or for a reaction the
     graph);
-  - a broken internal link.
+  - a broken internal link in any of the PDFs.
 - **FR-012**: The output MUST be compared with `event-pdf`'s for the same graph, by
   meaning:
   - a single-event PDF's cover: its title, whether it has a diagram and an excerpt note,
-    and the count of distinct names; the book's one cover: the count of distinct names
-    across today's files' covers;
+    and the count of distinct names; each of the book's PDFs' covers likewise, against
+    today's file for the same top-level pathway;
   - the introduction: the release and the counts;
   - with an analysis, the analysis's properties: the values it reports (such as its type,
     the identifiers found and in all, the pathways hit, projection, interactors, species,
@@ -453,8 +457,8 @@ of pages with today's book.
 
 - **Event**: a pathway or a reaction, with the parts FR-005 lists and the events it
   holds.
-- **Book**: the release's single PDF: cover, introduction, contents, sections, bookmarks
-  and links.
+- **Book**: the release's folder of PDFs, one per human top-level pathway, each with its
+  cover, introduction, contents, sections, bookmarks and links.
 - **Single-event PDF**: one event's PDF for the website, at depth 0 or 1, with or
   without an analysis.
 - **Section**: one event's pages, or in the book a short entry pointing at them.
@@ -468,16 +472,17 @@ of pages with today's book.
 
 ### Measurable Outcomes
 
-- **SC-001**: For a release, the book holds 100% of human's top-level pathways and every
-  event beneath them. Each event is reachable from the contents list and from the
-  bookmarks.
+- **SC-001**: For a release, the book holds a PDF for 100% of human's top-level pathways,
+  each with every event beneath it. Each event is reachable from its PDF's contents list
+  and bookmarks.
 - **SC-002**: Compared with `event-pdf`'s output for the same private graph by FR-012,
   the book and a sample of single-event PDFs agree. The only differences are those under
   Assumptions and others recorded with their reason.
 - **SC-003**: From its figures already drawn (SC-010), the book is made in no more time
   than `event-pdf` takes to make today's book from the same private graph on the same
   machine, measured as the baseline.
-- **SC-004**: The book opens, and its bookmarks and links work, in three readers:
+- **SC-004**: Each of the book's PDFs opens, and its bookmarks and links work, in three
+  readers:
   Chromium's built-in viewer, Firefox's built-in viewer, and a Poppler-based desktop
   viewer on Linux.
 - **SC-005**: A single-event PDF at depth 1, for a sample of pathways and reactions on
@@ -520,10 +525,9 @@ of pages with today's book.
 
 - **The book's scope:** human's top-level pathways, as today. Other species' books are
   out of scope for spec 001.
-- **The book's name and place:** `TheReactomeBook.pdf`, published where today's archive
-  is, without an archive around it (a PDF compresses its own content). The release's
-  owners agree the name. The website's download page and the cover's excerpt note point
-  at it.
+- **The book's name and place:** today's: a folder of PDFs named after their top-level
+  pathways, archived and published as today's archive is, under today's name. The
+  website's download page and the cover's excerpt note point at it as they do today.
 - **The figures' folder in service:** the single-event service reads the release's
   figures' folder, the one the book's figures step drew, so a PDF without an analysis
   of a human event draws none on request; other species' figures, and any the folder
@@ -533,8 +537,9 @@ of pages with today's book.
 - **The figures' step:** drawing the figures before the book adds a step of its own,
   about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
   machine and time are open, to be agreed with the release's owners (SC-010).
-- **The release's check:** the check of FR-011 replaces the release's file-list check
-  for the book. The release's owners agree the switch.
+- **The release's check:** the check of FR-011 joins the release's file-list check,
+  which, with the files named as today's, can keep running. The release's owners agree
+  the arrangement.
 - **The render service beside the figures' step:** the figures come from the website's
   render service, with its content service, run on the release's graph and files beside
   the step that draws the book's figures before the book (SC-010; plan, research R3,
@@ -546,14 +551,9 @@ of pages with today's book.
 - **Expected differences from `event-pdf`** (FR-012):
   - the bookmarks, in every PDF;
   - the contents list before the sections, not after, in every PDF that has one;
-  - the book's one cover, in place of a cover per file;
-  - short entries at every later place an event recurs in the book, where today's files
-    write nothing there;
-  - in one book, links that now reach events in other top-level pathways, where each
-    per-pathway file could not;
+  - short entries at every later place an event recurs in one of the book's PDFs, where
+    today's files write nothing there;
   - rewritten boilerplate (FR-009);
-  - links from location entries are as today, but events now outside a per-pathway file
-    are inside the one book;
   - a section with no figure today, where the new one has a figure, or the reverse,
     each recorded;
   - the look: layout, colours and typefaces (User Story 6);
@@ -564,7 +564,6 @@ of pages with today's book.
     (and so which five references are shown), summations, diseases and the events
     before and after in the database's order; the new ones in the curators' order
     (plan, research R2);
-  - top-level pathways by name, not by database identifier (FR-002);
   - with an analysis, the identifiers found where a pathway today's filter leaves out
     (one with no p-value, say) holds an identifier no kept pathway does: counted now,
     not today (research R6).
@@ -575,8 +574,9 @@ of pages with today's book.
   licence today, though its repository is CC0; the theme's owners are asked to declare
   it in the package, and until then CI's licence check is told it is CC0, with the
   reason.
-- **One book's size:** the human book runs to thousands of pages. It is printed in parts
-  and joined into one PDF (plan, research R4).
+- **The book's size:** the human book runs to about 23,500 pages, in 29 files, the
+  largest 3,760 pages. A file past about 200 pages is printed in parts and joined into
+  its one PDF; the files are made several at a time (plan, research R4).
 - **The analysis result** is read through the analysis service, which reads the files
   it writes by its own rules; its stored format is Java's own (plan, research R6). Tests
   use a non-production instance or a stub, never production.

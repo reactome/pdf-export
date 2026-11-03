@@ -43,7 +43,8 @@ contracts/figures.md).
 
 ## `pdf-export book`
 
-Writes the release's book (Story 1), from the figures already drawn by `figures`.
+Writes the release's book (Story 1), one PDF per top-level pathway into a folder, from
+the figures already drawn by `figures`.
 
 | Flag         | Environment                    | Meaning                                                                            |
 | ------------ | ------------------------------ | ---------------------------------------------------------------------------------- |
@@ -54,8 +55,8 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
 | `--files`    |                                | the release's folder: `diagram/`, `ehld/` and the EHLD summary                     |
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                       |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                    |
-| `--out`      |                                | the output path; default `TheReactomeBook.pdf`                                     |
-| `--parallel` |                                | parts printed at once; default 4                                                   |
+| `--out`      |                                | the folder written; default `TheReactomeBook`                                      |
+| `--parallel` |                                | parts printed at once, across the PDFs; default 4                                  |
 | `--report`   |                                | where the run report (data-model.md) is written, as JSON                           |
 
 - **The preflight,** before anything is printed (and the character check's second half,
@@ -82,15 +83,15 @@ Writes the release's book (Story 1), from the figures already drawn by `figures`
   - **on reading each figure, before its part is printed** (and by `figures`, after
     each is drawn; in `book` a backstop for a folder changed by hand), in the text of its SVG's labels, a fault naming the figure's event: the backstop for anything the first
     check's sources did not hold. The book is printed in parts (research R4), so a fault
-    here can come after earlier parts are printed; the step still ends with exit 1 and
-    no book written, the file being moved into place only at the end.
-- **Exit 0:** the book is written, and `check-book` passed on it. The file is written
+    here can come after earlier parts or PDFs are printed; the step still ends with exit
+    1 and no book written, the folder being moved into place only at the end.
+- **Exit 0:** the book is written, and `check-book` passed on it. The folder is written
   beside its name and moved into place, so a failed run never leaves a partial book.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
 - **Exit 2:** bad arguments, or the graph cannot be reached at the start.
 
-## `pdf-export check-book <file>`
+## `pdf-export check-book <folder>`
 
 FR-011's check, alone. Also run by `book`.
 
@@ -101,15 +102,17 @@ FR-011's check, alone. Also run by `book`.
 
 - **Exit 0:** every check passed.
 - **Exit 1:** at least one fault. Each is printed as `fault <kind> <stId>`. The kinds:
-  `missing-pathway`, `not-in-contents`, `not-in-outline`, `no-name`, `no-stable-id`,
-  `missing-figure` and `broken-link`. The book is untagged, so sections are found by
+  `missing-pathway`, `extra-file <name>`, `not-in-contents`, `not-in-outline`,
+  `no-name`, `no-stable-id`, `missing-figure` and `broken-link`, each within the PDF of
+  the top-level pathway it concerns. The PDFs are untagged, so sections are found by
   the outline and the text at each entry's destination (research R8).
 
-## `pdf-export compare <reference> <new.pdf>`
+## `pdf-export compare <reference> <new>`
 
 FR-012's comparison, for development only; it is never run by the release. The reference
 is a PDF, or a folder of today's PDFs, as today's book is one file per top-level
-pathway; their covers' distinct names are counted across the folder.
+pathway, and the new side likewise; a folder is compared file by file, by top-level
+pathway.
 
 - **Output:** a JSON report of the differences by part and kind, with counts. Names
   appear only as counts and hashes (FR-013).
