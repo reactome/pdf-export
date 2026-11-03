@@ -72,7 +72,7 @@ Each opens, has the parts of the spec's Background in order and has bookmarks.
   pdf.js at the same scale (research R8): no more than 1% of pixels differ.
 
 - **The errors:** an unknown identifier, a non-event, a bad depth, an unknown token, a
-  malformed token, an expired token and a token gone within the period each give
+  malformed token, an expired token and a token gone within the service's 7 days each give
   contracts/service.md's answer, and a bad identifier with a bad token gives the
   identifier's.
 

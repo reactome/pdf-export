@@ -156,7 +156,7 @@ Compare each with `event-pdf`'s by FR-012.
    the analysis's properties, the entities and interactors found per event, and figures
    overlaid with the analysis.
 4. **Given** an identifier that names no event, an unknown token, or a token whose
-   result is gone though its date is still within the retention period, **When** a PDF
+   result is gone though its date is still within the analysis service's 7 days, **When** a PDF
    is asked for, **Then** the answer says which of the three, by the analysis service's
    token rules, and no PDF is made. Today's endpoint answers an empty response for
    either token case; telling them apart is new.
@@ -298,10 +298,11 @@ of pages with today's book.
   the summary names for a pathway the graph holds, but the files lack. (An entry for an
   event the graph does not hold is ignored: plan, research R7.) The step fails and names
   it (Story 5, scenario 3).
-- **An analysis token unknown, malformed, older than the retention period, or gone
-  within it:** a malformed token, or one older than the retention period, is answered
-  as unknown; one whose result is gone within the period is answered as gone (Story 2,
-  scenario 4).
+- **An analysis token unknown, malformed, or gone:** a malformed token is answered as
+  unknown, as is one the analysis service answers 404 (no result, and dated more than 7
+  days ago or not at all); one it answers 410 (no result, though dated within its 7 days)
+  is answered as gone. Whether a token has expired is the analysis service's to say, as
+  it answers a result still stored whatever its date (Story 2, scenario 4; research R6).
 - **A release file missing for a single-event PDF:** the PDF is made without that figure,
   as today, and the absence is logged; only the book's step fails on it.
 

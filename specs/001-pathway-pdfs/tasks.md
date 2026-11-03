@@ -136,8 +136,9 @@ for WebsiteAngular to ship it (T042).
   - **From #106's review (#107):** the lettering reader left a letter's holes in, so on a short label a counter could win the baseline vote (BBB read 62% small; release 98's smallest labels, long names, were unaffected, and R4's numbers stand, recounted); read an exponent as a command; joined a subpath begun after a close without a move to the one before; took a command with the wrong count of numbers; and read a label transformed, or in a transformed group, at full size. Holes are now left out, an exponent (either case) is a number, a subpath after a close starts at the last one's start, each command's count is checked, and a transformed label is unread, the groups followed through the markup in one pass of its tags. An ancestor's illustration standing in for an event now links with the event selected. Stale wording of the 5 pt floor is gone from the code's comments and R4. Each was seen failing first.
   - **From #107's review (#109, replacing #108 after its review):** a dot or an accent met first could begin a line of its own that the letters beneath it missed, and a mark set high won a tied baseline vote; two identical subpaths each hid the other; the scan of tags read comments as markup and only double-quoted attributes, and missed a transform on a link, by style, a nested `<svg>`, and a label kept in `<defs>`. Lines are now the letters whose heights overlap, directly or through others; a tie goes to the lower bottom; only a smaller box within another is a hole; every element is followed, comments and character data left out, attributes in either quotes, and each of those leaves the label unread. The render service's viewport writes its scale by attribute and again by style, to six figures: the two must agree (found when this PR's first version read the real render as unmeasured; the tests' viewport now has both, as the render's does). FR-003 names an ancestor's illustration standing in. R4's numbers, recounted, stand. Each was seen failing first. From #108's review: two of its tests passed with their own fix undone, each rescued by the other (the line test by the tie-break, the tie test by the order the letters were written in); the line test now has two dotted letters, whose dots outvote the f on a line split off, and the tie test writes the mark first, each now failing with its own fix alone undone. Also from it: the scan of comments, and of tags never closed, was quadratic (40,000 comments took 12 s; both now under 250 ms, tested, though a tag left open by an unclosed quote stayed quadratic until #111); a close tag ends the element it names, so a stray one ends nothing; the viewport's class is matched whole; element names are known with a prefix or in capitals.
   - **From #109's review (#111, replacing #110 after its review):** a tag left open by an unclosed quote still made the scan quadratic (4 s); XML allows no `<` in a tag, so none is matched now, and every such tag ends at the next `<` (tested). A close tag that skips open elements (malformed markup, which could end the viewport and read later labels at the wrong scale) now leaves every label after it unread. A label in a title, a description or metadata is unread, as one in `<defs>` is. From #110's review: a tag holding a `<` was no longer matched, so its element went unseen and a label in it was read wrongly (unread on main); a `<` that would begin a tag, met between tags, now leaves every label after it unread, and the notes say which malformed markup is caught and which is not (a quote left open, a stray close tag ending the viewport itself). Release 98's 221 illustrations and the sample render read exactly as on main. Not looked for, as the render service writes none of it: a style element's rules, `display="none"`, an unquoted value, an entity in an id, a name in capitals taken as SVG's. Each fix was seen failing first.
+  - **From #111's review, recorded and not fixed** (three low findings, each on markup the render service does not write): a label whose own tag holds a `<` is dropped without being counted unread (it could be counted where the stray `<` is met); the notes on a quote left open are more cautious than the code needs; the cost grows with the square of the nesting depth, as on main.
 
-- [ ] T009 [P] Measure the analysis service's answers (research R6), on a private instance with a submitted analysis, never production. For each case, record the status and body in research R6:
+- [x] T009 [P] Measure the analysis service's answers (research R6), on a private instance with a submitted analysis, never production. For each case, record the status and body in research R6:
   - a good token;
   - an unknown one;
   - a malformed one;
@@ -147,12 +148,15 @@ for WebsiteAngular to ship it (T042).
 
   Also record its retention period, and whether its summary carries the count of identifiers found (otherwise `/download/{token}/result.json` is needed). Recorded answers are scrubbed of host names, paths and identifiers before they are committed.
 
+  - **Done (#112):** against a non-production instance on release 98, not a private one: nothing in its storage was touched, each case being a token the service reads by its own rules (analysis-core's `Tokenizer`, read alongside), and one small analysis was submitted. The period is 7 days, a constant in analysis-core, and the service judges it only when no result is stored: a result kept longer is still answered. So the token's date is no longer judged here (T021) and there is no `--retention` setting. A malformed token is the service's catch-all 500. Neither the summary nor `result.json` carries the found count; the found identifiers' CSV does, from the same set as today's book's count. Research R6 has the table.
+
 - [ ] T010 The analysis stub, `test/stubs/analysis.ts`. It is a small HTTP server on loopback that answers T009's recorded, scrubbed answers:
   - 404 (unknown);
   - 410 (gone within retention);
   - found entities and interactors on a reaction's first parent pathway;
   - a `found/interactors` 404 meaning none;
-  - `result.json` if T009 says it is needed;
+  - the found identifiers' CSV, `/download/{token}/entities/found/TOTAL/{name}.csv` (T009: neither the summary nor `result.json` has the count);
+  - a 500 in the service's catch-all form, as it answers a token that is not Base64;
   - a 503, for the `unavailable` answer.
 
   It can be written before T009, answering contract-shaped placeholders; T009's recorded answers replace them, and the task is ticked only then.
@@ -284,16 +288,15 @@ has the Background's parts in order, and bookmarks. Each error case gives its an
   Tests against T010's stub.
 
 - [ ] T021 [US2] Tokens, `src/analysis/token.ts`.
-  - A malformed token (not the analysis service's Base64 form) is `unknown-token`.
-  - A token older than the retention period is `unknown-token`. The period is the `--retention` setting, whose default is the period T009 reads (research R6).
-  - The service's 404 is `unknown-token`, and its 410 is `gone-token`.
+  - A malformed token is `unknown-token`: one the analysis service would fail to read (research R6: URL-decoding until unchanged fails, or Java's basic Base64 decoder refuses it).
+  - The token's date is not judged here: the service's 404 is `unknown-token`, its 410 is `gone-token`, and any other failure is `unavailable` (research R6, from T009).
 
   Tests for each case of T009's table, each seen failing.
 
 - [ ] T022 [US2] The service, `src/serve.ts` (contracts/service.md).
   - **Routes:** `GET /event/{stId}.pdf?depth&token` and `GET /health`.
   - **Figures:** every figure drawn on request, with the token where there is one; a figure that cannot be drawn leaves its section without it, logged. Reading the figures' folder is T047's, after T024.
-  - **Settings:** bind address (loopback by default), port, `--graph`, `--figures`, `--render`, `--analysis`, `--files`, `--site`, `--retention` and the concurrency limit, each with its environment variable where contracts/cli.md gives one.
+  - **Settings:** bind address (loopback by default), port, `--graph`, `--figures`, `--render`, `--analysis`, `--files`, `--site` and the concurrency limit, each with its environment variable where contracts/cli.md gives one.
   - **Answers:**
     - 200 with `Content-Disposition` naming the stable identifier;
     - 400 `bad-depth`, then 400 `not-an-event` or 404 `no-event`, then the token's answer (404 `unknown-token`, 410 `gone-token`), in that order;

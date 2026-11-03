@@ -188,7 +188,8 @@ Dockerfile
    - a single-event PDF's stages, with the render service's cache off (R7, SC-005);
    - the diagrams' widths against FR-016's floor (R4; measured by T008, which replaced the floor);
    - what the analysis service answers for an expired and a malformed token, and its
-     retention period, on a private instance (R6);
+     retention period (R6; measured by T009 on a non-production instance: the period is
+     the service's to judge, so none is set here);
    - the join's memory, and stamping page numbers after it (R4).
 2. **Foundations:**
    - the package, TypeScript, lint, Prettier and CI;
