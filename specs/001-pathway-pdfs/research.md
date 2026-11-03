@@ -395,16 +395,23 @@ own source, and the answers agree with them.
   the token's date is written and read in the JVM's default zone): a token dated 7 days
   23 hours ago is still 410, one dated 8 days ago 404, and one dated in the future 410.
   So the 7 days only tell a missing result's 410 from its 404; they delete nothing.
-- **How long a result is kept** is the service's own cleanup, hard-coded in its
-  configuration (`WebConfig`): every 10 s a checker (reactome-utils'
-  `LruFolderContentChecker`) measures the results folder, and only once it reaches its
-  maximum less a threshold (2.5 GB less 500 MB) deletes the files last accessed more than
-  a week ago, least recently used first, until it is under. (The service's API documents
-  its 410 as a result deleted for a new data release.) So retention depends on the folder's size and on use, not on a token's age: a
-  result read recently is kept, and a token older than 7 days whose result is still
-  stored is answered in full. Read from the code; not seen here, as no stored result
-  older than 7 days was at hand (five recorded tokens from September and October were
-  all 404).
+- **How long a result is kept** is not set by the token's age:
+  - The service's own cleanup is hard-coded in its configuration (`WebConfig`): every
+    10 s a checker (reactome-utils' `LruFolderContentChecker`) measures the results
+    folder, and only once it reaches its maximum less a threshold (2.5 GB less 500 MB)
+    deletes the files last accessed more than a week ago, least recently used first,
+    until it is under. "Last accessed" is the file system's access time, which a mount
+    may update at most daily or never, so a read result may or may not count as recent.
+  - Results are also removed outside the service's code: its API documents its 410 as a
+    result deleted for a new data release, and five recorded tokens from September and
+    October were all 404 here, which the cleanup alone would explain only if the folder
+    had passed about 2 GB. How and when is not known from here.
+  - Submitting the same data again reuses its earlier token while the service has not
+    restarted (an in-memory map), and runs the analysis again under it if its result is
+    gone: a token answered 404 can later be answered 200.
+  - So a token older than 7 days whose result is still stored is answered in full.
+    Read from the code; not seen here, as no stored result older than 7 days was at
+    hand.
 - **A stored result that cannot be read** (a class changed after an analysis-core
   upgrade, say) is the catch-all 500 (read, not run).
 - **The answers,** each `application/json;charset=UTF-8`:
@@ -415,6 +422,7 @@ own source, and the answers agree with them.
   | dated within 7 days (or in the future), no result stored                                     | 410    | `{"code":410,"reason":"Gone","messages":[]}`                                                                                                                    |
   | dated 8 days ago or more, no result stored                                                   | 404    | `{"code":404,"reason":"Not Found","messages":[]}`                                                                                                               |
   | Base64 of text with no date (no `_`)                                                         | 404    | as above                                                                                                                                                        |
+  | Base64 of `_` alone (`Xw==`): the date part is missing, and reading it fails                 | 500    | the 500 body below                                                                                                                                              |
   | not Base64 (`not-base64!`, or `QQ=` with the wrong padding), or a URL-decoding error (`%25`) | 500    | `{"code":500,"reason":"Internal Server Error","messages":["Please get in touch with our help desk ({help-desk address}) for more details about this problem"]}` |
   | a `/` in the token: encoded (`%2F`)                                                          | 400    | the servlet container's own HTML page, not the service's JSON                                                                                                   |
   | a `/` in the token: raw                                                                      | —      | another route: the framework's own JSON 404, or another endpoint (`{x}/resources`)                                                                              |
@@ -429,10 +437,18 @@ own source, and the answers agree with them.
   page of them), `resourceSummary`, `speciesSummary`, `expression` and `warnings`. **None
   of them is a count of identifiers found,** nor of identifiers submitted.
 - **`pathwaysFound` follows `includeDisease`:** the answer is filtered by the stored
-  analysis's own setting unless the request names one. For the analysis submitted here,
-  229 with disease pathways and 191 without. Today's book counts the stored result's
-  pathways unfiltered (229), as `includeDisease=true` gives; `identifiersNotFound` is the
-  stored not-found set's size, as today's book's.
+  analysis's own setting unless the request names one, and the summary it returns then
+  reports the request's setting, not the analysis's. For the analysis submitted here, 229
+  with disease pathways and 191 without.
+- **Today's book counts after its own filter:** it filters the stored result by species,
+  resource and importable-only (`filterBySpecies`, which writes the filtered pathways
+  back into the result), keeping disease pathways, those found for the resource and
+  those with a p-value, and counts the pathways hit and the identifiers found from what
+  is left. Under FR-006's defaults (all resources, not importable-only) that is
+  `pathwaysFound` with `includeDisease=true` (229 here, both ways), except for a pathway
+  without a p-value, which the two filters may treat differently; how often there is
+  one is not known. `identifiersNotFound` is the stored not-found set's size, as today's
+  book's.
 - **`/download/{token}/result.json`** has no such count either: its keys are `summary`,
   `pathways`, `notFound`, `expressionSummary` and `warnings`, and it was 468 KB for this
   four-identifier analysis.
@@ -442,7 +458,8 @@ own source, and the answers agree with them.
   as today's book's count (`getAnalysisIdentifiers()`, the found entities map's keys,
   which are equal when their ids are; interactors are a separate map, left out of both),
   so the count of distinct submitted identifiers in it, the header skipped, is that
-  count. Its values are not quoted. Each request writes a temporary file on the service's
+  count, but over all the stored pathways rather than the book's filtered ones: the same
+  except where a pathway left out by the filter holds an identifier no other does. Its values are not quoted. Each request writes a temporary file on the service's
   host, cleared within about half an hour.
 
 **Decision.**
@@ -454,11 +471,13 @@ own source, and the answers agree with them.
     such whatever the token.
   - A malformed token: `unknown-token` (404), as the service's answers to one (a 500, a
     400 page, another route) would read as `unavailable` or worse. Malformed is anything
-    but the form the service issues: once URL-decoded until it no longer changes (a
-    decoding error is malformed), letters and digits only, then at most two `=` making
-    the length a multiple of 4, and an unpadded length that is not 1 modulo 4. The
-    service's tokens, Base64 of digits and `_`, never hold `+` or `/`, so the rule refuses
-    none it issues. The token is sent percent-encoded as one path segment.
+    but the form the service issues: URL-decoded until it no longer changes (a decoding
+    error is malformed), it must be non-empty ASCII letters and digits with at most two
+    `=` of padding (the length then a multiple of 4, and not 1 modulo 4 without it), and
+    its Base64 must decode to `{14 digits}_{digits}`. A check of the Base64 alone is not
+    enough: `Xw==`, Base64 of `_`, is well formed and the service fails on it. The
+    service's tokens never hold `+` or `/`, so the rule refuses none it issues. The token
+    is sent percent-encoded as one path segment.
   - The service's 404: `unknown-token`. Its 410, for a result not stored though its date
     is within 7 days: `gone-token` (410). Its other answers, a 500 among them, are
     `unavailable`.
@@ -471,7 +490,10 @@ own source, and the answers agree with them.
   which grows with what was found, not with the pathways hit as `result.json` does; the
   total adds `/token/{token}`'s `identifiersNotFound`; the pathways hit are its
   `pathwaysFound`, asked for with `includeDisease=true` so that an analysis submitted
-  without disease pathways is counted as today's book counts it.
+  without disease pathways is counted as today's book counts it. Where a pathway has no
+  p-value the counts may differ from today's book's; the comparison (FR-012) records any
+  such difference. The analysis's own `includeDisease`, if shown, is read from an answer
+  asked for without the parameter.
 - pdf-export reads the analysis through the analysis service's API, at an address that
   is a setting. It is the same service, reading the same files by the same rules, and
   the render page reads it too, so a PDF's figures and its text agree.

@@ -25,8 +25,8 @@ inside the analysis service. It draws its figures with the same Java exporters a
   database id or "Homo sapiens". One the graph does not know is answered 404, before the
   token is read. A species the analysis has no result for gives a report with no
   pathways.
-- **The token:** one the service does not know is answered 404; one whose result a new
-  release deleted, 410.
+- **The token:** one the service answers 404 is answered 404; one it answers 410
+  (no result stored though the token is dated within the service's 7 days (a release's deletion, say)), 410 (spec 001 research R6).
 - **The number of pathways** to report: 25 by default, clamped to 1–50.
 - **The resource** to sort and filter by (`TOTAL` by default): one the result does not
   hold is silently replaced by the result's default (the only resource besides `TOTAL`
@@ -167,8 +167,8 @@ the statuses, the file names and the reports.
    address; the colour profiles are accepted and ignored (the new look sets the
    colours).
 2. **Given** a species the graph does not know, **When** a report is asked for, **Then**
-   404, whatever the token; **given** an unknown token, 404; **given** a token whose
-   result a release deleted, 410.
+   404, whatever the token; **given** an unknown token, 404; **given** a token the
+   analysis service answers 410 (no result stored though the token is dated within the service's 7 days (a release's deletion, say)), 410.
 3. **Given** a number of pathways out of range, **Then** it is clamped to 1–50; **given**
    a resource the result lacks, **Then** the result's default is used, as today.
 4. **Given** more requests at once than the service makes, **When** they arrive, **Then**
@@ -260,7 +260,7 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
 - **FR-203**: The report MUST answer errors in the analysis service's JSON form
   (`code`, `reason`, `messages`), the form the analysis gateway in front of it also uses,
   so the address keeps one error format: 404 for a species the graph does not know
-  (before the token is read), 404 for an unknown token, 410 for one a release deleted
+  (before the token is read), 404 for an unknown token, 410 for one gone (no result stored though the token is dated within the service's 7 days (a release's deletion, say))
   (by the analysis service's answers), a number or flag that is not one as today's (the
   replay records which), 500 when making the PDF fails, and 503 when the
   analysis service, the graph or the render service cannot answer or the service is at
