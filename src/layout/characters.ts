@@ -26,7 +26,7 @@ export const SUBSTITUTIONS: ReadonlyMap<number, string> = new Map([
 export const REPLACEMENT = '\uFFFD';
 
 /** Characters never drawn, and so never uncovered: white space, controls, joiners. */
-const NEVER_DRAWN = /[\s\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
+export const NEVER_DRAWN = /[\s\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
 
 /** Text that holds nothing to substitute or replace, read at once. */
 const PLAIN = /^[\x20-\x7e\s]*$/;

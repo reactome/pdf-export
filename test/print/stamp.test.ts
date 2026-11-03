@@ -29,7 +29,13 @@ import { rewriteLinks } from '../../src/print/links.ts';
 import { writeOutline } from '../../src/print/outline.ts';
 import { printBook, type Part } from '../../src/print/parts.ts';
 import { Printer } from '../../src/print/print.ts';
-import { pageStamps, stampLook, stampPages, type FrontTarget } from '../../src/print/stamp.ts';
+import {
+  marginText,
+  pageStamps,
+  stampLook,
+  stampPages,
+  type FrontTarget,
+} from '../../src/print/stamp.ts';
 import { buildFixture, fixtureFigures, skipWithoutGraph, type Built } from '../layout/fixture.ts';
 
 interface Item {
@@ -259,10 +265,7 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
         const font = now.context.lookup(added[0], PDFDict);
         const base = font.lookup(PDFName.of('BaseFont'), PDFName).decodeText();
         assert.match(base, /^[A-Z]{6}\+Roboto-Regular$/, label);
-        const cid = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict);
-        const file = cid.lookup(PDFName.of('FontDescriptor'), PDFDict).get(PDFName.of('FontFile2'));
-        const program = fontkit.create(Buffer.from(streamBytes(now, file)));
-        assert.ok('numGlyphs' in program);
+        const program = embeddedProgram(now, added[0] as PDFRef);
         assert.ok(program.numGlyphs < 40 && program.numGlyphs < full.numGlyphs, label);
         // what is drawn, in the theme's colour and size: every fill colour the stamps set
         const operators = drawn
@@ -281,6 +284,58 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
         assert.ok(sizes.length >= 2 && sizes.every((s) => s === 9), `${label}: ${String(sizes)}`);
       }
     }
+  });
+
+  test('every stamped glyph has an outline, each face embedded once in a PDF', async () => {
+    for (const [name, { doc, parts, targets, before, after }] of stamped) {
+      const [was, now] = [await PDFDocument.load(before), await PDFDocument.load(after)];
+      // the fonts the stamps added, on any page: one, Roboto's, however many pages
+      const added = new Map<string, PDFRef>();
+      for (const [i, page] of now.getPages().entries()) {
+        for (const ref of refsOf(fontsOf(page), fontsOf(was.getPage(i)))) {
+          added.set(String(ref), ref);
+        }
+      }
+      assert.equal(added.size, 1, `${name}: ${[...added.keys()].join(', ')}`);
+      const [ref] = added.values();
+      assert.ok(ref);
+      const program = embeddedProgram(now, ref);
+      // each character stamped is a glyph with an outline; a space and .notdef have none
+      const chars = new Set(
+        pageStamps(
+          doc.cover.title,
+          parts.map((p) => p.pages),
+          targets
+        ).flatMap((stamp) => (stamp ? Array.from(stamp.header + stamp.number) : []))
+      );
+      chars.delete(' ');
+      assert.ok(program.tables.includes('glyf'), `${name}: tables ${program.tables.join(' ')}`);
+      const outlined = [];
+      for (let id = 1; id < program.numGlyphs; id++) {
+        if (outlineOf(program, id) > 0) outlined.push(id);
+      }
+      assert.equal(outlined.length, chars.size, `${name}: ${[...chars].join('')}`);
+      assert.ok(program.numGlyphs <= chars.size + 2, `${name}: ${String(program.numGlyphs)}`);
+    }
+  });
+
+  test('the stamps put ink in the margins, which were blank, and none on the cover', async () => {
+    let landscape = 0;
+    for (const [name, { before, after }] of stamped) {
+      const pages = await pagesOf(after);
+      for (const [i, page] of pages.entries()) {
+        // the cover, the first page after it, and every landscape page
+        const wide = page.width > page.height;
+        if (i > 1 && !wide) continue;
+        if (wide) landscape += 1;
+        const label = `${name}, page ${String(i + 1)}`;
+        assert.deepEqual(await inkInMargins(before, i + 1), { top: 0, bottom: 0 }, label);
+        const ink = await inkInMargins(after, i + 1);
+        if (i === 0) assert.deepEqual(ink, { top: 0, bottom: 0 }, label);
+        else assert.ok(ink.top > 20 && ink.bottom > 5, `${label}: ${JSON.stringify(ink)}`);
+      }
+    }
+    assert.ok(landscape >= 2, String(landscape));
   });
 
   test("a pathway's name is stamped after FR-017's substitutions", async () => {
@@ -315,7 +370,23 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     const names = refsOf(fontsOf(now.getPage(front)), fontsOf(was.getPage(front))).map((ref) =>
       now.context.lookup(ref, PDFDict).lookup(PDFName.of('BaseFont'), PDFName).decodeText()
     );
+    // each face once on the page, and each a subset of the glyphs it draws, outlined: a
+    // few hundred bytes for the arrow's face (Noto Sans Math's WOFF2 subset was 135 KB, #147)
+    assert.equal(new Set(names).size, names.length, String(names));
     assert.ok(names.length >= 3, String(names));
+    for (const ref of refsOf(fontsOf(now.getPage(front)), fontsOf(was.getPage(front)))) {
+      const program = embeddedProgram(now, ref);
+      const empty = Array.from({ length: program.numGlyphs - 1 }, (_, k) => k + 1).filter(
+        (id) => outlineOf(program, id) === 0
+      );
+      assert.ok(
+        empty.length <= 1,
+        `${String(ref)}: ${String(empty.length)} glyphs without outlines`
+      );
+      assert.ok(program.size < 10_000, `${String(ref)}: ${String(program.size)} bytes`);
+    }
+    const ink = await inkInMargins(saved, front + 1);
+    assert.ok(ink.top > 20 && ink.bottom > 5, JSON.stringify(ink));
     for (const base of names) assert.match(base, /^[A-Z]{6}\+[\w-]+$/);
     assert.ok(
       names.some((base) => base.includes('Noto')),
@@ -327,6 +398,35 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     const left = Math.min(...read.header.map((item) => item.x));
     const right = Math.max(...read.header.map((item) => item.x + item.width));
     assert.ok(Math.abs((left + right) / 2 - read.width / 2) < 1, 'off centre');
+  });
+
+  test('white space and characters never drawn in a name are as a margin box draws them', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    // a tab, a newline, a variation selector, a zero-width joiner and a control character,
+    // each of which prints in a section and none of which a face's character map holds
+    const planted: Document = {
+      ...alpha.doc,
+      cover: { ...alpha.doc.cover, title: ' Alpha\tpathway\n\uFE0F one\u200D\u0007 ' },
+    };
+    const pdf = await PDFDocument.load(alpha.before);
+    await stampPages({ doc: planted, pdf, parts: alpha.parts }, alpha.targets);
+    const pages = await pagesOf(await pdf.save({ useObjectStreams: false }));
+    const front = alpha.parts[0]?.pages ?? 0;
+    const headers = new Set(pages.slice(front).map((page) => joinedText(page.header)));
+    assert.deepEqual(headers, new Set(['Alpha pathway one']));
+  });
+
+  test('a PDF is stamped once: a second stamping is refused, changing nothing', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    const pdf = await PDFDocument.load(alpha.before);
+    const joined = { doc: alpha.doc, pdf, parts: alpha.parts };
+    await stampPages(joined, alpha.targets);
+    const once = await pagesOf(await pdf.save({ useObjectStreams: false }));
+    await assert.rejects(stampPages(joined, alpha.targets), /stamped already/);
+    assert.deepEqual(await pagesOf(await pdf.save({ useObjectStreams: false })), once);
+    assert.deepEqual(once, await pagesOf(alpha.after));
   });
 
   test('a character no font draws, or parts that are not the PDF, are refused', async () => {
@@ -353,6 +453,80 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     );
   });
 });
+
+/** A Type0 font's embedded program, read with fontkit. */
+function embeddedProgram(pdf: PDFDocument, ref: PDFRef) {
+  const font = pdf.context.lookup(ref, PDFDict);
+  const cid = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict);
+  const file = cid.lookup(PDFName.of('FontDescriptor'), PDFDict).get(PDFName.of('FontFile2'));
+  const bytes = streamBytes(pdf, file);
+  // the table directory, read by hand: fontkit overflows its stack on a font with no glyf
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tables = Array.from({ length: view.getUint16(4) }, (_, i) =>
+    new TextDecoder().decode(bytes.subarray(12 + 16 * i, 16 + 16 * i))
+  );
+  const program = fontkit.create(Buffer.from(bytes));
+  assert.ok('numGlyphs' in program);
+  return Object.assign(program, { size: bytes.length, tables });
+}
+
+/** A glyph's outline's path commands; none where its data cannot be read as an outline. */
+function outlineOf(program: ReturnType<typeof embeddedProgram>, id: number): number {
+  try {
+    return program.getGlyph(id).path.commands.length;
+  } catch {
+    // a WOFF2 file's transformed glyf bytes, copied as they are by fontkit's subsetter (#147)
+    return 0;
+  }
+}
+
+interface Canvases {
+  create(
+    width: number,
+    height: number
+  ): {
+    canvas: unknown;
+    context: {
+      getImageData(x: number, y: number, w: number, h: number): { data: Uint8ClampedArray };
+    };
+  };
+}
+
+/**
+ * A page rendered by pdf.js at 2 px a point, and the pixels of ink (darker than light grey)
+ * in its top margin and in its bottom margin: what a reader sees there, not what the text
+ * layer says.
+ */
+async function inkInMargins(
+  pdf: Uint8Array,
+  number: number
+): Promise<{ top: number; bottom: number }> {
+  const task = getDocument({ data: pdf.slice() });
+  try {
+    const doc = await task.promise;
+    const page = await doc.getPage(number);
+    const viewport = page.getViewport({ scale: 2 });
+    const [width, height] = [Math.ceil(viewport.width), Math.ceil(viewport.height)];
+    const { canvas, context } = (doc.canvasFactory as Canvases).create(width, height);
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    const band = Math.floor(PAGE.margin * 2) - 2;
+    const count = (y: number) => {
+      const { data } = context.getImageData(0, y, width, band);
+      let ink = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (
+          (data[i + 3] ?? 0) > 0 &&
+          Math.min(data[i] ?? 255, data[i + 1] ?? 255, data[i + 2] ?? 255) < 200
+        )
+          ink += 1;
+      }
+      return ink;
+    };
+    return { top: count(0), bottom: count(height - band) };
+  } finally {
+    await task.destroy();
+  }
+}
 
 /** A page's font dictionaries' references. */
 function fontsOf(page: PDFPage): PDFRef[] {
@@ -398,6 +572,40 @@ describe('pageStamps', () => {
       { header: 'P', number: '8' },
       { header: 'P', number: '9' },
     ]);
+  });
+
+  test('an analysis front part is named for its pages', () => {
+    const analysed = new Map([
+      ['introduction', { index: 1 }],
+      ['analysis', { index: 2 }],
+      ['contents', { index: 3 }],
+    ]);
+    assert.deepEqual(
+      pageStamps('P', [4, 1], analysed).map((stamp) => stamp?.header ?? null),
+      [null, 'Introduction', 'Analysis properties', 'Contents', 'P']
+    );
+  });
+
+  test('a margin box collapses white space and leaves out what is never drawn', () => {
+    for (const [given, drawn] of [
+      ['a\tb', 'a b'],
+      ['a\nb', 'a b'],
+      ['a\r\n  b', 'a b'],
+      [' a b ', 'a b'],
+      ['a\uFE0Fb', 'ab'],
+      ['a \uFE0F b', 'a b'],
+      ['a\u200Db', 'ab'],
+      ['a\u0007b', 'ab'],
+      ['a\u00ADb', 'ab'],
+      ['TNF-\u03b1', 'TNF-\u03b1'],
+    ] as const) {
+      assert.equal(marginText(given), drawn, JSON.stringify(given));
+    }
+    // after the substitutions, in pageStamps
+    assert.equal(
+      pageStamps('P\u2011Q\t', [2, 1], new Map([['introduction', { index: 1 }]]))[2]?.header,
+      'P-Q'
+    );
   });
 
   test('a front part outside the front part, or no introduction, refused', () => {

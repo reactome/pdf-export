@@ -7,14 +7,23 @@
 // body-small size and on-surface-variant colour read from the compiled theme, centred
 // where the box puts it. The cover has neither. A top-level pathway's name is stamped,
 // not laid out, so FR-017's substitutions are made here; they are not counted in the run
-// report, which counts the name where its section prints it.
+// report, which counts the name where its section prints it. White space is collapsed and
+// characters never drawn are left out, as a margin box does, so a stray tab or variation
+// selector that prints in a section does not refuse the PDF here.
+//
+// Each face is embedded from its WOFF file, not the WOFF2 the pages load: fontkit's
+// subsetter copies a WOFF2 file's `glyf` bytes as they are, transformed, and the subset's
+// glyphs have no outlines (found in review: the text read back, and nothing was drawn).
+// There is no shaping: no kerning, no ligatures, no bidirectional text or joined scripts
+// (Arabic). A stamp is a pathway's name, a front part's or a number, which today's names
+// do not need; a name that did would be drawn letter by letter.
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-import { ColorTypes, type PDFFont, type RGB } from '@cantoo/pdf-lib';
+import { ColorTypes, type PDFDocument, type PDFFont, type RGB } from '@cantoo/pdf-lib';
 import * as fontkit from 'fontkit';
 
-import { substituted } from '../layout/characters.ts';
+import { NEVER_DRAWN, substituted } from '../layout/characters.ts';
 import { MARGIN_FAMILIES, pageStyles } from '../layout/document.ts';
 import { PAGE } from '../layout/figure.ts';
 import { codePointName, fontFaces, type FontFace } from '../layout/fonts.ts';
@@ -30,6 +39,18 @@ export interface PageStamp {
 /** Where a front part's heading landed: its page, counted from 0 (links.ts's Target). */
 export interface FrontTarget {
   index: number;
+}
+
+/**
+ * A text as a margin box draws it: each run of white space one space, characters never
+ * drawn (controls, variation selectors, joiners; FR-017's) left out, and trimmed.
+ */
+export function marginText(text: string): string {
+  let out = '';
+  for (const char of text.replace(/\s+/g, ' ')) {
+    if (char === ' ' || !NEVER_DRAWN.test(char)) out += char;
+  }
+  return out.replace(/ {2,}/g, ' ').trim();
 }
 
 /**
@@ -60,7 +81,7 @@ export function pageStamps(
     const named = outside.map((s) => `${s.header} on page ${String(s.index + 1)}`).join(', ');
     throw new Error(`Front parts outside the front part's pages 2–${String(frontPages)}: ${named}`);
   }
-  const header = substituted(name);
+  const header = marginText(substituted(name));
   const stamps: (PageStamp | null)[] = [];
   for (let i = 0; i < pages; i++) {
     const number = String(i + 1);
@@ -128,10 +149,19 @@ interface Loaded {
 
 const loaded = new Map<string, Loaded>();
 
+/** A face's WOFF file, beside the WOFF2 the pages load (see above). */
+export function stampFile(face: FontFace): string {
+  const path = face.path.replace(/\.woff2$/, '.woff');
+  if (path === face.path || !existsSync(path)) {
+    throw new Error(`No WOFF file beside ${face.path} to stamp with`);
+  }
+  return path;
+}
+
 function load(face: FontFace): Loaded {
   let file = loaded.get(face.path);
   if (!file) {
-    const bytes = new Uint8Array(readFileSync(face.path));
+    const bytes = new Uint8Array(readFileSync(stampFile(face)));
     const font = fontkit.create(Buffer.from(bytes));
     if (!('postscriptName' in font)) throw new Error(`${face.path} is a collection, not a font`);
     file = {
@@ -176,11 +206,18 @@ function subsetTag(face: FontFace, chars: ReadonlySet<string>): string {
 }
 
 /**
+ * The PDFs stamped in this process, so none is stamped twice (T028 swaps a front part in
+ * before stamping, never after). Held in memory, not marked in the file: a stamped PDF is
+ * saved and done with, never loaded to be stamped again.
+ */
+const stamped = new WeakSet<PDFDocument>();
+
+/**
  * Each page of a joined PDF stamped with its number and running header, in place. The
  * front part is the PDF's first part; `targets` are where its headings landed, as
  * `rewriteLinks` gives them, so it runs after that. Throws, stamping nothing, when the
- * parts' pages are not the PDF's, a front part's heading is not in the front part, or a
- * character of a stamp is one no font draws.
+ * PDF is stamped already, the parts' pages are not the PDF's, a front part's heading is
+ * not in the front part, or a character of a stamp is one no font draws.
  */
 export async function stampPages(
   joined: Pick<Joined, 'doc' | 'pdf' | 'parts'>,
@@ -188,6 +225,7 @@ export async function stampPages(
   look: Look = stampLook()
 ): Promise<void> {
   const { doc, pdf, parts } = joined;
+  if (stamped.has(pdf)) throw new Error('The joined PDF is stamped already');
   const pages = pdf.getPages();
   const counted = parts.reduce((n, part) => n + part.pages, 0);
   if (!parts[0] || parts[0].places.length > 0) {
@@ -234,13 +272,13 @@ export async function stampPages(
   const top = (PAGE.margin - line) / 2 + metrics.ascent * em;
   const bottom = PAGE.margin - top;
   const { size, colour: color } = look;
+  stamped.add(pdf);
   pages.forEach((page, i) => {
     const stamp = laid[i];
     if (!stamp) return;
     const { width, height } = page.getSize();
-    // a font set on the page only when it changes: each drawText given a font adds the
-    // page another name for it
-    let current: PDFFont | undefined;
+    // each run placed, the header's and the number's, centred on the page's width
+    const placed: { font: PDFFont; text: string; x: number; y: number }[] = [];
     const centred = (text: readonly { face: FontFace; text: string }[], y: number) => {
       const sized = text.map((run) => {
         const font = fonts.get(run.face);
@@ -249,13 +287,19 @@ export async function stampPages(
       });
       let x = (width - sized.reduce((w, run) => w + run.width, 0)) / 2;
       for (const run of sized) {
-        if (run.font !== current) page.setFont(run.font);
-        current = run.font;
-        page.drawText(run.text, { x, y, size, color });
+        placed.push({ font: run.font, text: run.text, x, y });
         x += run.width;
       }
     };
     centred(stamp.header, height - top);
     centred(stamp.number, bottom);
+    // drawn a font at a time, each set on the page once: pdf-lib gives the page another
+    // name for a font each time it is set
+    for (const font of new Set(placed.map((run) => run.font))) {
+      page.setFont(font);
+      for (const run of placed) {
+        if (run.font === font) page.drawText(run.text, { x: run.x, y: run.y, size, color });
+      }
+    }
   });
 }
