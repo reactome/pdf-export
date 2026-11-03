@@ -13,9 +13,9 @@
 //   systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 --quiet \
 //     node ci/measure/join.ts --figures <folder of T005's SVGs> --out <scratch folder> \
 //     [--pdfs 1] [--pages 3760 | --sections n] [--part-pages 200] [--parallel 4] [--seed 98]
-//     [--together] [--no-object-streams] [--verify]
+//     [--together [n]] [--no-object-streams] [--verify]
 //
-// The run refuses to start outside a memory cap. `TMPDIR` should be inside `--out`: the
+// The run refuses to start outside a memory cap with swap off. `TMPDIR` should be inside `--out`: the
 // printer writes its pages there. The output is numbers only; the sections are made up.
 import { mkdirSync, readFileSync, rmSync, statfsSync, writeFileSync } from 'node:fs';
 import { cpus, totalmem } from 'node:os';
@@ -471,7 +471,8 @@ async function main() {
       parallel: { type: 'string', default: '4' },
       seed: { type: 'string', default: '98' },
       verify: { type: 'boolean', default: false },
-      together: { type: 'boolean', default: false },
+      // the first n PDFs' parts in turn, so their joins coincide; the rest after, PDF by PDF
+      together: { type: 'string' },
       // pdf-lib's object streams: a smaller file, a slower save
       'no-object-streams': { type: 'boolean', default: false },
       'min-free-gb': { type: 'string', default: '3' },
@@ -494,6 +495,10 @@ async function main() {
   const group = cgroup();
   const cap = readFileSync(path.join(group, 'memory.max'), 'utf8').trim();
   if (cap === 'max') throw new Error('no memory cap: run under systemd-run -p MemoryMax=…');
+  // a cap with swap allowed lets the run spill onto the host's swap instead of being stopped
+  const swap = readFileSync(path.join(group, 'memory.swap.max'), 'utf8').trim();
+  if (swap !== '0') throw new Error(`swap is ${swap}: run with -p MemorySwapMax=0`);
+  const together = values.together === undefined ? 0 : whole('together', values.together);
   const free = statfsSync(out);
   const freeGb = (free.bavail * free.bsize) / 2 ** 30;
   if (freeGb < Number(values['min-free-gb']))
@@ -562,13 +567,15 @@ async function main() {
 
     // The queue: every part of every PDF, in order; a PDF's join goes first once its parts are.
     type Task = { kind: 'part'; pdf: number; index: number } | { kind: 'join'; pdf: number };
-    // PDF by PDF, so one PDF's join overlaps the next one's printing; or, `--together`, the
-    // PDFs' parts in turn, so their joins run at once: the worst case for memory
+    // PDF by PDF, so one PDF's join overlaps the next one's printing; or, `--together n`,
+    // the first n PDFs' parts in turn, so their joins run at once (the worst case for
+    // memory), while the rest print
     const queue: Task[] = made.flatMap((m, pdf) =>
       m.slices.map((_, index): Task => ({ kind: 'part', pdf, index }))
     );
-    if (values.together)
-      queue.sort((a, b) => ('index' in a && 'index' in b ? a.index - b.index : 0));
+    const rank = (task: Task) =>
+      task.pdf < together && 'index' in task ? task.index : Number.MAX_SAFE_INTEGER;
+    if (together > 0) queue.sort((a, b) => rank(a) - rank(b));
     const runJoin = (pdf: number) =>
       new Promise<void>((resolve, reject) => {
         const m = made[pdf];
@@ -671,7 +678,7 @@ async function main() {
         {
           machine: { cpus: cpus().length, memoryGb: Math.round(totalmem() / 2 ** 30) },
           cap,
-          together: values.together,
+          together,
           objectStreams: !values['no-object-streams'],
           pdfs,
           parallel,

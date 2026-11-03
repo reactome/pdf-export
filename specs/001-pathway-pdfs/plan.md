@@ -94,9 +94,13 @@ fonts above), run by the release and beside the website's services.
 - **Memory:**
   - The book's printing peaks under 2.5 GB at four parts at once (R4: 2.1 GB measured
     with synthetic parts; real figures are heavier, so it is re-measured).
-  - A join holds one PDF in memory: 120 MB for 4,930 synthetic pages, and perhaps near
-    400 MB for the largest real PDF (3,760 pages, 383 MB today; inference). A join takes
-    one of `--parallel`'s slots, so printing and joining stay within its bound. It is re-measured in the first tasks (R4).
+  - A join holds one PDF in memory (pdf-lib holds the whole file): about 0.5 GiB for a
+    3,760-page synthetic PDF of 85 MiB, measured (T011, R4); a real all-vector PDF of
+    300–400 MB could need 1.5–2 GiB (inference), which T029 measures. Two of the largest
+    joining beside a print peaked at 2.5 GiB, three alone at 3.3 GiB, and four were
+    killed by a 4 GiB cap. So a join takes one of `--parallel`'s slots and joins have a
+    limit of their own, at most 2 at once by default, and the largest PDFs are printed
+    first so their joins do not coincide (R4).
   - A single-event PDF stays under 1 GB.
 - **No network** but the graph, the render service (for `figures` and `serve`; `book`
   reads the figures' folder), the content service's release (for `figures`) and the
