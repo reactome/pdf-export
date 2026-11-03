@@ -6,8 +6,9 @@
 // answers are the service's: the catch-all 500, the servlet container's HTML 400 for an
 // encoded `/`, the framework's 404 and 406, a `found/…` 404 for none found, and the found
 // identifiers' CSV. Like the render stub, it answers 400 to a query parameter pdf-export
-// never sends, or one given twice, so a wrongly named one fails a test instead of passing
-// silently; the service itself ignores them.
+// never sends, one given twice, or a resource or importable-only setting other than
+// FR-006's defaults, so a client getting one wrong fails a test instead of passing
+// silently; the service itself ignores unknown ones and filters by the others.
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -41,6 +42,8 @@ export const TOKENS = {
   gone: issue(`${stamp(new Date(Date.now() - 2 * DAY))}_4`),
   /** No result, dated in the future: 410. */
   future: issue(`${stamp(new Date(Date.now() + DAY))}_5`),
+  /** No result, dated 7 days and 12 hours ago: still within the 7 whole days, 410. */
+  lastDay: issue(`${stamp(new Date(Date.now() - 7.5 * DAY))}_7`),
   /** No result, dated 8 days ago: 404. */
   expired: issue(`${stamp(new Date(Date.now() - 8 * DAY))}_6`),
   /** Base64 of text with no `_`, so no date: 404. */
@@ -74,8 +77,8 @@ const MOUSE = { dbId: 48892, taxId: '10090', name: 'Mus musculus' };
  * The pathways the stored analyses hit, by p-value. The first is Reaction one's first
  * parent pathway, with entities and interactors found; one is a disease pathway the
  * fixture's graph does not hold (the analysis service reads its own data), so that the
- * count with disease pathways differs from the count without; and one is mouse's, so that
- * a species changes it again.
+ * count with disease pathways differs from the count without; and two are mouse's (one
+ * the graph does not hold), so that a species changes it to a count of its own.
  */
 const HITS: readonly Hit[] = [
   {
@@ -124,6 +127,15 @@ const HITS: readonly Hit[] = [
     entities: { X00001: ['X00001'] },
     pValue: 5e-1,
   },
+  {
+    stId: 'R-MMU-90000901',
+    dbId: 90000901,
+    name: 'Placeholder mouse pathway',
+    species: MOUSE,
+    inDisease: false,
+    entities: { X00001: ['X00001'] },
+    pValue: 6e-1,
+  },
 ];
 
 /** The stored analysis's own setting: disease pathways left out, as T009's case needed. */
@@ -159,10 +171,11 @@ const REASONS: Readonly<Record<number, string>> = {
 /** The parameters pdf-export sends to each endpoint, and the values each may take. */
 const BOOLEAN = (value: string) => value === 'true' || value === 'false';
 const NUMBER = (value: string) => /^[1-9]\d{0,5}$/.test(value);
-const RESOURCE = (value: string) => /^[A-Z_]+$/.test(value);
+// FR-006's defaults: all resources together, not importable-only
+const RESOURCE = (value: string) => value === 'TOTAL';
 const SUMMARY_PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
   resource: RESOURCE,
-  importableOnly: BOOLEAN,
+  importableOnly: (value) => value === 'false',
   includeDisease: BOOLEAN,
   species: (value) => value.length > 0,
   pageSize: NUMBER,
@@ -178,10 +191,14 @@ type Read = { kind: 'stored'; decoded: string } | { kind: 'error'; status: 404 |
 function accepts(accept: string | undefined, type: string): boolean {
   if (accept === undefined) return true;
   const [major] = type.split('/');
-  return accept
-    .split(',')
-    .map((part) => part.split(';')[0]?.trim().toLowerCase())
-    .some((range) => range === '*/*' || range === `${String(major)}/*` || range === type);
+  return (
+    accept
+      .split(',')
+      .map((part) => part.split(';').map((p) => p.trim().toLowerCase()))
+      // a range with `q=0` refuses its type
+      .filter((params) => !params.slice(1).some((p) => /^q=0(\.0*)?$/.test(p)))
+      .some(([range]) => range === '*/*' || range === `${String(major)}/*` || range === type)
+  );
 }
 
 export interface AnalysisRequest {
@@ -306,6 +323,10 @@ export async function startAnalysisStub(): Promise<AnalysisStub> {
     const match = summary ?? found ?? download;
     if (!match?.[1]) {
       framework(404, 'Not Found');
+      return;
+    }
+    if (download && !RESOURCE(download[2] ?? '')) {
+      error(400, [`Not a resource pdf-export asks for: ${String(download[2])}`]);
       return;
     }
     const type = download ? 'text/csv' : 'application/json';

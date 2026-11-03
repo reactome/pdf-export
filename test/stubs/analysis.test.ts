@@ -64,11 +64,11 @@ describe('the analysis stub', () => {
     const withDisease = await summary(TOKENS.stored);
     const own = await summary(TOKENS.stored, 'resource=TOTAL&pageSize=1&page=1');
     const without = await summary(TOKENS.stored, SUMMARY.replace('true', 'false'));
-    assert.equal(withDisease.pathwaysFound, 5);
+    assert.equal(withDisease.pathwaysFound, 6);
     assert.equal(withDisease.summary.includeDisease, true);
-    assert.equal(own.pathwaysFound, 4);
+    assert.equal(own.pathwaysFound, 5);
     assert.equal(own.summary.includeDisease, false);
-    assert.equal(without.pathwaysFound, 4);
+    assert.equal(without.pathwaysFound, 5);
   });
 
   test('counts another number of pathways when a species is sent', async () => {
@@ -76,7 +76,7 @@ describe('the analysis stub', () => {
     assert.equal(human.pathwaysFound, 4);
     assert.equal(
       (await summary(TOKENS.stored, `${SUMMARY}&species=Mus+musculus`)).pathwaysFound,
-      1
+      2
     );
   });
 
@@ -124,6 +124,10 @@ describe('the analysis stub', () => {
   test("answers the CSV to no Accept or one listing text/csv, and the framework's 406 to JSON alone", async () => {
     assert.equal(await bare(`/download/${TOKENS.stored}/entities/found/TOTAL/a.csv`), 200);
     assert.equal((await csv(TOKENS.stored, { Accept: 'text/csv' })).status, 200);
+    assert.equal(
+      (await csv(TOKENS.stored, { Accept: 'text/csv;q=0, application/json' })).status,
+      406
+    );
     const refused = await csv(TOKENS.stored, JSON_TYPE);
     assert.equal(refused.status, 406);
     const body = (await refused.json()) as { status: number; error: string };
@@ -135,6 +139,7 @@ describe('the analysis stub', () => {
   test("answers each token case of T009's table", async () => {
     const cases: [string, number][] = [
       [TOKENS.gone, 410],
+      [TOKENS.lastDay, 410],
       [TOKENS.future, 410],
       [TOKENS.expired, 404],
       [TOKENS.undated, 404],
@@ -203,6 +208,21 @@ describe('the analysis stub', () => {
     }
     const csvQuery = `/download/${TOKENS.stored}/entities/found/TOTAL/a.csv?resource=TOTAL`;
     assert.equal((await get(csvQuery, CSV_TYPE)).status, 400);
+  });
+
+  test("answers 400 to anything but FR-006's defaults: the TOTAL resource, not importable-only", async () => {
+    for (const path of [
+      `/token/${TOKENS.stored}?${SUMMARY.replace('TOTAL', 'UNIPROT')}`,
+      `/token/${TOKENS.stored}?${SUMMARY.replace('importableOnly=false', 'importableOnly=true')}`,
+      `/token/${TOKENS.stored}/found/entities/${PARENT}?resource=ENSEMBL`,
+    ]) {
+      assert.equal((await get(path)).status, 400, path);
+    }
+    const other = await get(
+      `/download/${TOKENS.stored}/entities/found/UNIPROT/result.csv`,
+      CSV_TYPE
+    );
+    assert.equal(other.status, 400);
   });
 
   test('issues tokens as the service does, and records each request with its Accept', async () => {
