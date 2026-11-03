@@ -417,6 +417,23 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     assert.deepEqual(headers, new Set(['Alpha pathway one']));
   });
 
+  test('a space no face draws is stamped as a space, as a margin box draws it', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    // an ideographic space, a line separator and an Ogham space mark, which print in a
+    // section and which Chromium's margin box draws as spaces; none in a stamp face
+    const planted: Document = {
+      ...alpha.doc,
+      cover: { ...alpha.doc.cover, title: 'Alpha\u3000pathway\u2028one\u1680two' },
+    };
+    const pdf = await PDFDocument.load(alpha.before);
+    await stampPages({ doc: planted, pdf, parts: alpha.parts }, alpha.targets);
+    const pages = await pagesOf(await pdf.save({ useObjectStreams: false }));
+    const front = alpha.parts[0]?.pages ?? 0;
+    const headers = new Set(pages.slice(front).map((page) => joinedText(page.header)));
+    assert.deepEqual(headers, new Set(['Alpha pathway one two']));
+  });
+
   test('a PDF is stamped once: a second stamping is refused, changing nothing', async () => {
     const alpha = stamped.get('Alpha pathway');
     assert.ok(alpha);
@@ -427,6 +444,24 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     await assert.rejects(stampPages(joined, alpha.targets), /stamped already/);
     assert.deepEqual(await pagesOf(await pdf.save({ useObjectStreams: false })), once);
     assert.deepEqual(once, await pagesOf(alpha.after));
+  });
+
+  test("a stamping refused for a face's file leaves the PDF to be stamped", async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    const pdf = await PDFDocument.load(alpha.before);
+    const joined = { doc: alpha.doc, pdf, parts: alpha.parts };
+    await assert.rejects(
+      stampPages(joined, alpha.targets, stampLook(), (face) => {
+        throw new Error(`No WOFF file beside ${face.path} to stamp with`);
+      }),
+      /No WOFF file beside .*roboto/
+    );
+    await stampPages(joined, alpha.targets);
+    assert.deepEqual(
+      await pagesOf(await pdf.save({ useObjectStreams: false })),
+      await pagesOf(alpha.after)
+    );
   });
 
   test('two stampings of a PDF at once: one stamps, the other is refused', async () => {
@@ -624,13 +659,18 @@ describe('pageStamps', () => {
       ['a\tb', 'a b'],
       ['a\nb', 'a b'],
       ['a\r\n  b', 'a b'],
-      ['a\fb', 'a b'],
+      // a form feed is a control, not CSS's white space: left out, not collapsed
+      ['a\fb', 'ab'],
       [' a b ', 'a b'],
-      // a no-break, thin or ideographic space is not collapsed, as Chromium keeps it
+      // a no-break or thin space, which a stamp face draws, is kept as it is, not collapsed
       ['a\u00A0b', 'a\u00A0b'],
       ['a\u2009\u2009b', 'a\u2009\u2009b'],
-      ['a\u3000b', 'a\u3000b'],
       [' \u00A0a\u00A0 ', '\u00A0a\u00A0'],
+      // one no face draws is kept as a space, each its own
+      ['a\u3000b', 'a b'],
+      ['a\u2028b', 'a b'],
+      ['a\u1680b', 'a b'],
+      ['a\u3000 b', 'a  b'],
       ['a\uFE0Fb', 'ab'],
       ['a \uFE0F b', 'a b'],
       ['a\u200Db', 'ab'],
@@ -644,6 +684,10 @@ describe('pageStamps', () => {
     assert.throws(
       () => pageStamps(' \t\uFE0F\u200D ', [2, 1], new Map([['introduction', { index: 1 }]])),
       /The pathway's name " \\t.*" leaves no header to stamp/
+    );
+    assert.throws(
+      () => pageStamps('\u3000\u00A0', [2, 1], new Map([['introduction', { index: 1 }]])),
+      /leaves no header to stamp/
     );
     assert.equal(
       pageStamps('P\u2011Q\t', [2, 1], new Map([['introduction', { index: 1 }]]))[2]?.header,
