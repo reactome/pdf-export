@@ -8,8 +8,10 @@
 // where the box puts it. The cover has neither. A top-level pathway's name is stamped,
 // not laid out, so FR-017's substitutions are made here; they are not counted in the run
 // report, which counts the name where its section prints it. White space is collapsed and
-// characters never drawn are left out, as a margin box does, so a stray tab or variation
-// selector that prints in a section does not refuse the PDF here.
+// characters never drawn are left out, close to a margin box, so a stray tab or variation
+// selector that prints in a section does not refuse the PDF here. Only CSS's collapsible
+// white space is collapsed (space, tab, line feed, carriage return, form feed): a
+// no-break, thin or ideographic space is kept, as Chromium keeps it.
 //
 // Each face is embedded from its WOFF file, not the WOFF2 the pages load: fontkit's
 // subsetter copies a WOFF2 file's `glyf` bytes as they are, transformed, and the subset's
@@ -23,7 +25,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { ColorTypes, type PDFDocument, type PDFFont, type RGB } from '@cantoo/pdf-lib';
 import * as fontkit from 'fontkit';
 
-import { NEVER_DRAWN, substituted } from '../layout/characters.ts';
+import { substituted } from '../layout/characters.ts';
 import { MARGIN_FAMILIES, pageStyles } from '../layout/document.ts';
 import { PAGE } from '../layout/figure.ts';
 import { codePointName, fontFaces, type FontFace } from '../layout/fonts.ts';
@@ -42,15 +44,24 @@ export interface FrontTarget {
 }
 
 /**
- * A text as a margin box draws it: each run of white space one space, characters never
- * drawn (controls, variation selectors, joiners; FR-017's) left out, and trimmed.
+ * What a margin box leaves out: FR-017's characters never drawn (`NEVER_DRAWN`) but its
+ * white space, which is collapsed or kept (below), so controls and default-ignorable
+ * characters (variation selectors, joiners, a soft hyphen).
+ */
+const LEFT_OUT = /[\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
+
+/**
+ * A text close to how a margin box draws it: each run of collapsible white space (space,
+ * tab, line feed, carriage return, form feed; not JavaScript's `\s`, which takes in a
+ * no-break, thin or ideographic space that Chromium keeps) one space, `LEFT_OUT`'s
+ * characters left out, and a space at either end trimmed.
  */
 export function marginText(text: string): string {
   let out = '';
-  for (const char of text.replace(/\s+/g, ' ')) {
-    if (char === ' ' || !NEVER_DRAWN.test(char)) out += char;
+  for (const char of text.replace(/[ \t\n\r\f]+/g, ' ')) {
+    if (char === ' ' || !LEFT_OUT.test(char)) out += char;
   }
-  return out.replace(/ {2,}/g, ' ').trim();
+  return out.replace(/ {2,}/g, ' ').replace(/^ | $/g, '');
 }
 
 /**
@@ -82,6 +93,9 @@ export function pageStamps(
     throw new Error(`Front parts outside the front part's pages 2–${String(frontPages)}: ${named}`);
   }
   const header = marginText(substituted(name));
+  if (header === '') {
+    throw new Error(`The pathway's name ${JSON.stringify(name)} leaves no header to stamp`);
+  }
   const stamps: (PageStamp | null)[] = [];
   for (let i = 0; i < pages; i++) {
     const number = String(i + 1);
@@ -217,7 +231,8 @@ const stamped = new WeakSet<PDFDocument>();
  * front part is the PDF's first part; `targets` are where its headings landed, as
  * `rewriteLinks` gives them, so it runs after that. Throws, stamping nothing, when the
  * PDF is stamped already, the parts' pages are not the PDF's, a front part's heading is
- * not in the front part, or a character of a stamp is one no font draws.
+ * not in the front part, the name leaves no header, or a character of a stamp is one no font
+ * draws.
  */
 export async function stampPages(
   joined: Pick<Joined, 'doc' | 'pdf' | 'parts'>,
@@ -253,6 +268,8 @@ export async function stampPages(
       used.set(run.face, chars);
     }
   }
+  // held before the first await, so two stampings of the PDF at once cannot both pass
+  stamped.add(pdf);
   pdf.registerFontkit(fontkit);
   const fonts = new Map<FontFace, PDFFont>();
   for (const [face, chars] of used) {
@@ -272,7 +289,6 @@ export async function stampPages(
   const top = (PAGE.margin - line) / 2 + metrics.ascent * em;
   const bottom = PAGE.margin - top;
   const { size, colour: color } = look;
-  stamped.add(pdf);
   pages.forEach((page, i) => {
     const stamp = laid[i];
     if (!stamp) return;

@@ -11,21 +11,7 @@ import { pathToFileURL } from 'node:url';
 
 import { chromium, type Browser } from 'playwright-core';
 
-import { contentsTargets, fillContents, landed, type Landed } from './contents.ts';
-
-/**
- * How a second print's pages differ from the first's, or null: another page count, or a
- * target on another page. Either means the numbers printed are not the pages.
- */
-export function movedPages(
-  first: Landed,
-  second: Landed,
-  targets: readonly string[]
-): string | null {
-  const moved = targets.filter((t) => second.pages.get(t) !== first.pages.get(t));
-  if (second.pageCount === first.pageCount && moved.length === 0) return null;
-  return `${String(first.pageCount)} pages, then ${String(second.pageCount)}; moved: ${moved.join(', ') || 'none'}`;
-}
+import { contentsTargets, fillContents, landed, movedPages } from './contents.ts';
 
 export class Printer {
   readonly #browser: Browser;

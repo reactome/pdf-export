@@ -400,7 +400,7 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     assert.ok(Math.abs((left + right) / 2 - read.width / 2) < 1, 'off centre');
   });
 
-  test('white space and characters never drawn in a name are as a margin box draws them', async () => {
+  test('white space and characters never drawn in a name are close to a margin box', async () => {
     const alpha = stamped.get('Alpha pathway');
     assert.ok(alpha);
     // a tab, a newline, a variation selector, a zero-width joiner and a control character,
@@ -429,6 +429,27 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     assert.deepEqual(once, await pagesOf(alpha.after));
   });
 
+  test('two stampings of a PDF at once: one stamps, the other is refused', async () => {
+    const alpha = stamped.get('Alpha pathway');
+    assert.ok(alpha);
+    const pdf = await PDFDocument.load(alpha.before);
+    const joined = { doc: alpha.doc, pdf, parts: alpha.parts };
+    const results = await Promise.allSettled([
+      stampPages(joined, alpha.targets),
+      stampPages(joined, alpha.targets),
+    ]);
+    assert.deepEqual(
+      results.map((r) => r.status),
+      ['fulfilled', 'rejected']
+    );
+    const [, second] = results;
+    assert.match(second.status === 'rejected' ? String(second.reason) : '', /stamped already/);
+    assert.deepEqual(
+      await pagesOf(await pdf.save({ useObjectStreams: false })),
+      await pagesOf(alpha.after)
+    );
+  });
+
   test('a character no font draws, or parts that are not the PDF, are refused', async () => {
     const alpha = stamped.get('Alpha pathway');
     assert.ok(alpha);
@@ -440,6 +461,18 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     await assert.rejects(
       stampPages({ doc: planted, pdf, parts: alpha.parts }, alpha.targets),
       /U\+E000, which no font draws/
+    );
+    // a name with nothing to draw once a margin box's white space and controls are out
+    await assert.rejects(
+      stampPages(
+        {
+          doc: { ...alpha.doc, cover: { ...alpha.doc.cover, title: ' \t\uFE0F\n ' } },
+          pdf,
+          parts: alpha.parts,
+        },
+        alpha.targets
+      ),
+      /leaves no header to stamp/
     );
     const short = alpha.parts.slice(0, -1);
     await assert.rejects(
@@ -586,12 +619,18 @@ describe('pageStamps', () => {
     );
   });
 
-  test('a margin box collapses white space and leaves out what is never drawn', () => {
+  test("a margin box's white space collapsed, other spaces kept, and what is never drawn out", () => {
     for (const [given, drawn] of [
       ['a\tb', 'a b'],
       ['a\nb', 'a b'],
       ['a\r\n  b', 'a b'],
+      ['a\fb', 'a b'],
       [' a b ', 'a b'],
+      // a no-break, thin or ideographic space is not collapsed, as Chromium keeps it
+      ['a\u00A0b', 'a\u00A0b'],
+      ['a\u2009\u2009b', 'a\u2009\u2009b'],
+      ['a\u3000b', 'a\u3000b'],
+      [' \u00A0a\u00A0 ', '\u00A0a\u00A0'],
       ['a\uFE0Fb', 'ab'],
       ['a \uFE0F b', 'a b'],
       ['a\u200Db', 'ab'],
@@ -601,7 +640,11 @@ describe('pageStamps', () => {
     ] as const) {
       assert.equal(marginText(given), drawn, JSON.stringify(given));
     }
-    // after the substitutions, in pageStamps
+    // after the substitutions, in pageStamps, which refuses a name left empty
+    assert.throws(
+      () => pageStamps(' \t\uFE0F\u200D ', [2, 1], new Map([['introduction', { index: 1 }]])),
+      /The pathway's name " \\t.*" leaves no header to stamp/
+    );
     assert.equal(
       pageStamps('P\u2011Q\t', [2, 1], new Map([['introduction', { index: 1 }]]))[2]?.header,
       'P-Q'
