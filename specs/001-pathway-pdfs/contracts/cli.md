@@ -1,6 +1,6 @@
 # Contract: the command line
 
-One executable, `pdf-export`, with five commands. Settings come from flags or from the
+One executable, `pdf-export`, with six commands. Settings come from flags or from the
 environment variables named beside them. A password never goes on the command line.
 
 ## `pdf-export figures`
@@ -34,7 +34,7 @@ contracts/figures.md).
   stopped run is not resumed. The manifest (contracts/figures.md) records the folder's
   fingerprint and what each file draws.
 - **Exit 0:** every figure is in the folder. **Exit 1:** a preflight fault
-  (`missing-file`, `uncovered-character`), a label fault after drawing, or a figure that
+  (`missing-file`, `uncovered-character`, `bad-file`), a label fault after drawing, or a figure that
   could not be drawn, each named by stable identifier or file name. **Exit 2:** bad
   arguments; the render or content service unreachable at the start; another release
   at `--content`; no graph checksum, no render `build`, or a render service not reading local files; or an `--out` that is not
@@ -67,7 +67,8 @@ the figures already drawn by `figures`.
   hold) and the figures' files in `--figures`, and a file missing is a fault
   `missing-file <name>`. The folder must pass the checks contracts/figures.md lists under
   "What `book` checks": `incomplete-folder`, `no-checksum`, `stale-folder`,
-  `stale-summary` and `stale-figure <stId>`. A top-level pathway's name a file cannot
+  `stale-summary` and `stale-figure <stId>`. A diagram file that cannot be read as JSON is
+  a fault `bad-file <name>`. A top-level pathway's name a file cannot
   hold, or two equal ignoring case, is a fault `bad-file-name <stId>` (data-model Book).
   Any of these ends the step with exit 1 and no book written (Story 5,
   scenario 3). A character no font covers, after FR-017's substitutions, is a fault
@@ -76,7 +77,9 @@ the figures already drawn by `figures`.
   - **before any figure is read** (and by `figures`, before any is drawn), in the graph's texts the layout writes, in the names
     the figures label (every physical entity a reaction's figure draws: its inputs,
     outputs, catalysts and regulators; and their compartments, from the graph), and in
-    the labels of the diagram files the Figure rules choose to draw (`--files`; today an
+    the labels of the diagram files the Figure rules choose to draw (the `displayName`s
+    of their nodes, compartments, notes, shadows and links, and the `label`s of their
+    nodes' attachments, a modification's lettering) (`--files`; today an
     illustrated pathway's file is not among them, its figure being its EHLD, data-model
     Figure); a fault in a text names the event whose section holds it, one in a
     figure's names the first event in document order whose figure holds it, and one in
@@ -93,7 +96,32 @@ the figures already drawn by `figures`.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
 - **Exit 2:** bad arguments; an `--out` that is not absent or empty, as for `figures`
-  (an old book is never replaced in place); or the graph cannot be reached at the start.
+  (an old book is never replaced in place); the graph cannot be reached at the start; or
+  any other error during the preflight, as `preflight` exits on one (below).
+
+## `pdf-export preflight`
+
+`book`'s preflight alone (T024), with `book`'s `--graph`, `--database`, `--files`,
+`--figures` (both required) and `--species`, so a release's inputs and figures' folder can
+be checked before the book is made. It prints one line per fault, `fault <fault>`, in the
+forms above (`missing-file <name>`, `incomplete-folder`, `no-checksum`,
+`stale-folder <folder's release>/<checksum> <graph's release>/<checksum>`, `stale-summary`,
+`stale-figure <stId>`, `bad-file-name <stId>`, `uncovered-character <code point> <stId>`,
+and `bad-file <name>` for a diagram file that cannot be read as JSON, whose labels are then
+not checked),
+each naming a stable identifier or a file, never a text or a person. A release file is named
+as in `--files` (`diagram/R-HSA-….json`), a figure's as in `--figures` (`R-HSA-….svg`).
+
+- **Exit 0:** no fault. **Exit 1:** at least one. **Exit 2:** bad arguments; the graph
+  cannot be reached at the start, or its address cannot be parsed (said within seconds:
+  that first read's retrying is bounded, the rest keep the driver's own); or any other
+  error during the checks (a graph that fails mid-run): the faults found before it are
+  printed first, then the error on stderr. The faults are kept check by check: those of
+  the check the error stopped are lost. Exit 1 always means faults, never an error.
+- A folder that is not whole, or not this graph's release or summary's, is refused as a
+  whole: its figures are then not checked one by one.
+- Without the EHLD summary the Figure rules cannot be followed: the one fault is
+  `missing-file ehld/svgsummary.txt`.
 
 ## `pdf-export check-book <folder>`
 

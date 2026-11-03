@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // pdf-export's command line (contracts/cli.md). Its commands come with spec 001's tasks:
-// serve (T022) runs the single-event service; book, check-book and compare are to come.
+// serve (T022) runs the single-event service; preflight (T024) runs the book's preflight
+// alone; book, check-book and compare are to come.
 
 export const USAGE = `Usage: pdf-export <command> [options]
 
@@ -8,6 +9,7 @@ Commands:
   book         write the release's book (spec 001, User Story 1)
   check-book   check a book for FR-011's faults
   compare      compare with event-pdf's output, by meaning (FR-012)
+  preflight    check the book's inputs, as book does before printing
   serve        the website's single-event PDF service (User Story 2)
 `;
 
@@ -48,6 +50,12 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   if (args[0] === 'serve') {
     process.exitCode = await serve(args.slice(1));
+  } else if (args[0] === 'preflight') {
+    const { preflightCommand } = await import('./preflight/command.ts');
+    process.exitCode = await preflightCommand(args.slice(1), process.env, {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
   } else {
     const { code, out } = run(args);
     (code === 0 ? process.stdout : process.stderr).write(out);
