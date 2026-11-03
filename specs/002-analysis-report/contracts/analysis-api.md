@@ -20,7 +20,7 @@ In this order, for a report being made (research R1):
 
 **Answers relied on.**
 
-- 404 for an unknown token, 410 for one gone (no result stored though the token is dated within the service's 7 days, as after a release's deletion; spec 001 research R6): passed on in the report's
+- 404 for an unknown token, 410 for one gone (no result stored though the token is dated within the service's 7 days; spec 001 research R6): passed on in the report's
   JSON form (contracts/service.md).
 - Call 4 is not made when call 2 has no pathway: the service cannot take an empty
   body.

@@ -509,6 +509,14 @@ own source, and the answers agree with them.
   from the request (the service writes a file under it). The exact count would be spec 002's (`POST
 /token/{token}/found/all` over every kept pathway, its research R1), at the cost of
   sending the whole pathway list; the CSV is one small request, and its edge is rare.
+- **Each call says what it accepts:** the CSV call `Accept: text/csv, application/json`,
+  the others `Accept: application/json`. The CSV endpoint produces only `text/csv`: asked
+  with `Accept: application/json` alone it answers the framework's own 406, not the
+  service's JSON, and `/token/{token}` asked for `text/csv` answers an empty 406. With
+  both types listed, an error comes back in the service's JSON (ran).
+- **`/token/{token}` is paged to one pathway** (`pageSize=1&page=1`): the counts and the
+  summary are the same, and the answer was 1 KB rather than 94 KB unpaged for 229
+  pathways (ran).
 - **A 404 from `found/…` is read as none found,** as today's book reads it, though it
   may mean the result went between `/token/{token}` and that call. The analysis's own `includeDisease`, if shown, is read from an answer
   asked for without the parameter.

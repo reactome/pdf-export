@@ -314,4 +314,7 @@ overview. The fixture graph's placeholder people serve the edit history.
 001 research R6), so call 1 reads it as "any other failure" and the report answers 503,
 where spec 001 answers 404 `unknown-token` after checking the token's form itself
 (R6's rule). Whether the report takes the same check is decided with its first token
-task.
+task. Spec 001 also sends only the canonical token (R6): sent as given, one nested in
+`%25` layers or holding `%2F` reaches the servlet container's HTML 400, and a decoded
+`/` reaches another route, whose 404 would pass on as the token's; and it names each
+call's `Accept`, as the CSV endpoint answers a 406 to the wrong one.
