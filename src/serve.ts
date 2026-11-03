@@ -4,10 +4,13 @@
 // form, then the concurrency limit, and only then is anything made. Every figure is drawn on
 // request, with the token where there is one; one that cannot be drawn leaves its section
 // without it, logged. Characters no font draws print as U+FFFD (FR-017), logged once per PDF.
-// Each request has a deadline across everything it waits for, the analysis service's calls
-// among them; past it the answer is 503 `unavailable`. A reason never carries a path, a host
-// or a name: the content service writes WebsiteAngular's envelope from it.
+// Each request has a deadline across everything it waits for, the graph's reads and the
+// analysis service's calls among them; past it, or once the client has gone, the work stops
+// between stages, its calls are stopped, nothing more is printed, and the answer is 503
+// `unavailable`. The browser that prints is started again if it goes. A reason never carries
+// a path, a host or a name: the content service writes WebsiteAngular's envelope from it.
 import { readFileSync } from 'node:fs';
+import { setTimeout as pause } from 'node:timers/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
@@ -69,8 +72,10 @@ export interface ServeLimits {
   figureTimeoutMs: number;
   /** The pause before a figure's one retry after a 503. */
   retryPauseMs: number;
-  /** A health check's call to another service. */
+  /** A health check's call to another service, and its read of the graph. */
   healthTimeoutMs: number;
+  /** The least time between two starts of the browser, so a crashing one is not restarted in a loop. */
+  relaunchPauseMs: number;
 }
 
 export const LIMITS: ServeLimits = {
@@ -79,6 +84,7 @@ export const LIMITS: ServeLimits = {
   figureTimeoutMs: 60_000,
   retryPauseMs: 5_000,
   healthTimeoutMs: 5_000,
+  relaunchPauseMs: 5_000,
 };
 
 /** Figures asked of the render service at once: its own default concurrency. */
@@ -163,9 +169,19 @@ export interface Service {
   close(): Promise<void>;
 }
 
+/** What prints the PDFs: T019's `Printer`, or a test's. */
+export interface ServicePrinter {
+  single(html: string): Promise<Uint8Array>;
+  readonly connected: boolean;
+  onDisconnected(listener: () => void): void;
+  close(): Promise<void>;
+}
+
 export interface ServiceOptions {
   /** The graph, if not opened from the settings (tests give one). */
   graph?: Graph;
+  /** How a printer is started: T019's `Printer` by default (tests wrap it). */
+  startPrinter?: () => Promise<ServicePrinter>;
   /** Where log lines go: standard error by default. */
   log?: (line: string) => void;
   limits?: Partial<ServeLimits>;
@@ -207,30 +223,83 @@ export async function startService(
   const limits: ServeLimits = { ...LIMITS, ...options.limits };
   const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));
   const illustrated = readIllustrated(settings.files);
-  const graph = options.graph ?? openGraph(settings.graph);
+  // a read the database runs longer than a request may wait is ended there too
+  const graph =
+    options.graph ?? openGraph(settings.graph, { transactionTimeoutMs: limits.deadlineMs });
   const ownGraph = options.graph === undefined;
-  const printer = await Printer.start();
+  const startPrinter = options.startPrinter ?? (() => Printer.start());
   const styles = pageStyles();
   let active = 0;
+  const state = { closing: false };
+  // read through a call: a check before an await does not hold after it
+  const closing = () => state.closing;
 
-  /** Rejects once the deadline passes, so a wait that cannot be stopped is not waited on. */
-  const within = <T>(work: Promise<T>, deadline: AbortSignal): Promise<T> =>
+  // The browser: started at once, and again whenever it goes (a crash, a kill), never twice
+  // within relaunchPauseMs, so one that dies at once is not restarted in a loop.
+  let printer: ServicePrinter | null = null;
+  let launching: Promise<ServicePrinter> | null = null;
+  let lastLaunch = -Infinity;
+  /** A browser; `retry` keeps trying after a failed start (the first start does not). */
+  function launch(retry = true): Promise<ServicePrinter> {
+    launching ??= (async () => {
+      for (;;) {
+        const wait = lastLaunch + limits.relaunchPauseMs - Date.now();
+        if (wait > 0) await pause(wait);
+        if (closing()) throw new Error('the service is closing');
+        lastLaunch = Date.now();
+        try {
+          const started = await startPrinter();
+          started.onDisconnected(() => {
+            if (printer !== started) return;
+            printer = null;
+            void started.close().catch(() => undefined);
+            if (closing()) return;
+            log('printer: the browser went; starting another');
+            void launch().catch(() => undefined);
+          });
+          printer = started;
+          return started;
+        } catch (error) {
+          log(`printer: the browser could not start (${describe(error)})`);
+          if (!retry || closing()) throw error;
+        }
+      }
+    })().finally(() => {
+      launching = null;
+    });
+    return launching;
+  }
+  await launch(false);
+  const currentPrinter = (): Promise<ServicePrinter> =>
+    printer?.connected ? Promise.resolve(printer) : launch();
+
+  /**
+   * Rejects once the signal ends (with its reason), so a wait that cannot be stopped is not
+   * waited on.
+   */
+  const within = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const stop = () => {
-        reject(new Refusal('unavailable', 'the deadline passed'));
+        reject(stopReason(signal));
       };
-      if (deadline.aborted) stop();
-      deadline.addEventListener('abort', stop, { once: true });
+      if (signal.aborted) stop();
+      signal.addEventListener('abort', stop, { once: true });
       void work.then(resolve, reject).finally(() => {
-        deadline.removeEventListener('abort', stop);
+        signal.removeEventListener('abort', stop);
       });
     });
 
-  async function identify(identifier: string, deadline: AbortSignal): Promise<Child> {
+  /** The graph as one request reads it: each read given up when the request ends. */
+  const graphFor = (signal: AbortSignal): Graph => ({
+    read: (query, params) => within(graph.read(query, params), signal),
+    close: () => Promise.resolve(),
+  });
+
+  async function identify(identifier: string, signal: AbortSignal): Promise<Child> {
     if (!IDENTIFIER.test(identifier)) throw new Refusal('no-event');
     let found;
     try {
-      found = await within(eventByIdentifier(graph, identifier), deadline);
+      found = await eventByIdentifier(graphFor(signal), identifier);
     } catch (error) {
       if (error instanceof Refusal) throw error;
       throw new Refusal('unavailable', `the graph: ${describe(error)}`);
@@ -247,7 +316,17 @@ export async function startService(
     token: string | null,
     deadline: AbortSignal
   ): Promise<Uint8Array> {
-    const doc = await buildSingle(graph, root, { depth, illustrated, analysis: token !== null });
+    // between stages: a request that has ended goes no further
+    const going = () => {
+      if (deadline.aborted) throw stopReason(deadline);
+    };
+    const reading = graphFor(deadline);
+    const doc = await buildSingle(reading, root, {
+      depth,
+      illustrated,
+      analysis: token !== null,
+    });
+    going();
     const sections = doc.places.flatMap((place) => (place.full ? [place.section] : []));
     const analysis =
       token === null
@@ -257,10 +336,11 @@ export async function startService(
             {
               token,
               species: sections[0]?.event.speciesName ?? '',
-              events: await analysedEvents(graph, sections),
+              events: await analysedEvents(reading, sections),
             },
             { timeoutMs: limits.analysisTimeoutMs, signal: deadline }
           );
+    going();
     const characters = new CharacterLog(
       token === null ? root.stId : `${root.stId} token=${token}`,
       log
@@ -270,6 +350,7 @@ export async function startService(
       characters,
       deadline,
     });
+    going();
     const laid = layoutSingle(onRequestStrings(doc, characters), {
       site: settings.site,
       date: new Date(),
@@ -277,7 +358,10 @@ export async function startService(
       styles,
       analysis: analysis === null ? null : onRequestStrings(analysis, characters),
     });
-    return printer.single(laid.html);
+    const printing = await within(currentPrinter(), deadline);
+    // never printed once the request has ended
+    going();
+    return printing.single(laid.html);
   }
 
   /** Each figure the document draws, once, at most FIGURES_AT_ONCE at a time. */
@@ -318,7 +402,17 @@ export async function startService(
   }
 
   async function answerPdf(req: IncomingMessage, res: ServerResponse, rawId: string) {
-    const deadline = AbortSignal.timeout(limits.deadlineMs);
+    // the request's end: its deadline, or its client gone before it is answered
+    const ending = new AbortController();
+    const deadline = ending.signal;
+    const timer = setTimeout(() => {
+      ending.abort(new Refusal('unavailable', 'the deadline passed'));
+    }, limits.deadlineMs);
+    timer.unref();
+    res.once('close', () => {
+      clearTimeout(timer);
+      if (!res.writableFinished) ending.abort(new Refusal('unavailable', 'the client went'));
+    });
     const query = new URL(req.url ?? '/', 'http://service').searchParams;
     // the depth first
     const depths = query.getAll('depth');
@@ -409,7 +503,7 @@ export async function startService(
     const base = (url: string) => (url.endsWith('/') ? url : `${url}/`);
     let graphRelease: number;
     try {
-      graphRelease = await release(graph);
+      graphRelease = await within(release(graph), AbortSignal.timeout(limits.healthTimeoutMs));
     } catch (error) {
       log(`unavailable health: the graph: ${describe(error)}`);
       refuse(res, 'unavailable');
@@ -420,7 +514,15 @@ export async function startService(
       // any answer of its own: the service has no health endpoint of its own to ask
       answers(new URL('database/version', base(settings.analysis)).href, (status) => status < 500),
     ]);
-    json(res, 200, { version: VERSION, release: graphRelease, render, analysis, figures: 'none' });
+    json(res, 200, {
+      version: VERSION,
+      release: graphRelease,
+      render,
+      analysis,
+      printer: printer?.connected === true,
+      making: active,
+      figures: 'none',
+    });
   }
 
   const server: Server = createServer((req, res) => {
@@ -455,6 +557,7 @@ export async function startService(
   return {
     url: `http://${host}:${String(port)}`,
     async close() {
+      state.closing = true;
       server.closeAllConnections();
       await new Promise<void>((resolve) =>
         server.close(() => {
@@ -462,7 +565,8 @@ export async function startService(
         })
       );
       try {
-        await printer.close();
+        await launching?.catch(() => undefined);
+        await printer?.close();
       } finally {
         if (ownGraph) await graph.close();
       }
@@ -515,7 +619,15 @@ function figureRequest(figure: Figure, token: string | undefined): FigureRequest
   }
 }
 
+/** Why a request ended: its signal's reason, a refusal of its own. */
+function stopReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new Refusal('unavailable', 'the request ended');
+}
+
 function refuse(res: ServerResponse, reason: Reason) {
+  if (res.writableEnded || res.destroyed) return;
   json(res, STATUS[reason], { reason });
 }
 

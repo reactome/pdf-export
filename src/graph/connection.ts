@@ -28,7 +28,17 @@ export interface Graph {
   close(): Promise<void>;
 }
 
-export function openGraph(settings: GraphSettings): Graph {
+export interface GraphOptions {
+  /**
+   * How long one read may run in the database before Neo4j ends it (the driver's transaction
+   * timeout); none without it.
+   */
+  transactionTimeoutMs?: number;
+}
+
+export function openGraph(settings: GraphSettings, options: GraphOptions = {}): Graph {
+  const config =
+    options.transactionTimeoutMs === undefined ? {} : { timeout: options.transactionTimeoutMs };
   // Integers as JavaScript numbers: Reactome's ids are well below 2^53.
   const driver: Driver = neo4j.driver(
     settings.uri,
@@ -42,7 +52,7 @@ export function openGraph(settings: GraphSettings): Graph {
         defaultAccessMode: neo4j.session.READ,
       });
       try {
-        const result = await session.executeRead((tx) => tx.run(query, params));
+        const result = await session.executeRead((tx) => tx.run(query, params), config);
         return result.records.map((record) => record.toObject() as T);
       } finally {
         await session.close();

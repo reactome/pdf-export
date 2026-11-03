@@ -381,6 +381,8 @@ export async function diagramChoices(
  * reference identifiers of its participants, its inputs, outputs, catalysts and regulators,
  * through every complex's components, every set's members and candidates and every
  * polymer's unit, with an isoform's variant identifier beside its own. Sorted, each once.
+ * The nesting is read ten deep at most: unbounded, Neo4j expands every path to every leaf
+ * (`VarLengthExpand(All)`), and graph-core's entities nest a few levels, not ten.
  */
 export async function reactionIdentifiers(
   graph: Graph,
@@ -401,7 +403,7 @@ export async function reactionIdentifiers(
        WITH r
        MATCH (r)-[:regulatedBy]->(:Regulation)-[:regulator]->(pe:PhysicalEntity) RETURN pe
      }
-     MATCH (pe)-[:hasComponent|hasMember|hasCandidate|repeatedUnit*0..]->(:PhysicalEntity)
+     MATCH (pe)-[:hasComponent|hasMember|hasCandidate|repeatedUnit*0..10]->(:PhysicalEntity)
            -[:referenceEntity]->(re:ReferenceEntity)
      WITH id, collect(DISTINCT re.identifier) + collect(DISTINCT re.variantIdentifier) AS identifiers
      RETURN id, identifiers`,

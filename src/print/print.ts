@@ -47,6 +47,16 @@ export class Printer {
     }
   }
 
+  /** Whether its browser is still there: one that crashed or was killed is not. */
+  get connected(): boolean {
+    return this.#browser.isConnected();
+  }
+
+  /** Called once its browser goes, however it went (a crash, a kill, `close`). */
+  onDisconnected(listener: () => void): void {
+    this.#browser.once('disconnected', listener);
+  }
+
   /** A page of HTML, printed once from a file: tagged with an outline, or not. */
   async print(html: string, tagged: boolean): Promise<Uint8Array> {
     const file = join(this.#folder, `${String(++this.#count)}.html`);

@@ -43,7 +43,9 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   form are checked, so those answers come whatever the load. A PDF holds its place
   until its work has stopped, not only until it is answered. Each request has a
   deadline across everything it waits for, the analysis service's calls together among
-  them (each of which also has its own timeout); past it, the answer is 503.
+  them (each of which also has its own timeout); past it, or once the client has gone, the
+  work stops and nothing more is printed, and the answer is 503. A browser that goes is
+  started again.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's
@@ -55,5 +57,5 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 ## `GET /health`
 
 200 with the package's version, the graph's release, whether the render and analysis
-services answer, and the figures' folder: `ready` (its release and checksum),
+services answer, whether its browser is up, how many PDFs are being made, and the figures' folder: `ready` (its release and checksum),
 `stale`, `incomplete` or `none`. Used by the container's health check.

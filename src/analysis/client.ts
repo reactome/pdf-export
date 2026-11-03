@@ -83,6 +83,8 @@ export async function readAnalysis(
           : AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
+      // the caller's own end is its own, not the analysis service failing
+      if (signal?.aborted) throw signal.reason;
       throw new AnalysisError('unavailable', `${what}: no answer (${reason(error)})`);
     }
     if (response.ok) return response;
@@ -108,6 +110,7 @@ export async function readAnalysis(
     try {
       return await read(response);
     } catch (error) {
+      if (signal?.aborted) throw signal.reason;
       throw new AnalysisError(
         'unavailable',
         `${what}: the answer could not be read (${reason(error)})`

@@ -1,7 +1,9 @@
 // The figures client (spec 001 T014, contracts/render.md): asks the website's render
 // service for each figure as SVG. A 503 is tried once more after a pause; any other
 // refusal, a second 503 or a timeout is a missing figure, with its reason, for the caller
-// to fail the book on (FR-011) or go on without (a single-event PDF).
+// to fail the book on (FR-011) or go on without (a single-event PDF). The caller's own end
+// (its signal) is thrown as it is, never read as a missing figure.
+import { setTimeout as pause } from 'node:timers/promises';
 
 /** What to draw (data-model.md's Figure). */
 export type FigureRequest =
@@ -42,7 +44,12 @@ export async function fetchFigure(
   { timeoutMs = 60_000, retryPauseMs = 5_000, signal }: ClientOptions = {}
 ): Promise<FigureAnswer> {
   const url = figureUrl(base, request);
+  /** The caller's end is its own, not the render service failing: it is thrown, not missing. */
+  const stopped = () => {
+    if (signal?.aborted) throw signal.reason;
+  };
   for (let attempt = 1; ; attempt++) {
+    stopped();
     let response: Response;
     try {
       const timeout = AbortSignal.timeout(timeoutMs);
@@ -50,6 +57,7 @@ export async function fetchFigure(
         signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
       });
     } catch (error) {
+      stopped();
       return { missing: `${request.stId}: no answer (${reason(error)})` };
     }
     if (response.ok) {
@@ -62,12 +70,19 @@ export async function fetchFigure(
       try {
         return { svg: await response.text() };
       } catch (error) {
+        stopped();
         return { missing: `${request.stId}: the answer was cut short (${reason(error)})` };
       }
     }
     await response.body?.cancel();
-    if (response.status === 503 && attempt === 1 && !signal?.aborted) {
-      await new Promise((resolve) => setTimeout(resolve, retryPauseMs));
+    if (response.status === 503 && attempt === 1) {
+      // the pause ends with the caller's end too
+      try {
+        await pause(retryPauseMs, undefined, signal ? { signal } : {});
+      } catch (error) {
+        stopped();
+        throw error;
+      }
       continue;
     }
     return { missing: `${request.stId}: the render service answered ${String(response.status)}` };
