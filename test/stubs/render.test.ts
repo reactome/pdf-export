@@ -101,6 +101,50 @@ describe('the render stub', () => {
     stub.reset();
     assert.deepEqual(stub.requests, []);
   });
+
+  test('refuses with a 500 or a 504, for one figure or for every one', async () => {
+    stub.refuse(ALPHA, 500, 1);
+    assert.equal((await get(`/render/${ALPHA}.svg`)).status, 500);
+    assert.equal((await get(`/render/${ALPHA}.svg`)).status, 200);
+    stub.refuseAll(504, 2);
+    assert.equal((await get(`/render/${ALPHA}.svg`)).status, 504);
+    assert.equal((await get(`/render/${BETA}.svg`)).status, 504);
+    assert.equal((await get(`/render/${BETA}.svg`)).status, 200);
+  });
+
+  test('answers its health as set, and runs a hook as each figure is drawn', async () => {
+    assert.deepEqual(await (await get('/health')).json(), {
+      build: '000000000000',
+      files: 'local',
+    });
+    const drawn: string[] = [];
+    stub.onRender((stId) => {
+      drawn.push(stId);
+      stub.health.build = 'abcdefabcdef';
+    });
+    await (await get(`/render/${REACTION}.svg?layout=reaction`)).text();
+    assert.deepEqual(drawn, [REACTION]);
+    assert.equal(
+      ((await (await get('/health')).json()) as { build: string }).build,
+      'abcdefabcdef'
+    );
+    stub.reset();
+    assert.equal(
+      ((await (await get('/health')).json()) as { build: string }).build,
+      '000000000000'
+    );
+  });
+
+  test('silenced, it answers nothing, its health included; slowed, it answers late', async () => {
+    stub.slow(150);
+    const started = Date.now();
+    assert.equal((await get(`/render/${ALPHA}.svg`)).status, 200);
+    assert.ok(Date.now() - started >= 140);
+    stub.silence();
+    for (const path of ['/health', `/render/${ALPHA}.svg`]) {
+      await assert.rejects(get(path, AbortSignal.timeout(300)), { name: 'TimeoutError' });
+    }
+  });
 });
 
 test(
