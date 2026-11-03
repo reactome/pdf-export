@@ -17,7 +17,13 @@ import {
   type LayoutOptions,
   type Report,
 } from '../layout/document.ts';
-import { figureKey, measure, place as placeFigure, PORTRAIT } from '../layout/figure.ts';
+import {
+  figureKey,
+  measure,
+  place as placeFigure,
+  PORTRAIT,
+  type FigureSvgs,
+} from '../layout/figure.ts';
 import type { Document, Figure, Place } from '../model/types.ts';
 
 export interface PartsSettings {
@@ -68,6 +74,13 @@ export interface BookRun {
   joined: (joined: Joined) => Promise<void>;
   /** How parts are joined; the tests count it. */
   join?: typeof joinParts;
+  /**
+   * Called in a part's slot before it is laid out, with its places (null for the front
+   * part); a throw fails the part as a failed print does. `book` checks there the labels of
+   * the figures the part draws (T029), so a fault in one stops the run before its part is
+   * printed, not before the first.
+   */
+  laying?: (doc: Document, places: readonly Place[] | null) => void;
 }
 
 /** A figure as it prints: on a landscape page of its own, or its height in the portrait text. */
@@ -81,7 +94,7 @@ export interface FigureSize {
 export type Sizes = (figure: Figure) => FigureSize | null;
 
 /** Sizes from the layout's figures, each SVG measured once however many sections draw it. */
-export function figureSizes(figures: ReadonlyMap<string, string>): Sizes {
+export function figureSizes(figures: FigureSvgs): Sizes {
   const sizes = new Map<string, FigureSize | null>();
   return (figure) => {
     const key = figureKey(figure);
@@ -302,6 +315,7 @@ export async function printBook(docs: readonly Document[], run: BookRun): Promis
     let left = parts.length;
     const print = async (places: readonly Place[] | null, i: number) => {
       if (failures.length > 0) return;
+      run.laying?.(doc, places);
       const laid = places ? layoutBookPart(doc, places, layout) : layoutBookFront(doc, layout);
       printed[i] = await printer.part(laid.html);
       reports[i] = laid.report;

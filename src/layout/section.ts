@@ -4,7 +4,7 @@
 // Parts are set apart by space, type and thin rules, never boxes (FR-016).
 import type { Reference } from '../graph/queries.ts';
 import type { Found, FoundRow, Place, Section } from '../model/types.ts';
-import { figureHtml, figureKey, type Placement } from './figure.ts';
+import { figureHtml, figureKey, type FigureSvgs, type Placement } from './figure.ts';
 import { anchorOf } from '../model/build.ts';
 import { Links, attribute, text } from './html.ts';
 
@@ -20,7 +20,7 @@ export interface Report {
 
 export interface SectionInput {
   links: Links;
-  figures: ReadonlyMap<string, string>;
+  figures: FigureSvgs;
   /** What an analysis found, by the event's stable identifier. */
   found: ReadonlyMap<string, Found> | null;
   report: Report;

@@ -55,11 +55,16 @@ const LEFT_OUT = /[\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
  * space at either end trimmed. Any other space is kept, as Chromium keeps it: as itself
  * where a stamp face draws it (a no-break or thin space), and otherwise as U+0020, which
  * Chromium's box draws in its place where it has no face for it (an ideographic space, a
- * line separator, an Ogham space mark), not refused as a character no face draws.
+ * line separator, an Ogham space mark), not refused as a character no face draws. Such a
+ * space at either end is not trimmed, as Chromium does not trim it: CSS strips only its
+ * collapsible white space at a line's ends, so the box keeps it, a blank before or after
+ * the name, and so does the stamp, as U+0020.
  *
  * Gaps against Chromium, known: Hangul fillers (U+3164, U+115F) are default-ignorable and
- * left out here, where Chromium may draw them as blanks; a kept space is as wide as
- * U+0020, not its own width; and nothing here is shaped (above).
+ * left out here, where Chromium may draw them as blanks; a space no stamp face draws is
+ * stamped as U+0020, so as wide as a word space, where Chromium draws it at its own width
+ * (an ideographic space an em wide), while a no-break or thin space, which a face draws,
+ * is stamped at its own; and nothing here is shaped (above).
  */
 export function marginText(text: string): string {
   let out = '';
@@ -244,7 +249,10 @@ const stamped = new WeakSet<PDFDocument>();
  * `rewriteLinks` gives them, so it runs after that. Throws, stamping nothing, when the
  * PDF is stamped already, the parts' pages are not the PDF's, a front part's heading is
  * not in the front part, the name leaves no header, a character of a stamp is one no font
- * draws, or a face's file cannot be read; a PDF refused is not held as stamped.
+ * draws, or a face's file cannot be read; a PDF refused for any of these is not held as
+ * stamped. Once those checks pass it is held as stamped before anything is embedded, so a
+ * failure after that (embedding a face) leaves it held, part stamped: `book` discards a
+ * PDF on any throw, never saving one (T029).
  *
  * @param fileOf each face's file (`stampFile`); the tests give one that is missing
  */
@@ -285,7 +293,7 @@ export async function stampPages(
   }
   // every face's file read, and the space's face found, before the PDF is held: a refusal
   // leaves it unmarked
-  const files = new Map([...used.keys()].map((face) => [face, load(face, fileOf)]));
+  const files = [...used].map(([face, chars]) => ({ face, chars, file: load(face, fileOf) }));
   // a margin box's line is the first face's `normal` line (the one drawing a space,
   // Roboto's), centred in the box: the margin's height at the top or bottom of the page
   const space = faceFor(0x20);
@@ -295,8 +303,7 @@ export async function stampPages(
   stamped.add(pdf);
   pdf.registerFontkit(fontkit);
   const fonts = new Map<FontFace, PDFFont>();
-  for (const [face, chars] of used) {
-    const file = files.get(face) ?? load(face, fileOf);
+  for (const { face, chars, file } of files) {
     const customName = `${subsetTag(face, chars)}+${file.postscriptName}`;
     fonts.set(face, await pdf.embedFont(file.bytes, { subset: true, customName }));
   }

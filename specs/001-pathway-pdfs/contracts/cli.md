@@ -64,9 +64,9 @@ the figures already drawn by `figures`.
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                       |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                    |
 | `--out`      |                                | the folder written; default `TheReactomeBook`                                      |
-| `--parallel` |                                | parts printed and PDFs joined at once, the largest PDFs first; default 4           |
-| `--joins`    |                                | of those, PDFs joined at once; default 1 (research R4: T029 raises it if 2 fit)    |
-| `--report`   |                                | where the run report (data-model.md) is written, as JSON                           |
+| `--parallel` |                                | parts printed and PDFs joined at once, largest PDFs first; default 4, at most 64   |
+| `--joins`    |                                | of those, PDFs joined at once; default 1, at most `--parallel` (R4: T031 settles)  |
+| `--report`   |                                | where the run report (data-model.md) is written, as JSON, however the run ends     |
 
 - **The preflight,** before anything is printed (and the character check's second half,
   on reading each figure, below): from the graph and the EHLD summary it
@@ -104,8 +104,11 @@ the figures already drawn by `figures`.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
 - **Exit 2:** bad arguments; an `--out` that is not absent or empty, as for `figures`
-  (an old book is never replaced in place); the graph cannot be reached at the start; or
-  any other error during the preflight, as `preflight` exits on one (below).
+  (an old book is never replaced in place); the graph cannot be reached at the start;
+  any other error during the preflight, as `preflight` exits on one (below); or any other
+  error while the book is printed (a print or a join that fails, or a PDF refused at its
+  contents, links, outline or stamps), after printing the faults found before it. A
+  refused PDF is never saved, and the run writes none (Exit 0).
 
 ## `pdf-export preflight`
 

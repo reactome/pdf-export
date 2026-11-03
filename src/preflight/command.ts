@@ -92,18 +92,19 @@ export async function preflightCommand(
     err(`The graph cannot be read: ${message(error)}\n`);
     return 2;
   } finally {
-    await start?.close();
+    await closing(start, err);
   }
-  // the checks' reads with the driver's own retries
-  const graph = open(settings.graph);
+  // the checks' reads with the driver's own retries (opened inside the try, as above)
   const faults: string[] = [];
   let failure: { error: unknown } | null = null;
+  let graph: Graph | undefined;
   try {
+    graph = open(settings.graph);
     await preflight(graph, release, settings, faults);
   } catch (error) {
     failure = { error };
   } finally {
-    await graph.close();
+    await closing(graph, err);
   }
   // the faults found first, then the error that stopped the checks, if one did
   for (const fault of faults) out(`fault ${fault}\n`);
@@ -114,5 +115,17 @@ export async function preflightCommand(
   return faults.length > 0 ? 1 : 0;
 }
 
-const message = (error: unknown): string =>
+/**
+ * A graph closed, a failure to close said on stderr and never thrown: a rejection in a
+ * `finally` would replace the command's exit code with an error.
+ */
+export async function closing(graph: Graph | undefined, err: (text: string) => void) {
+  try {
+    await graph?.close();
+  } catch (error) {
+    err(`The graph did not close: ${message(error)}\n`);
+  }
+}
+
+export const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);

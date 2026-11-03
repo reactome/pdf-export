@@ -671,6 +671,9 @@ describe('pageStamps', () => {
       ['a\u2028b', 'a b'],
       ['a\u1680b', 'a b'],
       ['a\u3000 b', 'a  b'],
+      // and not trimmed at either end: CSS strips only collapsible white space at a line's
+      // ends, so Chromium's box keeps it there, a blank before the name
+      ['\u3000a', ' a'],
       ['a\uFE0Fb', 'ab'],
       ['a \uFE0F b', 'a b'],
       ['a\u200Db', 'ab'],
