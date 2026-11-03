@@ -16,11 +16,14 @@ export interface ClientOptions {
   timeoutMs?: number;
   /** The pause before the one retry of a 503 (the render service asks for 5 s). */
   retryPauseMs?: number;
+  /** The caller's own end: the service's deadline for the PDF. */
+  signal?: AbortSignal;
 }
 
 /**
- * The request's URL. The token is given as the analysis service issued it, and
- * URLSearchParams encodes it once: encoding it before would send a different token.
+ * The request's URL. The token is given decoded (its padding as `=`), and URLSearchParams
+ * encodes it once, so the service is sent the canonical token, `=` as `%3D`: a token given
+ * already encoded (`canonicalToken`'s answer) would be sent as `%253D`, another token.
  */
 export function figureUrl(base: string, request: FigureRequest): URL {
   const url = new URL(
@@ -36,13 +39,16 @@ export function figureUrl(base: string, request: FigureRequest): URL {
 export async function fetchFigure(
   base: string,
   request: FigureRequest,
-  { timeoutMs = 60_000, retryPauseMs = 5_000 }: ClientOptions = {}
+  { timeoutMs = 60_000, retryPauseMs = 5_000, signal }: ClientOptions = {}
 ): Promise<FigureAnswer> {
   const url = figureUrl(base, request);
   for (let attempt = 1; ; attempt++) {
     let response: Response;
     try {
-      response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      const timeout = AbortSignal.timeout(timeoutMs);
+      response = await fetch(url, {
+        signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
+      });
     } catch (error) {
       return { missing: `${request.stId}: no answer (${reason(error)})` };
     }
@@ -60,7 +66,7 @@ export async function fetchFigure(
       }
     }
     await response.body?.cancel();
-    if (response.status === 503 && attempt === 1) {
+    if (response.status === 503 && attempt === 1 && !signal?.aborted) {
       await new Promise((resolve) => setTimeout(resolve, retryPauseMs));
       continue;
     }

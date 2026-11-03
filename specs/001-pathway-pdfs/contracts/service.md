@@ -10,14 +10,14 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 | `depth` | `0` or `1`; default `1`                                                          |
 | `token` | an analysis token, as the analysis service issued it (not percent-encoded twice) |
 
-| Status | When                                                                                                | Body                                                                                 |
-| ------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 200    | the PDF is made                                                                                     | `application/pdf`, with the stable identifier in the `Content-Disposition` file name |
-| 400    | `depth` is not 0 or 1, or the identifier names something that is not a pathway or reaction          | JSON `{ "reason": "not-an-event" \| "bad-depth" }`                                   |
-| 404    | the identifier names nothing in the graph                                                           | JSON `{ "reason": "no-event" }`                                                      |
-| 404    | the token is malformed, or the analysis service answers 404 for it                                  | JSON `{ "reason": "unknown-token" }`                                                 |
-| 410    | the analysis service answers 410 for it: no result, though dated within its 7 days or in the future | JSON `{ "reason": "gone-token" }`                                                    |
-| 503    | the graph, the render service or the analysis service cannot answer, or the service is at its limit | JSON `{ "reason": "unavailable" }`                                                   |
+| Status | When                                                                                                                               | Body                                                                                 |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 200    | the PDF is made                                                                                                                    | `application/pdf`, with the stable identifier in the `Content-Disposition` file name |
+| 400    | `depth` is not 0 or 1, or the identifier names something that is not a pathway or reaction                                         | JSON `{ "reason": "not-an-event" \| "bad-depth" }`                                   |
+| 404    | the identifier names nothing in the graph                                                                                          | JSON `{ "reason": "no-event" }`                                                      |
+| 404    | the token is malformed, or the analysis service answers 404 for it                                                                 | JSON `{ "reason": "unknown-token" }`                                                 |
+| 410    | the analysis service answers 410 for it: no result, though dated within its 7 days or in the future                                | JSON `{ "reason": "gone-token" }`                                                    |
+| 503    | the graph, the render service or the analysis service cannot answer, the service is at its limit, or the request's deadline passes | JSON `{ "reason": "unavailable" }`                                                   |
 
 - **The order of checks:** the depth, then the identifier, then the token. An unknown or
   non-event identifier is answered as such whatever the token.
@@ -38,6 +38,12 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   analysis's overlay (SC-005). A PDF can so mix figures from the folder with figures
   drawn on request by another render build; contracts/figures.md lists what the
   fingerprint cannot see.
+- **The limit and the deadline:** a request beyond the concurrency limit is answered
+  503 at once, not queued; it is counted only once its depth, identifier and token's
+  form are checked, so those answers come whatever the load. A PDF holds its place
+  until its work has stopped, not only until it is answered. Each request has a
+  deadline across everything it waits for, the analysis service's calls together among
+  them (each of which also has its own timeout); past it, the answer is 503.
 - **A figure that cannot be drawn** does not fail the PDF. The section is written without
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's

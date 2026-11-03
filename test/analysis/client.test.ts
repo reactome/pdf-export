@@ -143,7 +143,7 @@ describe('the analysis client', () => {
       'MjAyMDAxMDEwMDAwMDBfM%2F',
       'MjAyMDAxMDEwMDAwMDBfM+',
       'MjAyMDAxMDEwMDAwMDBfM%2B',
-      // over the bound, nested in layers it would take seconds to decode
+      // over the bound, nested in layers that would take long to decode
       `MjAyMDAxMDEwMDAwMDBfMQ%${'25'.repeat(8_000)}3D%3D`,
       `${whole}A`,
       '%25',
