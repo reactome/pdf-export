@@ -409,7 +409,10 @@ own source, and the answers agree with them.
     had passed about 2 GB. How and when is not known from here.
   - Submitting the same data again reuses its earlier token while the service has not
     restarted (an in-memory map), and runs the analysis again under it if its result is
-    gone: a token answered 404 can later be answered 200.
+    gone: a token answered 404 can later be answered 200. This holds after the
+    service's own cleanup too: it asks the map to forget a deleted file's token
+    (`removeAssociatedToken`), but compares the file's decoded name with the map's
+    encoded tokens, which never match (read).
   - So a token older than 7 days whose result is still stored is answered in full.
     Read from the code; not seen here, as no stored result older than 7 days was at
     hand.
@@ -436,7 +439,10 @@ own source, and the answers agree with them.
   `interactors`, `type`, `sampleName`, `text` and `includeDisease`. Beside it,
   `/token/{token}` gives `identifiersNotFound` (a count), `pathwaysFound`, `pathways` (a
   page of them), `resourceSummary`, `speciesSummary`, `expression` and `warnings`. **None
-  of them is a count of identifiers found,** nor of identifiers submitted.
+  of them is a count of identifiers found,** nor of identifiers submitted. These are this
+  analysis's fields: the service leaves out empty ones, and the summary may also hold
+  `species`, `fileName`, `server`, `gsaToken` and `gsaMethod`, with `type` one of six
+  values (the ReactomeGSA ones among them), so the client's types stay open to them.
 - **`pathwaysFound` follows `includeDisease`:** the answer is filtered by the stored
   analysis's own setting unless the request names one, and the summary it returns then
   reports the request's setting, not the analysis's. For the analysis submitted here, 229
@@ -457,8 +463,10 @@ own source, and the answers agree with them.
   `pathways`, `notFound`, `expressionSummary` and `warnings`, and it was 468 KB for this
   four-identifier analysis.
 - **`/download/{token}/entities/found/TOTAL/{name}.csv`** lists them: a header row,
-  then a row per submitted identifier and what it maps to (three columns: submitted
-  identifier, found identifier, resource), 113 bytes here. It is built from the same map
+  then a row per submitted identifier and each identifier it maps to (one submitted
+  identifier mapping to two gives two rows), in three columns (submitted identifier,
+  found identifier, resource), so it is counted by distinct first column, not by row; 113
+  bytes here. It is built from the same map
   as today's book's count (`getAnalysisIdentifiers()`, the found entities map's keys,
   which are equal when their ids are; interactors are a separate map, left out of both),
   so the count of distinct submitted identifiers in it, the header skipped, is that
