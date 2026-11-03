@@ -1,5 +1,6 @@
 // The layout on the fixture's model (spec 001 T018): its parts and their order (FR-005), its
-// links (FR-003), and the book's placeholders and probes (research R4).
+// links (FR-003), and the book's placeholders and probes (research R4); the book is one PDF
+// per top-level pathway (T048).
 import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
@@ -14,7 +15,7 @@ import { figureKey } from '../../src/layout/figure.ts';
 import { Links, PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
 import { sectionHtml } from '../../src/layout/section.ts';
 import type { Document, Section } from '../../src/model/types.ts';
-import { buildFixture, fixtureFigures, skipWithoutGraph, type Built } from './fixture.ts';
+import { bookPdf, buildFixture, fixtureFigures, skipWithoutGraph, type Built } from './fixture.ts';
 
 const SITE = 'https://site.example';
 
@@ -49,7 +50,7 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     options = {
       site: SITE,
       date: new Date('2026-10-30T12:00:00Z'),
-      figures: fixtureFigures(built.book, built.pathway, built.reaction),
+      figures: fixtureFigures(...built.book, built.pathway, built.reaction),
       styles: pageStyles(),
     };
   });
@@ -224,16 +225,18 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
       'Literature references',
       'Edit history',
     ];
-    const { html } = layoutBookPart(built.book, built.book.places, options);
     const seen = new Set<string>();
-    for (const place of built.book.places) {
-      if (!place.full) continue;
-      const at = positions(sectionOf(html, place.section.event.stId), order);
-      const present = at.filter((n) => n >= 0);
-      assert.ok(increasing(present), `${place.section.event.stId}: ${String(at)}`);
-      order.forEach((marker, i) => {
-        if ((at[i] ?? -1) >= 0) seen.add(marker);
-      });
+    for (const doc of built.book) {
+      const { html } = layoutBookPart(doc, doc.places, options);
+      for (const place of doc.places) {
+        if (!place.full) continue;
+        const at = positions(sectionOf(html, place.section.event.stId), order);
+        const present = at.filter((n) => n >= 0);
+        assert.ok(increasing(present), `${place.section.event.stId}: ${String(at)}`);
+        order.forEach((marker, i) => {
+          if ((at[i] ?? -1) >= 0) seen.add(marker);
+        });
+      }
     }
     // and the fixture has each of them somewhere
     assert.deepEqual([...seen].sort(), [...order].sort());
@@ -287,22 +290,20 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     }
   });
 
-  test("a reaction's events before and after, those the book holds, to their sections", () => {
-    const { html } = layoutBookPart(built.book, built.book.places, options);
+  test("a reaction's events before and after, those its book PDF holds, to their sections", () => {
+    const alpha = bookPdf(built, 'Alpha pathway');
+    const { html } = layoutBookPart(alpha, alpha.places, options);
     const one = sectionOf(html, 'R-HSA-90000211');
+    // Polymerisation four, before it, is Gamma's, and Inferred reaction, after it, beta's
+    assert.doesNotMatch(one, /Preceded by|Polymerisation four|Inferred reaction/);
     assert.match(
       one,
-      /<dt>Preceded by<\/dt><dd><a href="https:\/\/anchor\.invalid\/s-R-HSA-90000313">Polymerisation four<\/a><\/dd>/
+      /<dt>Followed by<\/dt><dd><a href="https:\/\/anchor\.invalid\/s-R-HSA-90000212">Black box two<\/a>; <a href="https:\/\/anchor\.invalid\/s-R-HSA-90000251">Disease reaction<\/a><\/dd>/
     );
-    assert.match(
-      one,
-      /<dt>Followed by<\/dt><dd>(<a href="https:\/\/anchor\.invalid\/s-R-HSA-\d+">[^<]+<\/a>(; )?)+<\/dd>/
-    );
-    assert.match(one, /Black box two/);
   });
 
   test("a location's pathway the PDF does not hold is plain text, and an inferred-from source it holds links to its section", () => {
-    const section = fullSection(built.book, 'R-HSA-90000120');
+    const section = fullSection(bookPdf(built, 'beta pathway'), 'R-HSA-90000120');
     const links = new Links(false, SITE, new Set(['s-R-HSA-90000100', 's-SOURCE']));
     const html = sectionHtml(
       {
@@ -328,22 +329,32 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
   });
 
   test("the book's later places are short entries, linked to the one full section (FR-004)", () => {
-    const { html } = layoutBookPart(built.book, built.book.places, options);
-    const shorts = [...html.matchAll(/<p class="short"[^>]*>(.*?)<\/p>/g)].map((m) => m[1] ?? '');
-    assert.ok(shorts.length > 0);
-    for (const entry of shorts) {
-      const target = /href="https:\/\/anchor\.invalid\/(s-[^"]+)"/.exec(entry)?.[1];
-      assert.ok(target && ids(html).has(target), entry);
-      assert.match(entry, /<span class="id">R-HSA-\d+<\/span>$/);
+    let shorts = 0;
+    for (const doc of built.book) {
+      const { html } = layoutBookPart(doc, doc.places, options);
+      for (const [, entry = ''] of html.matchAll(/<p class="short"[^>]*>(.*?)<\/p>/g)) {
+        const target = /href="https:\/\/anchor\.invalid\/(s-[^"]+)"/.exec(entry)?.[1];
+        assert.ok(target && ids(html).has(target), entry);
+        assert.match(entry, /<span class="id">R-HSA-\d+<\/span>$/);
+        shorts++;
+      }
+      // each event's full section is written once
+      const anchors = [...html.matchAll(/class="name"/g)].length;
+      assert.equal(anchors, doc.places.filter((p) => p.full).length);
     }
-    // each event's full section is written once
-    const anchors = [...html.matchAll(/class="name"/g)].length;
-    assert.equal(anchors, built.book.places.filter((p) => p.full).length);
+    assert.ok(shorts > 0);
   });
 
   test('the book: placeholder links and a probe in every target; a single PDF has neither', () => {
-    const front = layoutBookFront(built.book, options).html;
-    const part = layoutBookPart(built.book, built.book.places, options).html;
+    for (const doc of built.book) bookLinks(doc);
+    const single = layoutSingle(built.pathway, options).html;
+    assert.doesNotMatch(single, /anchor\.invalid|probe\.invalid|class="probe"/);
+  });
+
+  /** One of the book's PDFs: its placeholders and probes, its links all within it, its cover. */
+  function bookLinks(doc: Document): void {
+    const front = layoutBookFront(doc, options).html;
+    const part = layoutBookPart(doc, doc.places, options).html;
     for (const html of [front, part]) {
       assert.ok(!hrefs(html).some((h) => h.startsWith('#')), 'a fragment link in the book');
       // every target holds its probe, first thing inside it
@@ -356,10 +367,10 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
         );
       }
     }
-    // every placeholder names a target the book holds, in some part
+    // every placeholder names a target this PDF holds, in some part: none is in another PDF
     const targets = new Set([...ids(front), ...ids(part)]);
     const placeholders = [...hrefs(front), ...hrefs(part)].filter((h) => h.startsWith(PLACEHOLDER));
-    assert.ok(placeholders.length > 10);
+    assert.ok(placeholders.length > 3);
     for (const href of placeholders) assert.ok(targets.has(href.slice(PLACEHOLDER.length)), href);
     // the front part holds the cover, introduction and contents, and no sections
     const at = positions(front, [
@@ -369,12 +380,27 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     ]);
     assert.ok(at.every((n) => n >= 0) && increasing(at), String(at));
     assert.doesNotMatch(front, /class="name"/);
-    // the book's cover: its title and release, no figure, no excerpt note
-    assert.match(front, />The Reactome Book<\/p>\n<p class="release">Reactome release 98<\/p>/);
-    assert.doesNotMatch(front, /class="cover-figure"|class="excerpt"/);
+    // its cover: its pathway's name and the release, no excerpt note
+    assert.ok(
+      front.includes(`>${doc.cover.title}</p>\n<p class="release">Reactome release 98</p>`)
+    );
+    assert.doesNotMatch(front, /class="excerpt"/);
+  }
 
-    const single = layoutSingle(built.pathway, options).html;
-    assert.doesNotMatch(single, /anchor\.invalid|probe\.invalid|class="probe"/);
+  test("each of the book's PDFs: its cover holds its pathway's figure", () => {
+    for (const doc of built.book) {
+      const front = layoutBookFront(doc, options).html;
+      const cover = front.slice(
+        front.indexOf('<div class="cover">'),
+        front.indexOf('<section class="front"')
+      );
+      // each fixture figure is titled with its event's name
+      assert.match(
+        cover,
+        new RegExp(`<div class="cover-figure"><svg [^>]*><title>${doc.cover.title} \\(placeholder`),
+        doc.cover.title
+      );
+    }
   });
 
   test('running headers and page numbers in a single PDF only; the book has none printed', () => {
@@ -388,7 +414,8 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     for (const name of ['introduction', 'contents', 'analysis']) {
       assert.match(single, new RegExp(`@page ${name} \\{ @top-center`));
     }
-    const front = layoutBookFront(built.book, options).html;
-    assert.doesNotMatch(front, /@top-center|@bottom-center/);
+    for (const doc of built.book) {
+      assert.doesNotMatch(layoutBookFront(doc, options).html, /@top-center|@bottom-center/);
+    }
   });
 });

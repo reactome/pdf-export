@@ -122,8 +122,9 @@ as today's (the pathway's name and `.pdf`). A name a file system cannot hold (ho
 
 In the code (`src/model/types.ts`), a book's PDF and a single event's PDF are one
 `Document` with `kind: 'book' | 'single'`; its `places` hold the pathway's tree in
-document order, and `contents` is a list of `ContentsEntry`. (Until T048, the code's
-`'book'` document holds every top-level pathway as chapters of one PDF.)
+document order, and `contents` is a list of `ContentsEntry`. `buildBook`
+(`src/model/build.ts`) gives one `'book'` document per top-level pathway, in FR-002's order
+(T048).
 
 ## BookPdf
 

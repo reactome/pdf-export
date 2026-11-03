@@ -22,7 +22,8 @@ export const illustrated = new Set(
 );
 
 export interface Built {
-  book: Document;
+  /** The book's PDFs, one per top-level pathway, in name order. */
+  book: Document[];
   /** A pathway at depth 1, with a contents list. */
   pathway: Document;
   /** The same pathway, built for an analysis. */
@@ -49,6 +50,13 @@ export async function buildFixture(): Promise<Built> {
   } finally {
     await graph.close();
   }
+}
+
+/** The book's PDF for a top-level pathway, by its name. */
+export function bookPdf(built: Built, title: string): Document {
+  const doc = built.book.find((d) => d.cover.title === title);
+  if (!doc) throw new Error(`no book PDF for ${title}`);
+  return doc;
 }
 
 /** Each document's figures, by figureKey, as the render stub draws them. */
