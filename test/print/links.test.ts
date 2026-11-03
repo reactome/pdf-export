@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 
-import { PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { layoutBookFront, layoutBookPart, pageStyles } from '../../src/layout/document.ts';
@@ -157,13 +157,32 @@ describe('links and outline', { skip: skipWithoutGraph }, () => {
           const { problem } = await landing(pdf, link.dest, title);
           assert.equal(problem, null, label);
         }
-        // and no link went: each is a destination, or a website's page as printed
+        // and a destination for each placeholder, no more
         assert.equal(
           links.filter((l) => l.dest).length,
           placeholders.length,
           `${name}: destinations`
         );
       });
+    }
+  });
+
+  test("every other link is kept as printed: the website's pages", async () => {
+    // each link that is neither a placeholder nor a probe (events' names and figures, to
+    // the website), by page, rectangle and address, before and after
+    const others = (links: Link[]) =>
+      links
+        .filter((l) => !l.dest && !l.url?.startsWith(PLACEHOLDER) && !l.url?.startsWith(PROBE))
+        .map((l) => [l.page, l.rect.map((v) => Math.round(v * 100) / 100), l.url]);
+    for (const [name, { copied, linked }] of joined) {
+      const before = others(await reading(copied, linksOf));
+      assert.ok(
+        before.some(
+          ([, , url]) => typeof url === 'string' && url.startsWith('https://site.example/')
+        ),
+        `${name}: no website links`
+      );
+      assert.deepEqual(others(await reading(linked, linksOf)), before, name);
     }
   });
 
@@ -257,6 +276,68 @@ describe('links and outline', { skip: skipWithoutGraph }, () => {
       const [full, short] = twoParent.map(({ entry }) => entry.dest);
       assert.deepEqual(short, full);
     });
+  });
+
+  test("the outline's dictionaries are linked as the PDF reference has them", async () => {
+    // read back with pdf-lib, not pdf.js, which walks only /First and /Next: each item's
+    // /Parent, /Prev, /Next, /First and /Last, and its /Count, the descendants that show
+    // when it is open, positive if it is, negated if not (the top level open)
+    for (const [name, { doc, linked }] of joined) {
+      const pdf = await PDFDocument.load(linked);
+      const key = (k: string) => PDFName.of(k);
+      const ref = (dict: PDFDict, k: string) => dict.get(key(k))?.toString();
+      const rootRef = pdf.catalog.get(key('Outlines'));
+      assert.ok(rootRef, name);
+      const root = pdf.context.lookup(rootRef, PDFDict);
+      assert.equal(root.get(key('Type'))?.toString(), '/Outlines', name);
+      const titles: [string, number][] = [];
+      /** Walks an item's children; returns how many show beneath it when it is open. */
+      const walk = (item: PDFDict, itemRef: string, depth: number): number => {
+        const first = item.get(key('First'));
+        if (!first) {
+          assert.equal(item.get(key('Last')), undefined, `${name}: /Last with no /First`);
+          assert.equal(item.get(key('Count')), undefined, `${name}: /Count with no children`);
+          return 0;
+        }
+        let shown = 0;
+        let previous: string | undefined;
+        let at = first.toString();
+        let childRef = first;
+        for (;;) {
+          const child = pdf.context.lookup(childRef, PDFDict);
+          const read = child.lookup(key('Title'));
+          const title =
+            read instanceof PDFHexString || read instanceof PDFString ? read.decodeText() : '';
+          const label = `${name}: ${title}`;
+          titles.push([title, depth]);
+          assert.equal(ref(child, 'Parent'), itemRef, `${label}: /Parent`);
+          assert.equal(ref(child, 'Prev'), previous, `${label}: /Prev`);
+          const beneath = walk(child, at, depth + 1);
+          const count = child.lookupMaybe(key('Count'), PDFNumber)?.asNumber();
+          if (beneath > 0 || count !== undefined) {
+            // open only at the top level
+            assert.equal(count, depth === 0 ? beneath : -beneath, `${label}: /Count`);
+          }
+          shown += 1 + (count !== undefined && count > 0 ? beneath : 0);
+          const next = child.get(key('Next'));
+          if (!next) {
+            assert.equal(ref(item, 'Last'), at, `${label}: its parent's /Last`);
+            break;
+          }
+          previous = at;
+          at = next.toString();
+          childRef = next;
+        }
+        return shown;
+      };
+      const shown = walk(root, rootRef.toString(), 0);
+      assert.equal(root.lookupMaybe(key('Count'), PDFNumber)?.asNumber(), shown, `${name}: /Count`);
+      assert.deepEqual(
+        titles,
+        (doc.contents ?? []).map((e) => [e.title, e.depth]),
+        name
+      );
+    }
   });
 
   test('a link with no probe, or an anchor probed twice, is a fault, naming it', async () => {
