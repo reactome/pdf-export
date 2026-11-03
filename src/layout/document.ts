@@ -7,7 +7,14 @@ import { readFileSync } from 'node:fs';
 
 import type { AnalysisProperties, Document, Found, Place } from '../model/types.ts';
 import { fontFaceCss } from './fonts.ts';
-import { FRONT, analysisHtml, contentsHtml, coverHtml, introductionHtml } from './front.ts';
+import {
+  FRONT,
+  FRONT_NAMES,
+  analysisHtml,
+  contentsHtml,
+  coverHtml,
+  introductionHtml,
+} from './front.ts';
 import { Links, attribute, cssString, text } from './html.ts';
 import { placeHtml, type Report } from './section.ts';
 import { themeCss } from './theme.ts';
@@ -126,20 +133,24 @@ function sections(
     .join('\n');
 }
 
+/** The running headers' and page numbers' families, in order; the book's stamps use them too. */
+export const MARGIN_FAMILIES = ['Roboto', 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math'];
+
 /**
  * A single event's running headers and page numbers (FR-016): the event's name, or a front
  * part's name on its pages; a number on every page but the cover. The header's text is in
  * the theme's on-surface-variant colour, its type the theme's body-small.
  */
 function runningHeaders(event: string): string {
+  const families = MARGIN_FAMILIES.map((family) => cssString(family)).join(', ');
   const box = (content: string) =>
-    `content: ${content}; font-family: Roboto, 'Noto Sans', 'Noto Sans Symbols 2', 'Noto Sans Math'; font-size: var(--mat-sys-body-small-size); color: var(--mat-sys-on-surface-variant);`;
+    `content: ${content}; font-family: ${families}; font-size: var(--mat-sys-body-small-size); color: var(--mat-sys-on-surface-variant);`;
   const header = (name: string) => `@top-center { ${box(cssString(name))} }`;
   return [
     `@page { ${header(event)} @bottom-center { ${box('counter(page)')} } }`,
-    `@page introduction { ${header('Introduction')} }`,
-    `@page analysis { ${header('Analysis properties')} }`,
-    `@page contents { ${header('Contents')} }`,
+    `@page introduction { ${header(FRONT_NAMES.introduction)} }`,
+    `@page analysis { ${header(FRONT_NAMES.analysis)} }`,
+    `@page contents { ${header(FRONT_NAMES.contents)} }`,
     '@page cover { @top-center { content: none; } @bottom-center { content: none; } }',
   ].join('\n');
 }

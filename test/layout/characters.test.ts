@@ -10,6 +10,7 @@ import {
   SUBSTITUTIONS,
   onRequestStrings,
   onRequestText,
+  substituted,
 } from '../../src/layout/characters.ts';
 import { coveredCodePoints } from '../../src/layout/fonts.ts';
 
@@ -30,6 +31,14 @@ test('each substitution is drawn by the fonts and replaces its character, unlogg
     'non-breaking, fine, O2\u2022\u2212, 2\u2032-O'
   );
   assert.deepEqual(lines, []);
+});
+
+test('substituted: the list alone, any other character left as it is (T027)', () => {
+  assert.equal(
+    substituted('non\u2011breaking, \uFB01ne, O2\u02D9, 2\u05F3-O, \uE000 \u03b1'),
+    'non-breaking, fine, O2\u2022, 2\u2032-O, \uE000 \u03b1'
+  );
+  assert.equal(substituted('Alpha pathway'), 'Alpha pathway');
 });
 
 test('a character no font draws is U+FFFD, logged once per log with its subject, never the text', () => {

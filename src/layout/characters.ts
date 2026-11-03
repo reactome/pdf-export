@@ -26,10 +26,18 @@ export const SUBSTITUTIONS: ReadonlyMap<number, string> = new Map([
 export const REPLACEMENT = '\uFFFD';
 
 /** Characters never drawn, and so never uncovered: white space, controls, joiners. */
-const NEVER_DRAWN = /[\s\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
+export const NEVER_DRAWN = /[\s\p{Cc}\p{Default_Ignorable_Code_Point}]/u;
 
 /** Text that holds nothing to substitute or replace, read at once. */
 const PLAIN = /^[\x20-\x7e\s]*$/;
+
+/** A text with FR-017's substitutions made, and nothing else changed. */
+export function substituted(text: string): string {
+  if (PLAIN.test(text)) return text;
+  let out = '';
+  for (const char of text) out += SUBSTITUTIONS.get(char.codePointAt(0) ?? 0) ?? char;
+  return out;
+}
 
 /**
  * One PDF's log of the characters no font draws: each code point once, however often and

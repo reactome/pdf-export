@@ -207,7 +207,7 @@ synthetic documents, on this host under load.
     its page on the website for what an event was inferred from, and left out of a
     reaction's events before and after;
   - **page numbers and running headers stamped after the join,** not printed: the parts
-    are printed without them, and pdf-lib writes each page's number ("12 of 3,760") and
+    are printed without them, and pdf-lib writes each page's number ("12", as a single PDF's margin box has it; T011 measured "12 of 3,760") and
     its top-level pathway's name, which the model knows from where each part landed,
     in an embedded subset of Roboto, in the compiled theme's on-surface-variant colour,
     read from the compiled CSS, not written here (FR-015). SC-009's check sees that font
