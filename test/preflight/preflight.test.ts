@@ -9,7 +9,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, test } from 'node:test';
 
-import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
+import {
+  graphSettings,
+  openGraph,
+  type Graph,
+  type GraphSettings,
+} from '../../src/graph/connection.ts';
 import { releaseInfo, type ReleaseInfo } from '../../src/graph/queries.ts';
 import { buildBook } from '../../src/model/build.ts';
 import { preflightCommand } from '../../src/preflight/command.ts';
@@ -165,6 +170,11 @@ describe("the book's preflight", { skip }, () => {
       folderFaults(swap('R-HSA-90000210', (r) => ({ ...r, highlight: r.highlight.slice(1) }))),
       ['stale-figure R-HSA-90000210']
     );
+    // a selection that is the right one's beginning
+    assert.deepEqual(
+      folderFaults(swap('R-HSA-90000210', (r) => ({ ...r, highlight: r.highlight.slice(0, -1) }))),
+      ['stale-figure R-HSA-90000210']
+    );
     assert.deepEqual(folderFaults(swap('R-HSA-90000300', (r) => ({ ...r, kind: 'diagram' }))), [
       'stale-figure R-HSA-90000300',
     ]);
@@ -196,6 +206,16 @@ describe("the book's preflight", { skip }, () => {
     assert.deepEqual(folderFaults(folder(undefined, { ...print, summary: 'sha256:0' })), [
       'stale-summary',
     ]);
+  });
+
+  test('a stale folder is refused as a whole, its figures not checked one by one', () => {
+    const dir = folder(
+      (lines) =>
+        lines.filter((line) => (JSON.parse(line) as { stId?: string }).stId !== 'R-HSA-90000132'),
+      { ...print, checksum: '1' }
+    );
+    unlinkSync(join(dir, 'R-HSA-90000211.svg'));
+    assert.deepEqual(folderFaults(dir), ['stale-folder 98/1 98/9007199254740993']);
   });
 
   test('a manifest that is not whole is incomplete-folder, each way', () => {
@@ -325,6 +345,46 @@ describe("the book's preflight", { skip }, () => {
       'bad-file-name R-HSA-90000200',
       'bad-file-name R-HSA-90000300',
     ]);
+  });
+
+  test('a diagram file that cannot be read as JSON is bad-file, and the run reports every fault', async () => {
+    const dir = files();
+    writeFileSync(join(dir, 'diagram/R-HSA-90000130.json'), '{"nodes": [');
+    const out: string[] = [];
+    const code = await preflightCommand(
+      ['--files', dir, '--figures', scratch()],
+      { NEO4J_URI: process.env['NEO4J_URI'] },
+      { out: (text) => out.push(text), err: () => undefined }
+    );
+    assert.equal(code, 1);
+    assert.equal(
+      out.join(''),
+      'fault incomplete-folder\nfault bad-file diagram/R-HSA-90000130.json\n'
+    );
+  });
+
+  test('an error during the preflight is exit 2, its error on stderr, the faults found so far printed', async () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    // the graph fails at the reactions' names, after the folder's check has found its fault
+    const failing = (settings: GraphSettings): Graph => {
+      const real = openGraph(settings);
+      return {
+        read: <T>(query: string, params?: Record<string, unknown>): Promise<T[]> =>
+          query.includes('-[:compartment]->(c)')
+            ? Promise.reject(new Error('the planted failure'))
+            : real.read<T>(query, params),
+        close: () => real.close(),
+      };
+    };
+    const code = await preflightCommand(
+      ['--files', FILES, '--figures', scratch()],
+      { NEO4J_URI: process.env['NEO4J_URI'] },
+      { out: (text) => out.push(text), err: (text) => err.push(text), open: failing }
+    );
+    assert.equal(code, 2);
+    assert.equal(out.join(''), 'fault incomplete-folder\n');
+    assert.match(err.join(''), /the planted failure/);
   });
 
   test('pdf-export preflight: exit 0 with no fault, 1 with each fault a line, 2 on bad arguments or no graph', async () => {

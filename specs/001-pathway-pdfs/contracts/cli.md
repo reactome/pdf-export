@@ -76,7 +76,9 @@ the figures already drawn by `figures`.
   - **before any figure is read** (and by `figures`, before any is drawn), in the graph's texts the layout writes, in the names
     the figures label (every physical entity a reaction's figure draws: its inputs,
     outputs, catalysts and regulators; and their compartments, from the graph), and in
-    the labels of the diagram files the Figure rules choose to draw (`--files`; today an
+    the labels of the diagram files the Figure rules choose to draw (the `displayName`s
+    of their nodes, compartments, notes, shadows and links, and the `label`s of their
+    nodes' attachments, a modification's lettering) (`--files`; today an
     illustrated pathway's file is not among them, its figure being its EHLD, data-model
     Figure); a fault in a text names the event whose section holds it, one in a
     figure's names the first event in document order whose figure holds it, and one in
@@ -102,12 +104,17 @@ the figures already drawn by `figures`.
 be checked before the book is made. It prints one line per fault, `fault <fault>`, in the
 forms above (`missing-file <name>`, `incomplete-folder`, `no-checksum`,
 `stale-folder <folder's release>/<checksum> <graph's release>/<checksum>`, `stale-summary`,
-`stale-figure <stId>`, `bad-file-name <stId>`, `uncovered-character <code point> <stId>`),
+`stale-figure <stId>`, `bad-file-name <stId>`, `uncovered-character <code point> <stId>`,
+and `bad-file <name>` for a diagram file that cannot be read as JSON, whose labels are then
+not checked),
 each naming a stable identifier or a file, never a text or a person. A release file is named
 as in `--files` (`diagram/R-HSA-….json`), a figure's as in `--figures` (`R-HSA-….svg`).
 
-- **Exit 0:** no fault. **Exit 1:** at least one. **Exit 2:** bad arguments, or the graph
-  cannot be reached at the start (said at once, without the driver's retries).
+- **Exit 0:** no fault. **Exit 1:** at least one. **Exit 2:** bad arguments; the graph
+  cannot be reached at the start (said within seconds: that first read's retrying is
+  bounded, the rest keep the driver's own); or any other error during the checks (a graph
+  that fails mid-run), after the faults found before it are printed, the error on stderr.
+  Exit 1 always means faults, never an error.
 - A folder that is not whole, or not this graph's release or summary's, is refused as a
   whole: its figures are then not checked one by one.
 - Without the EHLD summary the Figure rules cannot be followed: the one fault is

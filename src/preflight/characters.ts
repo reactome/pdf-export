@@ -7,7 +7,8 @@
 //   participants and the participants' compartments), naming the first event in document
 //   order whose figure holds the name;
 // - the labels of the diagram files the Figure rules choose to draw, naming the pathway whose
-//   diagram it is. An illustration's own diagram file is not drawn, so not read.
+//   diagram it is. An illustration's own diagram file is not drawn, so not read. A file that
+//   cannot be read as JSON is a fault `bad-file <name>`, after the characters' faults.
 // The second half of the check, over each drawn figure's labels, is src/figures/labels.ts's.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -69,7 +70,8 @@ function drawnReactions(docs: readonly Document[]): number[] {
 
 /**
  * Every fault FR-017 finds before drawing, each once, in the order found: the texts', the
- * figures' names', then the diagram files' (a file missing is the files' check's fault).
+ * figures' names', then the diagram files', then the files unread (a file missing is the
+ * files' check's fault).
  */
 export async function checkCharacters(
   graph: Graph,
@@ -88,6 +90,7 @@ export async function checkCharacters(
   }
   for (const [name, stId] of namesInOrder(docs, names)) characters.text(name, stId);
 
+  const unreadable: string[] = [];
   const diagrams = new Set<string>();
   for (const { kind, source } of expected) {
     if (kind === 'diagram' || kind === 'ancestor') diagrams.add(source);
@@ -96,7 +99,9 @@ export async function checkCharacters(
     const name = `diagram/${stId}.json`;
     const path = join(files, name);
     if (!existsSync(path)) continue;
-    for (const label of readDiagramLabels(path, name)) characters.text(label, stId);
+    const labels = readDiagramLabels(path);
+    if (labels === null) unreadable.push(`bad-file ${name}`);
+    for (const label of labels ?? []) characters.text(label, stId);
   }
-  return characters.faults;
+  return [...characters.faults, ...unreadable];
 }

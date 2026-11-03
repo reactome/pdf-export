@@ -38,22 +38,28 @@ export function bookPathways(docs: readonly Document[]): { stId: string; name: s
   });
 }
 
-/** The book's preflight, against its graph (whose release was read at the start). */
+/**
+ * The book's preflight, against its graph (whose release was read at the start). Each check's
+ * faults are added to `faults` as it ends, so a caller met by an error (a graph that fails
+ * mid-run) still has those found before it.
+ */
 export async function preflight(
   graph: Graph,
   release: ReleaseInfo,
-  { species, files, figures }: PreflightSettings
+  { species, files, figures }: PreflightSettings,
+  faults: string[] = []
 ): Promise<Preflight> {
   const summary = readSummary(files);
   // without the summary the Figure rules cannot be followed, so nothing more is checked
-  if (!summary) return { faults: [`missing-file ${SUMMARY}`], docs: null };
+  if (!summary) {
+    faults.push(`missing-file ${SUMMARY}`);
+    return { faults, docs: null };
+  }
   const docs = await buildBook(graph, { species, illustrated: summary.illustrated });
   const expected = expectedFigures(docs);
-  const faults = [
-    ...checkFileNames(bookPathways(docs)),
-    ...checkFiles(files, neededFiles(expected.values())),
-    ...checkFolder(figures, { release, summary: summary.hash, expected }),
-    ...(await checkCharacters(graph, docs, { files, expected: expected.values() })),
-  ];
+  faults.push(...checkFileNames(bookPathways(docs)));
+  faults.push(...checkFiles(files, neededFiles(expected.values())));
+  faults.push(...checkFolder(figures, { release, summary: summary.hash, expected }));
+  faults.push(...(await checkCharacters(graph, docs, { files, expected: expected.values() })));
   return { faults, docs };
 }

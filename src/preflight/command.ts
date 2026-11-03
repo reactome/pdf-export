@@ -1,8 +1,15 @@
 // `pdf-export preflight` (spec 001 T024, contracts/cli.md): the book's preflight alone, with
 // the book's flags, so a release's inputs can be checked before the book is made. `book`
 // (T029) runs the same checks first. Exit 0 with no fault, 1 with any (one line each,
-// `fault <fault>`), 2 on bad arguments or a graph that cannot be reached at the start.
-import { graphSettings, openGraph, type Graph, type GraphSettings } from '../graph/connection.ts';
+// `fault <fault>`), 2 on bad arguments, a graph that cannot be reached at the start, or any
+// other error during the checks, after printing the faults found before it.
+import {
+  graphSettings,
+  openGraph,
+  type Graph,
+  type GraphOptions,
+  type GraphSettings,
+} from '../graph/connection.ts';
 import { releaseInfo, type ReleaseInfo } from '../graph/queries.ts';
 import { preflight, type PreflightSettings } from './preflight.ts';
 
@@ -54,7 +61,16 @@ export function preflightSettings(
 export async function preflightCommand(
   args: readonly string[],
   env: Readonly<Record<string, string | undefined>>,
-  { out, err }: { out: (text: string) => void; err: (text: string) => void }
+  {
+    out,
+    err,
+    open = openGraph,
+  }: {
+    out: (text: string) => void;
+    err: (text: string) => void;
+    /** How the graph is opened (a test gives one that fails). */
+    open?: (settings: GraphSettings, options?: GraphOptions) => Graph;
+  }
 ): Promise<number> {
   let settings;
   try {
@@ -64,22 +80,32 @@ export async function preflightCommand(
     err(`${error.message}\n`);
     return 2;
   }
-  const graph: Graph = openGraph(settings.graph, {
-    connectionTimeoutMs: 5000,
-    retryTimeMs: 0,
-  });
+  // the start's check, its own driver retrying a failed read briefly, so a graph that cannot
+  // be reached is said within seconds, not after the driver's default half minute
+  const start = open(settings.graph, { connectionTimeoutMs: 5000, retryTimeMs: 0 });
+  let release: ReleaseInfo;
   try {
-    let release: ReleaseInfo;
-    try {
-      release = await releaseInfo(graph);
-    } catch (error) {
-      err(`The graph cannot be read: ${error instanceof Error ? error.message : String(error)}\n`);
-      return 2;
-    }
-    const { faults } = await preflight(graph, release, settings);
-    for (const fault of faults) out(`fault ${fault}\n`);
-    return faults.length > 0 ? 1 : 0;
+    release = await releaseInfo(start);
+  } catch (error) {
+    err(`The graph cannot be read: ${message(error)}\n`);
+    return 2;
   } finally {
+    await start.close();
+  }
+  // the checks' reads with the driver's own retries
+  const graph = open(settings.graph);
+  const faults: string[] = [];
+  try {
+    await preflight(graph, release, settings, faults);
+    return faults.length > 0 ? 1 : 0;
+  } catch (error) {
+    err(`The preflight stopped: ${message(error)}\n`);
+    return 2;
+  } finally {
+    for (const fault of faults) out(`fault ${fault}\n`);
     await graph.close();
   }
 }
+
+const message = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);

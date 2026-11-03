@@ -50,6 +50,8 @@ test('a manifest that is not whole is refused, each way', () => {
     'complete differing from the first line':
       first + manifestLine({ type: 'complete', ...PRINT, build: 'b2' }),
     'no fingerprint first': fig('R-HSA-1') + complete,
+    'a figure line whose selection is not all strings':
+      first + fig('R-HSA-1').replace('"highlight":[]', '"highlight":[1]') + complete,
     'a figure line of no known kind':
       first + fig('R-HSA-1').replace('reaction', 'photo') + complete,
     'a fingerprint whose checksum is a number':
@@ -92,14 +94,20 @@ test("the labels of a diagram file are its nodes', compartments', notes', shadow
   assert.deepEqual(
     diagramLabels({
       displayName: 'not a label',
-      nodes: [item('n')],
+      nodes: [
+        {
+          ...item('n'),
+          nodeAttachments: [{ label: 'P' }, { label: 7 }, { displayName: 'not drawn' }],
+        },
+        item('n2'),
+      ],
       compartments: [item('c')],
       notes: [item('o')],
       shadows: [item('s')],
       links: [item('l'), { id: 2 }],
       edges: [item('not drawn as a label')],
     }),
-    ['n', 'c', 'o', 's', 'l']
+    ['n', 'P', 'n2', 'c', 'o', 's', 'l']
   );
 });
 
