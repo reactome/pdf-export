@@ -158,15 +158,21 @@ function attribute(attributes: string, name: string): string | undefined {
 const TAG = /<(\/?)([A-Za-z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
 
 /** Elements whose content is not drawn where it stands: a label there is unread. */
-const UNDRAWN = new Set(['defs', 'symbol', 'clipPath', 'mask', 'pattern', 'marker']);
+const UNDRAWN = new Set(['defs', 'symbol', 'clippath', 'mask', 'pattern', 'marker']);
+
+/** An element's name without its namespace prefix, in lower case. */
+const local = (name: string) => name.slice(name.lastIndexOf(':') + 1).toLowerCase();
 
 /** The markup without its comments and character data, which may hold tags that are not. */
 function withoutComments(svg: string): string {
   const kept: string[] = [];
   let at = 0;
+  // each kind's next start, searched again only once passed, so the whole is linear
+  let comment = svg.indexOf('<!--');
+  let data = svg.indexOf('<![CDATA[');
   for (;;) {
-    const comment = svg.indexOf('<!--', at);
-    const data = svg.indexOf('<![CDATA[', at);
+    if (comment >= 0 && comment < at) comment = svg.indexOf('<!--', at);
+    if (data >= 0 && data < at) data = svg.indexOf('<![CDATA[', at);
     const open = comment < 0 ? data : data < 0 ? comment : Math.min(comment, data);
     if (open < 0) break;
     kept.push(svg.slice(at, open));
@@ -187,17 +193,22 @@ function withoutComments(svg: string): string {
  * to the figure's frame and is applied (a viewport that is not a plain scale leaves every
  * label inside it unread); or when it is in a nested `<svg>`, or in content not drawn where
  * it stands (`<defs>` and the like). The elements are followed through the markup in one
- * pass of its tags, its comments and character data left out.
+ * pass of its tags, its comments and character data left out, names known with a prefix or
+ * in capitals, and a close tag ending the element it names. Markup this does not read as a
+ * browser would (a style element's rules, an unquoted value, an entity in an id) is not
+ * looked for: the render service writes none of it.
  */
 export function lettering(svg: string): { smallest: number | null; unread: number } {
   let smallest: number | null = null;
   let unread = 0;
   /** What an element applies to what it holds: a scale, or null where it is not known. */
   const applies = (name: string, attributes: string, depth: number): number | null => {
-    if (UNDRAWN.has(name) || (name === 'svg' && depth > 0)) return null;
+    if (UNDRAWN.has(local(name)) || (local(name) === 'svg' && depth > 0)) return null;
     const transform = attribute(attributes, 'transform');
     const styled = /transform\s*:\s*([^;]*)/i.exec(attribute(attributes, 'style') ?? '')?.[1];
-    const viewport = /\bsvg-pan-zoom_viewport\b/.test(attribute(attributes, 'class') ?? '');
+    const viewport = (attribute(attributes, 'class') ?? '')
+      .split(/\s+/)
+      .includes('svg-pan-zoom_viewport');
     if (!viewport) return transform === undefined && styled === undefined ? 1 : null;
     // the viewport writes its scale twice, by attribute and by style (to six figures): they agree
     const scale = plainScale(transform);
@@ -206,18 +217,24 @@ export function lettering(svg: string): { smallest: number | null; unread: numbe
       ? scale
       : null;
   };
-  // for each open element: the scale it applies, or null where it is not known
-  const open: (number | null)[] = [];
-  for (const [, close, name = '', attributes = ''] of withoutComments(svg).matchAll(TAG)) {
+  // for each open element: its name, and the scale it applies, or null where it is not known
+  const open: { name: string; scale: number | null }[] = [];
+  const markup = withoutComments(svg);
+  // up to the last `>`: past it no tag can end, and a tail of `<` would be searched from each
+  for (const [, close, name = '', attributes = ''] of markup
+    .slice(0, markup.lastIndexOf('>') + 1)
+    .matchAll(TAG)) {
     if (close) {
-      open.pop();
+      // it ends the element it names, and any left open inside it; a stray one, nothing
+      const at = open.map((e) => e.name).lastIndexOf(local(name));
+      if (at >= 0) open.length = at;
       continue;
     }
     const selfClosing = attributes.trimEnd().endsWith('/');
     const own = applies(name, attributes, open.length);
-    if (name === 'path' && (attribute(attributes, 'id') ?? '').startsWith('PATHWAY TEXT')) {
+    if (local(name) === 'path' && (attribute(attributes, 'id') ?? '').startsWith('PATHWAY TEXT')) {
       let scale = own;
-      for (const s of open) scale = scale === null || s === null ? null : scale * s;
+      for (const e of open) scale = scale === null || e.scale === null ? null : scale * e.scale;
       const d = attribute(attributes, 'd');
       const boxes = d === undefined ? null : outlineBoxes(d);
       const cap = boxes === null ? null : capHeight(boxes);
@@ -227,7 +244,7 @@ export function lettering(svg: string): { smallest: number | null; unread: numbe
         if (smallest === null || size < smallest) smallest = size;
       }
     }
-    if (!selfClosing) open.push(own);
+    if (!selfClosing) open.push({ name: local(name), scale: own });
   }
   return { smallest, unread };
 }
