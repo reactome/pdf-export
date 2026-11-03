@@ -4,6 +4,8 @@
 // probe link; after the join, the placeholders become destinations at the probes and the
 // probes are removed (T026). A single-event PDF is printed whole, with ordinary links.
 
+import type { Figure } from '../model/types.ts';
+
 /** Text for an element's content. */
 export function text(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -57,6 +59,18 @@ export class Links {
 
   event(stId: string): string {
     return this.website(`/content/detail/${encodeURIComponent(stId)}`);
+  }
+
+  /**
+   * An event's figure in its interactive form on the website, where its labels can be read:
+   * a pathway's diagram or illustration in the Pathway Browser, the event selected where it
+   * is drawn in an ancestor's; a reaction's page, which opens it in its pathway there. The
+   * Browser's address is its older form, which the website still reads (`#/` and `SEL`).
+   */
+  figure(figure: Figure, stId: string): string {
+    if (figure.kind === 'reaction') return this.event(stId);
+    const select = figure.kind === 'ancestor' ? `&SEL=${encodeURIComponent(stId)}` : '';
+    return this.website(`/PathwayBrowser/#/${encodeURIComponent(figure.stId)}${select}`);
   }
 
   /** The probe a target carries in the book, none in a single-event PDF. */

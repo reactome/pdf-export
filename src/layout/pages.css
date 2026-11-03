@@ -176,7 +176,8 @@ h6 {
   margin: 10pt 0;
   text-align: center;
 }
-.figure svg {
+.figure svg,
+.figure-link {
   display: inline-block;
 }
 .figure.landscape {

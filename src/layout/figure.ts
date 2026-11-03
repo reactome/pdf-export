@@ -1,10 +1,12 @@
 // A figure on the page (spec 001 T018, FR-016, research R4): inlined, its ids prefixed with
-// the section's anchor, and sized so its smallest label prints at no less than 5 pt. One
-// that would print smaller at the text's width gets a landscape page of its own; one still
-// too small there is printed at the largest that page allows and listed for the run report.
+// the section's anchor, linked to its interactive form on the website, and printed as large
+// as the page allows: in the portrait text, or on a landscape page of its own where that
+// prints it larger. One whose smallest label still prints below FLOOR_PT is listed for the
+// run report. The rule is T008's, from release 98's sizes; curators may change it (R4).
 import type { Figure } from '../model/types.ts';
 import { prefixIds } from '../figures/prefix.ts';
 import { attribute } from './html.ts';
+import { lettering } from './lettering.ts';
 
 /** A4 with 20 mm margins on every side, in points. */
 export const PAGE = {
@@ -20,8 +22,12 @@ export const PORTRAIT = {
 };
 export const LANDSCAPE = { width: PORTRAIT.height, height: PORTRAIT.width };
 
-/** The smallest a label may print (FR-016). */
-export const FLOOR_PT = 5;
+/**
+ * Below this, a figure's smallest label is listed in the run report (FR-016). Not a floor
+ * the layout can keep: at release 98, 93% of diagrams print their labels below 5 pt even on
+ * a landscape page, as today's book does, and are read by zooming or on the website (R4).
+ */
+export const FLOOR_PT = 1;
 
 /** No figure is drawn larger than the render service's own size: a CSS pixel, 0.75 pt. */
 const NATURAL = 0.75;
@@ -37,7 +43,7 @@ export interface Measured {
   /** Its size in the SVG's own pixels. */
   width: number;
   height: number;
-  /** Its smallest label, in the SVG's pixels, or none if it has no text. */
+  /** Its smallest label, in the SVG's pixels, of its text and its lettering; or none. */
   smallestLabel: number | null;
   /** Labels whose size could not be read: relative, or in a unit not known. */
   unreadLabels: number;
@@ -63,6 +69,9 @@ export function measure(svg: string): Measured {
   if (!(width > 0 && height > 0))
     throw new Error('A figure with no size: no viewBox, width or height');
   const { sizes, unread } = labelSizes(svg);
+  // an illustration's lettering, read from its outlines (T008), counts as its labels
+  const letters = lettering(svg);
+  if (letters.smallest !== null) sizes.push(letters.smallest);
   return {
     width,
     height,
@@ -71,7 +80,7 @@ export function measure(svg: string): Measured {
       (min, size) => (min === null || size < min ? size : min),
       null
     ),
-    unreadLabels: unread,
+    unreadLabels: unread + letters.unread,
   };
 }
 
@@ -210,33 +219,34 @@ export interface Placement {
   /** Points on the page for each of the SVG's pixels. */
   scale: number;
   landscape: boolean;
-  /** Its smallest label prints below the floor even so. */
+  /** Its smallest label prints below FLOOR_PT, at its largest: listed for the run report. */
   belowFloor: boolean;
   /**
-   * It has no text whose size can be read: an illustration's lettering is drawn as outlines
-   * (research R3), so it is placed by its size alone and listed for the run report, its
-   * lettering measured by T008.
+   * It has no label whose size can be read: no text, and no lettering read from outlines
+   * (an illustration's, lettering.ts), so it is placed by its size alone and listed for the
+   * run report.
    */
   unmeasured: boolean;
 }
 
 /**
  * Where and how large a figure prints: as large as fits the text area, never larger than
- * its own size; in the portrait text when its labels are legible there, otherwise on a
- * landscape page if that prints it larger.
+ * its own size, in portrait, or on a landscape page of its own where that prints it larger
+ * (most diagrams, being wider than tall, and every illustration).
  */
 export function place({ width, height, smallestLabel, unreadLabels }: Measured): Placement {
   const fit = (area: { width: number; height: number }) =>
     Math.min(area.width / width, area.height / height, NATURAL);
   const portrait = fit(PORTRAIT);
-  const legible = (scale: number) => smallestLabel === null || scale * smallestLabel >= FLOOR_PT;
-  // a label whose size could not be read may be the smallest: it is not taken as legible
-  const unmeasured = smallestLabel === null || unreadLabels > 0;
-  if (legible(portrait))
-    return { scale: portrait, landscape: false, belowFloor: false, unmeasured };
   const landscape = fit(LANDSCAPE);
   const scale = Math.max(portrait, landscape);
-  return { scale, landscape: landscape > portrait, belowFloor: !legible(scale), unmeasured };
+  return {
+    scale,
+    landscape: landscape > portrait,
+    belowFloor: smallestLabel !== null && scale * smallestLabel < FLOOR_PT,
+    // a label whose size could not be read may be the smallest: it is not taken as legible
+    unmeasured: smallestLabel === null || unreadLabels > 0,
+  };
 }
 
 /**
@@ -246,7 +256,8 @@ export function place({ width, height, smallestLabel, unreadLabels }: Measured):
 export function figureHtml(
   svg: string,
   prefix: string,
-  label: string
+  label: string,
+  href: string
 ): { html: string; placement: Placement } {
   const measured = measure(svg);
   const placement = place(measured);
@@ -259,7 +270,11 @@ export function figureHtml(
     return `<svg${kept}${box} width="${size(measured.width)}" height="${size(measured.height)}" role="img" aria-label="${attribute(label)}">`;
   });
   const classes = placement.landscape ? 'figure landscape' : 'figure';
-  return { html: `<div class="${classes}">${sized}</div>`, placement };
+  // the whole figure links to its interactive form, where its labels can be read
+  return {
+    html: `<div class="${classes}"><a class="figure-link" href="${attribute(href)}">${sized}</a></div>`,
+    placement,
+  };
 }
 
 /**

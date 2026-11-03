@@ -38,8 +38,9 @@ of WebsiteAngular (research R10).
   - a single-event PDF goes on without it.
 - **The text** is set in Roboto. pdf-export's page supplies the font, at weights 300 to
   600 (research R5).
-- **Node labels are 12 px** in the SVG (compartments' 80 px), and the smallest sets the figure's scale
-  against the legibility floor (research R4).
+- **Node labels are 12 px** in the SVG (compartments' 80 px), and the smallest sets the size reported
+  against the run report's threshold (research R4). An illustration's lettering is outlines,
+  read from its `PATHWAY TEXT` paths and its viewport's scale (`src/layout/lettering.ts`).
 
 ## Settings for the figures' run (research R3, R7)
 
