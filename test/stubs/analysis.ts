@@ -187,18 +187,17 @@ const FOUND_PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
 
 type Read = { kind: 'stored'; decoded: string } | { kind: 'error'; status: 404 | 410 | 500 };
 
-/** Whether `accept` lets the answer be `type`: no header at all lets anything. */
+/**
+ * Whether `accept` lets the answer be `type`: no header at all lets anything. The service
+ * matches types and ignores their weights, so `q=0` refuses nothing (T009, measured).
+ */
 function accepts(accept: string | undefined, type: string): boolean {
   if (accept === undefined) return true;
   const [major] = type.split('/');
-  return (
-    accept
-      .split(',')
-      .map((part) => part.split(';').map((p) => p.trim().toLowerCase()))
-      // a range with `q=0` refuses its type
-      .filter((params) => !params.slice(1).some((p) => /^q=0(\.0*)?$/.test(p)))
-      .some(([range]) => range === '*/*' || range === `${String(major)}/*` || range === type)
-  );
+  return accept
+    .split(',')
+    .map((part) => part.split(';')[0]?.trim().toLowerCase())
+    .some((range) => range === '*/*' || range === `${String(major)}/*` || range === type);
 }
 
 export interface AnalysisRequest {
