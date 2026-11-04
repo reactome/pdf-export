@@ -7,13 +7,12 @@
 //   running headers and page numbers, which FR-012 does not compare; MARGIN_BAND_PT unless
 //   set) and what is inside a figure (a vector diagram's labels) is left out.
 // - **Links:** each link's box, its address or where in the PDF it lands.
-// - **Figures:** the boxes of what is drawn: images, and painted paths that are neither thin
-//   (a rule, a table's border) nor the whole page, clustered where they lie within
-//   FIGURE_GAP_PT of each other, a line of thin paths joining the clusters it touches only
-//   where it touches two or more (a diagram's connector, never a table's borders); a cluster
-//   at least FIGURE_MIN_PT each way is a figure. A raster diagram is one image; a vector one
-//   is many paths. A table with thick borders or shaded rows near one another could be read
-//   as one, its text then left out (for T040 to check on `event-pdf`).
+// - **Figures:** the boxes of what is drawn, images and painted paths (figureBoxes): shapes
+//   at least a few points each way clustered within FIGURE_GAP_PT of each other, and lines
+//   (thin paths, and the small shapes they pass through) joining clusters only where a line
+//   touches two or more, as a diagram's connector does; a cluster at least FIGURE_MIN_PT
+//   each way is a figure. A raster diagram is one image; a vector one is many paths. A
+//   table with shaded cells can still be read as one, its text then left out (figureBoxes).
 import { getDocument, OPS, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 /**
@@ -29,9 +28,6 @@ export const FIGURE_GAP_PT = 30;
 
 /** A figure is at least this wide and this tall: a logo's mark or a bullet is not. */
 export const FIGURE_MIN_PT = 60;
-
-/** A shape thinner than this either way is a rule or a border, not part of a figure. */
-const THIN_PT = 2;
 
 /** A place in a PDF: its page, counted from 0, and a height on it in points from its foot. */
 export interface Spot {
@@ -195,53 +191,59 @@ function clustered(boxes: readonly Box[], gap: number): Box[] {
   return clusters;
 }
 
-/** The shapes a thin path joins must be at least this big each way, as a diagram's nodes are. */
+/**
+ * A shape smaller than this either way, and not thin, is a waypoint, not a node: a reaction's
+ * square or a junction's dot, which a connector passes through.
+ */
 const NODE_PT = 4;
 
-/** How near a thin path must come to a shape to touch it. */
+/** How near one piece of a line must come to another, or to a shape, to touch it. */
 const TOUCH_PT = 1;
 
 /**
- * The figures among a page's shapes. The shapes that are neither thin nor all of the page
- * are clustered within FIGURE_GAP_PT. Thin paths that touch one another are one line (a
- * connector drawn in segments); a line joins the clusters it touches only where it touches
- * two or more, each at least NODE_PT each way, as a connector joins a diagram's nodes. A
- * table's hairline borders, which touch at most its one shaded header, join nothing, nor
- * does a rule beside a figure. A cluster at least FIGURE_MIN_PT each way is a figure.
+ * The figures among a page's shapes.
+ *
+ * - **Nodes:** shapes at least NODE_PT each way (and not all of the page) are clustered
+ *   within FIGURE_GAP_PT.
+ * - **Lines:** thin paths, and waypoints smaller than NODE_PT, are pieces of lines: pieces
+ *   that touch are one line, so a connector drawn in segments, or clipped at the reaction's
+ *   square it passes through, is one line.
+ * - **Joining:** a line joins the clusters it touches only where it touches two or more, as
+ *   a connector joins a diagram's nodes. A line touching one cluster or none joins nothing:
+ *   a table's hairline borders touching only its one shaded header, a rule beside a figure,
+ *   or a rule ending at a mark.
+ *
+ * A cluster at least FIGURE_MIN_PT each way is a figure. A table whose borders touch two
+ * shaded cells, or whose shaded rows lie within FIGURE_GAP_PT of each other, can still be
+ * read as one (for T040 to check on `event-pdf`'s tables).
  */
 export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
   const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
-  const thin = (b: Box) => b.x2 - b.x1 < THIN_PT || b.y2 - b.y1 < THIN_PT;
-  let clusters = clustered(
-    kept.filter((b) => !thin(b)),
-    FIGURE_GAP_PT
-  );
-  // the thin paths, as lines of paths that touch
-  const lines = kept.filter(thin);
-  const group = lines.map((_, i) => i);
+  const node = (b: Box) => b.x2 - b.x1 >= NODE_PT && b.y2 - b.y1 >= NODE_PT;
+  let clusters = clustered(kept.filter(node), FIGURE_GAP_PT);
+  // the lines: thin paths and waypoints, grouped where they touch
+  const pieces = kept.filter((b) => !node(b));
+  const group = pieces.map((_, i) => i);
   const root = (i: number): number => {
     let r = i;
     while (group[r] !== r) r = group[r] ?? r;
     group[i] = r;
     return r;
   };
-  for (let a = 0; a < lines.length; a++) {
-    for (let b = a + 1; b < lines.length; b++) {
-      const [la, lb] = [lines[a], lines[b]];
-      if (la && lb && near(la, lb, TOUCH_PT)) group[root(a)] = root(b);
+  for (let a = 0; a < pieces.length; a++) {
+    for (let b = a + 1; b < pieces.length; b++) {
+      const [pa, pb] = [pieces[a], pieces[b]];
+      if (pa && pb && near(pa, pb, TOUCH_PT)) group[root(a)] = root(b);
     }
   }
-  const joined = new Map<number, Box[]>();
-  lines.forEach((line, i) => {
-    joined.set(root(i), [...(joined.get(root(i)) ?? []), line]);
+  const lines = new Map<number, Box[]>();
+  pieces.forEach((piece, i) => {
+    lines.set(root(i), [...(lines.get(root(i)) ?? []), piece]);
   });
-  for (const paths of joined.values()) {
-    const node = (c: Box) => c.x2 - c.x1 >= NODE_PT && c.y2 - c.y1 >= NODE_PT;
-    const touched = clusters.filter(
-      (c) => node(c) && paths.some((path) => near(c, path, TOUCH_PT))
-    );
+  for (const line of lines.values()) {
+    const touched = clusters.filter((c) => line.some((piece) => near(c, piece, TOUCH_PT)));
     if (touched.length < 2) continue;
-    const merged = [...touched, ...paths].reduce(union);
+    const merged = [...touched, ...line].reduce(union);
     clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
   }
   clusters = clustered(clusters, FIGURE_GAP_PT);

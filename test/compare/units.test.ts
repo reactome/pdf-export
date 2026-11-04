@@ -10,8 +10,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { PDFDocument, PDFOperator, type PDFOperatorNames } from '@cantoo/pdf-lib';
-
 import {
   applyRecorded,
   commonSubsequence,
@@ -37,6 +35,7 @@ import {
 } from '../../src/compare/read.ts';
 import { hash, reduce, type Reduced, type ReducedSection } from '../../src/compare/reduce.ts';
 import { CONTRIBUTORS } from '../../src/layout/text.ts';
+import { PLANTED, plantedFilter, plantedOperator } from './planted.ts';
 import { PEOPLE } from './samples.ts';
 
 /** Placeholder names, and more of them, to plant. */
@@ -462,15 +461,6 @@ describe('the constants a layout is read by', () => {
 });
 
 describe('what a library writes to the console', () => {
-  const PLANTED = 'PlaceholderPersonJaneQExample';
-
-  /** A PDF whose page's content holds the planted word as an operator pdf.js does not know. */
-  async function planted(): Promise<Uint8Array> {
-    const doc = await PDFDocument.create();
-    doc.addPage().pushOperators(PDFOperator.of(PLANTED as unknown as PDFOperatorNames));
-    return doc.save();
-  }
-
   /** What reaches the console and standard error while `run` runs, and what it returns. */
   async function captured<T>(run: () => Promise<T>): Promise<{ text: string; value: T }> {
     let text = '';
@@ -497,7 +487,7 @@ describe('what a library writes to the console', () => {
   }
 
   test('pdf.js reads a PDF quoting its content without a word: its warnings are off', async () => {
-    const bytes = await planted();
+    const bytes = await plantedOperator();
     let said = '';
     const warn = Reflect.get(console, 'warn') as unknown;
     Reflect.set(console, 'warn', (...args: unknown[]) => {
@@ -515,13 +505,117 @@ describe('what a library writes to the console', () => {
     const folder = mkdtempSync(join(tmpdir(), 'pdf-export-console-'));
     try {
       const file = join(folder, 'planted.pdf');
-      writeFileSync(file, await planted());
+      writeFileSync(file, await plantedOperator());
       let err = '';
       let out = '';
       const { text } = await captured(() =>
         compareCommand([file, file], { out: (t) => (out += t), err: (t) => (err += t) })
       );
       assert.ok(!(text + err + out).includes(PLANTED), 'the planted word was printed');
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  test("a file pdf.js throws on, quoting it, is named by its error's kind alone", async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'pdf-export-console-'));
+    try {
+      const file = join(folder, 'filtered.pdf');
+      writeFileSync(file, await plantedFilter());
+      let err = '';
+      let out = '';
+      const { text, value } = await captured(() =>
+        compareCommand([file, file], { out: (t) => (out += t), err: (t) => (err += t) })
+      );
+      assert.equal(value, 1);
+      assert.ok(!(text + err + out).includes(PLANTED), 'the planted word was printed');
+      assert.match(err, /^Not read: .*filtered\.pdf \([A-Za-z]+\)\n/);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  /** The console's methods replaced by ones that keep what they are given, for `run`. */
+  async function spied(run: (said: string[]) => Promise<void>): Promise<string[]> {
+    const said: string[] = [];
+    const names = Object.keys(console).filter((n) => typeof Reflect.get(console, n) === 'function');
+    const saved = names.map((n) => [n, Reflect.get(console, n) as unknown] as const);
+    for (const n of names) {
+      Reflect.set(console, n, (...args: unknown[]) =>
+        said.push(`${n}: ${args.map(String).join(' ')}`)
+      );
+    }
+    try {
+      await run(said);
+    } finally {
+      for (const [n, m] of saved) Reflect.set(console, n, m);
+    }
+    return said;
+  }
+
+  test('every console method is held, and the calls said in one line', async () => {
+    let err = '';
+    const said = await spied(() =>
+      withConsoleHeld(
+        () => {
+          console.log(PLANTED);
+          console.info(PLANTED);
+          console.debug(PLANTED);
+          console.dir({ name: PLANTED });
+          console.table([PLANTED]);
+          console.trace(PLANTED);
+          console.warn(PLANTED);
+          console.error(new TypeError(PLANTED));
+          return Promise.resolve();
+        },
+        (t) => (err += t)
+      )
+    );
+    assert.deepEqual(said, []);
+    assert.equal(err, '8 message(s) from a library withheld (TypeError)\n');
+  });
+
+  test('the console is put back when the comparison fails, and what was held still said', async () => {
+    let err = '';
+    let before: unknown;
+    let after: unknown;
+    const said = await spied(async () => {
+      before = Reflect.get(console, 'warn');
+      await assert.rejects(
+        withConsoleHeld(
+          () => {
+            console.warn(PLANTED);
+            return Promise.reject(new RangeError('stopped'));
+          },
+          (t) => (err += t)
+        ),
+        RangeError
+      );
+      after = Reflect.get(console, 'warn');
+    });
+    assert.equal(after, before);
+    assert.deepEqual(said, []);
+    assert.equal(err, '1 message(s) from a library withheld\n');
+  });
+
+  test('compare holds the console while it compares', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'pdf-export-console-'));
+    try {
+      const file = join(folder, 'unread.pdf');
+      writeFileSync(file, 'not a PDF');
+      let err = '';
+      // a library writing to the console as the comparison runs: here, as a file is not read
+      const said = await spied(async () => {
+        await compareCommand([file, file], {
+          out: () => undefined,
+          err: (t) => {
+            if (t.startsWith('Not read')) console.warn(PLANTED);
+            err += t;
+          },
+        });
+      });
+      assert.deepEqual(said, []);
+      assert.match(err, /^2 message\(s\) from a library withheld\n$/m);
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
@@ -559,6 +653,28 @@ describe('figures and tables', () => {
     const connector: Box = { page: 0, x1: 170, y1: 134.75, x2: 230, y2: 135.25 };
     assert.equal(figureBoxes([square(100, 100), square(230, 100)], 595, 842).length, 2);
     assert.equal(figureBoxes([square(100, 100), connector, square(230, 100)], 595, 842).length, 1);
+  });
+
+  test('a connector drawn in segments joins the shapes at its ends', () => {
+    const segment = (x1: number, x2: number): Box => ({ page: 0, x1, y1: 134.75, x2, y2: 135.25 });
+    const shapes = [
+      square(100, 100),
+      segment(170, 250),
+      segment(250, 330),
+      segment(330, 400),
+      square(400, 100),
+    ];
+    assert.equal(figureBoxes(shapes, 595, 842).length, 1);
+  });
+
+  test("a connector through a reaction's small square, clipped at it, joins its two nodes", () => {
+    const node = (x: number): Box => ({ page: 0, x1: x, y1: 100, x2: x + 55, y2: 170 });
+    const waypoint: Box = { page: 0, x1: 298.5, y1: 133.5, x2: 301.5, y2: 136.5 };
+    const edge = (x1: number, x2: number): Box => ({ page: 0, x1, y1: 134.75, x2, y2: 135.25 });
+    const shapes = [node(100), edge(155, 298.5), waypoint, edge(301.5, 445), node(445)];
+    const figures = figureBoxes(shapes, 595, 842);
+    assert.equal(figures.length, 1);
+    assert.equal((figures[0]?.x2 ?? 0) - (figures[0]?.x1 ?? 0), 400);
   });
 
   test('a rule between two figures, touching neither, joins nothing', () => {
@@ -623,5 +739,30 @@ describe('the analysis and the cover, by their meaning', () => {
       new: 'new/Alpha.pdf',
     });
     assert.deepEqual([d?.reference, d?.new], ['same', 'differs']);
+  });
+});
+
+describe("a section's bounds", () => {
+  const layout = (figurePage: number): Layout => ({
+    pages: [0, 1, 2].map(() => ({ width: 595, height: 842 })),
+    lines: [
+      { page: 0, y: 700, x: 100, size: 28, text: 'Alpha signalling pathway' },
+      { page: 1, y: 780, x: 57, size: 14, text: 'Beta binds gamma' },
+      { page: 1, y: 760, x: 57, size: 10.5, text: 'Stable identifier R-HSA-1' },
+      { page: 1, y: 740, x: 57, size: 10.5, text: 'A summation.' },
+      { page: 1, y: 726, x: 57, size: 10.5, text: 'Its second line.' },
+    ],
+    links: [],
+    figures: [{ page: figurePage, x1: 100, y1: 500, x2: 400, y2: 700 }],
+  });
+
+  test("the first section's heading is its own, never the cover's title", () => {
+    const [section] = reduce(layout(1)).sections;
+    assert.deepEqual(section?.parts[0], { part: 'name', items: ['Betabindsgamma'] });
+  });
+
+  test("the last section's figure is found on a later page", () => {
+    assert.equal(reduce(layout(1)).sections[0]?.figure, 'figure');
+    assert.equal(reduce(layout(2)).sections[0]?.figure, 'figure');
   });
 });

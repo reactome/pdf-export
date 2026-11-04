@@ -30,6 +30,7 @@ import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { layoutBookFront, type LayoutOptions } from '../layout/document.ts';
 import { probeTargets, type Target } from './links.ts';
 import type { Joined, PartPrinter } from './parts.ts';
+import { UnreadPdf } from './unread.ts';
 
 /** An entry's placeholder, as the layout writes it (src/layout/front.ts). */
 const PLACEHOLDER = /<span class="page" data-target="([^"]*)">[^<]*<\/span>/g;
@@ -55,6 +56,13 @@ export interface Landed {
 }
 
 /** Where each target landed in a PDF, from its named destinations. */
+/** A contents entry the printed PDF has no destination for, named by its anchor. */
+class MissingDestination extends Error {
+  constructor(target: string) {
+    super(`No destination for the contents entry ${target}`);
+  }
+}
+
 export async function landed(pdf: Uint8Array, targets: Iterable<string>): Promise<Landed> {
   // pdf.js may take the buffer over, so it is given a copy
   // pdf.js's warnings off: they quote the file's content, which holds names
@@ -66,11 +74,14 @@ export async function landed(pdf: Uint8Array, targets: Iterable<string>): Promis
       const destination = await doc.getDestination(target);
       const page: unknown = destination?.[0];
       if (page === undefined || typeof page !== 'object' || page === null) {
-        throw new Error(`No destination for the contents entry ${target}`);
+        throw new MissingDestination(target);
       }
       pages.set(target, (await doc.getPageIndex(page as { num: number; gen: number })) + 1);
     }
     return { pages, pageCount: doc.numPages };
+  } catch (error) {
+    // pdf.js's own errors by their kind alone: their messages quote the file
+    throw error instanceof MissingDestination ? error : new UnreadPdf(error);
   } finally {
     await task.destroy();
   }

@@ -262,8 +262,10 @@ pathway, and a file on one side only is reported as a difference.
   reference's pages read as margins (running headers, page numbers), 50 by default, as
   pdf-export's own; T040 sets it for `event-pdf`'s files from their real margins.
 - **Standard error:** paths, and an error's kind and code, never its message. pdf.js's
-  warnings, which quote a file's content, are off, and anything a library writes to the
-  console during a comparison is withheld: counted, with the kinds of the errors it passed.
+  warnings, which quote a file's content, are off, and while it compares every method of
+  the console is held: what a library writes there is counted and said in one line, with
+  the kinds of the errors it passed, never its words. `check-book` likewise says an error
+  that stops it by its kind and code alone.
 - **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments, a
   path that does not exist, or a reference and a new side not both PDFs or both folders.
 - **What it does not know yet:** the reducer reads parts by their labels, pdf-export's

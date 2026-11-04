@@ -251,8 +251,11 @@ export function reduce(layout: Layout): Reduced {
     const stId = rest === null ? undefined : STABLE_ID.exec(fold(rest))?.[0];
     return stId === undefined ? [] : [{ i, stId }];
   });
+  const firstPage = lines.findIndex((line) => line.page > 0);
+  const afterCover = firstPage < 0 ? lines.length : firstPage;
   const starts = anchors.map(({ i }, n) => {
-    const floor = n > 0 ? (anchors[n - 1]?.i ?? 0) + 1 : 0;
+    // never back onto the cover, whose title is no section's heading
+    const floor = n > 0 ? (anchors[n - 1]?.i ?? 0) + 1 : afterCover;
     let j = i - 1;
     for (let k = i - 1; k >= Math.max(floor, i - 6); k--) {
       if (labelled(lines[k]?.text ?? '', LOCATION_LABELS) !== null) {
@@ -331,7 +334,9 @@ export function reduce(layout: Layout): Reduced {
     const to = spotOf(end);
     const own: Box[] = [];
     if (from) {
-      for (let page = from.page; page <= (to?.page ?? from.page); page++) {
+      // to the next section's page, or the last page for the last section
+      const last = to?.page ?? layout.pages.length - 1;
+      for (let page = from.page; page <= last; page++) {
         for (const box of figuresOn(page)) {
           const top = { page: box.page, y: box.y2 };
           if (!before(top, from) && (to === null || before(top, to))) own.push(box);

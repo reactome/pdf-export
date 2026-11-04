@@ -160,6 +160,31 @@ ${label ? `<p>${label}</p>` : ''}
     assert.equal(section.parts.find((p) => p.part === 'entities')?.items.length, 8);
   });
 
+  test("a diagram whose connector passes through a reaction's small square is one figure", async () => {
+    // in points: two 55 x 70 nodes 290 apart, a 3 x 3 square between, edges clipped at it
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="70pt" viewBox="0 0 400 70">
+<rect x="0" y="0" width="55" height="70" fill="#9ab"/><text x="6" y="38" font-size="9">Left node</text>
+<path d="M55 35 H198.5" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="198.5" y="33.5" width="3" height="3" fill="#333"/>
+<path d="M201.5 35 H345" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="345" y="0" width="55" height="70" fill="#9ab"/><text x="351" y="38" font-size="9">Right node</text></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<p>${svg}</p>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    assert.equal(read.sections.length, 1);
+    const section = read.sections[0];
+    assert.equal(section?.figure, 'figure');
+    // the nodes' labels are the figure's, not the summation's
+    assert.deepEqual(section.parts.find((p) => p.part === 'summation')?.items, [
+      'Asummation,writtenforthesetests.',
+    ]);
+  });
+
   test('a reference laid out unlike the sample: facts in a table, contents first, vector figures, numbered references in brackets', async () => {
     const doc = sampleDocument();
     const props = sampleAnalysis();

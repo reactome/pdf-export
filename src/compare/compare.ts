@@ -16,6 +16,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 import { SettingsError } from '../preflight/command.ts';
+import { errorKind } from '../print/unread.ts';
 import { fold, hash, Output, type Difference } from './output.ts';
 import { MARGIN_BAND_PT, readLayout } from './read.ts';
 import { reduce, type ContentsItem, type Reduced, type ReducedSection } from './reduce.ts';
@@ -481,33 +482,34 @@ export function compareSettings(args: readonly string[]): CompareSettings {
   return { reference, neu, expected: flags.get('--expected') ?? null, referenceMargin };
 }
 
-/** An error as it may be printed: its kind and code, never its message, which may quote a file. */
-export const errorKind = (error: unknown): string => {
-  if (!(error instanceof Error)) return 'error';
-  const code = (error as { code?: unknown }).code;
-  return typeof code === 'string' && /^[A-Z_]+$/.test(code) ? `${error.name} ${code}` : error.name;
-};
-
-const CONSOLE = ['log', 'info', 'warn', 'error', 'debug'] as const;
+export { errorKind };
 
 /**
- * `run`, with the console's methods held for its length: a library writing to the console
- * (pdf.js's warnings quote a file's content) is not printed, only counted, and said once on
- * standard error with the kinds of the errors it passed, never its words.
+ * `run`, with the console held for its length: every method of the global console (`log`,
+ * `warn`, `error`, `dir`, `table`, `trace`, `assert` and the rest: each own property that is
+ * a function, as the console is when `run` begins) is replaced by one that counts the call
+ * and keeps the kinds of the errors it was passed, and is put back after, whether `run`
+ * succeeds or fails. A library writing to the console (pdf.js's warnings quote a file's
+ * content) is not printed: the calls are said once, in one line on standard error, with
+ * those kinds, never their words. Standard error itself is not held: what `compare` writes
+ * there is its own.
  */
 export async function withConsoleHeld<T>(
   run: () => Promise<T>,
   err: (text: string) => void
 ): Promise<T> {
+  const names = Object.keys(console).filter(
+    (name) => typeof Reflect.get(console, name) === 'function'
+  );
   // the methods as they are, put back as they were
-  const saved = CONSOLE.map((name) => [name, Reflect.get(console, name) as unknown] as const);
+  const saved = names.map((name) => [name, Reflect.get(console, name) as unknown] as const);
   let count = 0;
   const kinds = new Set<string>();
   const held = (...args: unknown[]) => {
     count++;
     for (const arg of args) if (arg instanceof Error) kinds.add(errorKind(arg));
   };
-  for (const name of CONSOLE) console[name] = held;
+  for (const name of names) Reflect.set(console, name, held);
   try {
     return await run();
   } finally {
