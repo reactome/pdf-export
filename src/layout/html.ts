@@ -12,34 +12,69 @@ export function plainText(value: string): string {
 }
 
 /**
- * A token longer than this, with no space in it, may break every BREAK_EVERY characters:
- * the pages break words only where they may (`overflow-wrap: break-word`, pages.css), so
- * that a table's short columns keep their words whole, and a token longer than the text
- * column (a run of letters, a long address) would otherwise overflow it, and Chromium then
- * prints its whole part scaled down.
+ * A token longer than this, with no space in it, is given places to break, in equal pieces
+ * of at most BREAK_EVERY characters: the pages break words only where they may
+ * (`overflow-wrap: break-word`, pages.css), so that a table's short columns keep their
+ * words whole, and a token longer than the text column (a run of letters, a long address)
+ * would otherwise overflow it, and Chromium then prints its whole part scaled down.
  */
 export const LONG_TOKEN = 40;
 export const BREAK_EVERY = 20;
 
 /**
- * Units of text (characters as a reader sees them, and a markup run's character references)
- * with `<wbr>` between every BREAK_EVERY of a token longer than LONG_TOKEN: a break
+ * The spaces a token ends at: those Chromium breaks a line at. A no-break space, U+202F or
+ * U+FEFF joins its neighbours, so a token runs through it; a space it could break at but
+ * that is not listed (an en space, say) only adds a `<wbr>` where a break already was.
+ * A carriage return and line feed are one grapheme.
+ */
+const BREAKABLE_SPACE = /^[ \t\n\r]+$/;
+
+/**
+ * A unit of text: a character as a reader sees it, a character reference, or a tag, which
+ * is no character, and which ends the token it is in unless it is inline (`joins`).
+ */
+interface Unit {
+  readonly text: string;
+  readonly tag?: 'joins' | 'ends';
+}
+
+/**
+ * Units with `<wbr>` between the pieces of a token longer than LONG_TOKEN, each piece of
+ * at most BREAK_EVERY units and none more than one shorter than another: a break
  * opportunity, which adds no character to the printed text.
  */
-function breakTokens(units: readonly string[], escape: (unit: string) => string): string {
+function breakTokens(units: readonly Unit[], escape: (unit: string) => string): string {
   let out = '';
-  let token: string[] = [];
+  let token: Unit[] = [];
   const flush = () => {
-    for (let i = 0; i < token.length; i++) {
-      if (token.length > LONG_TOKEN && i > 0 && i % BREAK_EVERY === 0) out += '<wbr>';
-      out += escape(token[i] ?? '');
+    const length = token.filter((unit) => unit.tag === undefined).length;
+    const pieces = length > LONG_TOKEN ? Math.ceil(length / BREAK_EVERY) : 1;
+    // the k-th piece ends at ceil(k * length / pieces) units, so the pieces differ by one at most
+    let next = 1;
+    let counted = 0;
+    for (const unit of token) {
+      if (unit.tag !== undefined) {
+        out += unit.text;
+        continue;
+      }
+      if (next < pieces && counted === Math.ceil((next * length) / pieces)) {
+        out += '<wbr>';
+        next++;
+      }
+      out += escape(unit.text);
+      counted++;
     }
     token = [];
   };
   for (const unit of units) {
-    if (/^\s$/u.test(unit)) {
+    if (unit.tag === 'joins') {
+      token.push(unit);
+    } else if (unit.tag === 'ends') {
       flush();
-      out += escape(unit);
+      out += unit.text;
+    } else if (BREAKABLE_SPACE.test(unit.text)) {
+      flush();
+      out += escape(unit.text);
     } else {
       token.push(unit);
     }
@@ -50,8 +85,8 @@ function breakTokens(units: readonly string[], escape: (unit: string) => string)
 
 /** Characters as a reader sees them: a break never parts a mark from its letter. */
 const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
-const graphemes = (value: string): string[] =>
-  Array.from(GRAPHEMES.segment(value), (part) => part.segment);
+const graphemes = (value: string): Unit[] =>
+  Array.from(GRAPHEMES.segment(value), (part) => ({ text: part.segment }));
 
 /** Text for an element's content, escaped, a long token given places to break. */
 export function text(value: string): string {
@@ -59,14 +94,37 @@ export function text(value: string): string {
 }
 
 /**
- * A run of markup's text (raw: its character references as they are) given places to break
- * in a long token, as `text` gives plain text: for `markupText`'s runs of a summation.
+ * The inline tags of a summation (the sanitiser's, rules.ts): a word may run through them,
+ * as `Na<sub>2</sub>` or a word half in italics, and is counted whole. Any other tag, a
+ * paragraph's or a cell's, ends the word.
  */
-export function markupBreaks(run: string): string {
-  // each character reference one unit, every other text by its characters
-  const units = run
-    .split(/(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu)
-    .flatMap((part, i) => (i % 2 === 1 ? [part] : graphemes(part)));
+const INLINE_TAGS = new Set(['a', 'b', 'em', 'i', 'span', 'strong', 'sub', 'sup', 'u']);
+
+/** A tag (its attributes' quoted values may hold `>`), or a comment; a `<` before neither is text. */
+const TAG = /(<!--[\s\S]*?(?:-->|$)|<\/?([a-z][a-z0-9]*)(?:[^>"']|"[^"]*"|'[^']*')*>?)/giu;
+const REFERENCE = /(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu;
+
+/**
+ * A summation's sanitised markup, a long token in its text given places to break as `text`
+ * gives plain text: each character reference one unit, a tag never broken into and never
+ * counted, and a word counted whole through inline tags.
+ */
+export function markupBreaks(markup: string): string {
+  const units: Unit[] = [];
+  const parts = markup.split(TAG);
+  // split gives text, then each tag with its name (or undefined), then text again
+  for (let i = 0; i < parts.length; i += 3) {
+    const between = parts[i] ?? '';
+    between.split(REFERENCE).forEach((part, j) => {
+      if (j % 2 === 1) units.push({ text: part });
+      else units.push(...graphemes(part));
+    });
+    const tag = parts[i + 1];
+    if (tag === undefined) continue;
+    const name = parts[i + 2]?.toLowerCase();
+    const joins = tag.startsWith('<!--') || (name !== undefined && INLINE_TAGS.has(name));
+    units.push({ text: tag, tag: joins ? 'joins' : 'ends' });
+  }
   return breakTokens(units, (unit) => unit);
 }
 
