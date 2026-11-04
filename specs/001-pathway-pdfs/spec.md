@@ -527,7 +527,7 @@ of pages with today's book.
   that runs before the book's, and the book reads them from that step's folder. The
   step's time on the machine the release gives it is measured and agreed with the
   release's owners (research R7: about 3.5 hours on an 8-core host at concurrency 8, as the render service
-  is today).
+  is today; measured by T031 at 5 h 47 min, which the user accepted on 4 Nov 2026).
 
 ## Assumptions
 

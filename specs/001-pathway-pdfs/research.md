@@ -848,7 +848,8 @@ is ignored, not a missing file.
   (about 10 with them on), scale to about 2–3 and 1–1.5 minutes for the book's 23,541
   pages, within 13 and 6 (inference: light synthetic files, T005's SVGs). How many pages
   the new layout prints was left to T031, which found the landscape rule doubled the book;
-  with every figure in the text column (T049) it is 21,538 pages (R4).
+  with every figure in the text column (T049) it is 21,538 pages (R4), and 21,500 on main
+  after #180 (below).
 
 - **Go or no-go, first:** the first task measures the render service's throughput at the
   book's scale, on the machine the release would use, with its concurrency raised and
@@ -931,6 +932,83 @@ is ignored, not a missing file.
   part (R4), its PDF is split at section boundaries and joined; the 29 PDFs are made
   several at a time, the largest first, so the joins overlap the printing, one at a time
   by default (T011, R4; T029 raises it only if two real joins fit).
+
+**Measured on the real book (T031, 4 Nov 2026),** on the private copy of release 98's
+graph on this host, as the baseline above. Each run capped at 6 GB of memory with no
+swap.
+
+- **The figures (SC-010):** `figures` drew all 19,076 figures the book needs, through a
+  loopback render service reading the release's files locally (`RENDER_FILES`), in
+  5 h 47 min. That is longer than the 3.5 hours inferred above.
+
+  | Kind          | Figures | Mean time each |
+  | ------------- | ------- | -------------- |
+  | Reactions     | 16,187  | 4.0 s          |
+  | Diagrams      | 1,170   | 6.0 s          |
+  | Selections    | 1,499   | 6.7 s          |
+  | Illustrations | 220     | 4.0 s          |
+
+  The summed times are about four times the elapsed time, so about four figures were drawn
+  at once on average (inference).
+  - **Accepted:** the user accepted the step's time on 4 Nov 2026: five to six hours is
+    acceptable, and the release may later give the step a larger machine.
+  - **What might shorten it:** T042, many figures per page load, is expected to shorten
+    it and is measured there.
+  - **The reactions:** 16,187, not the 16,424 above. 237 of the graph's human reactions
+    are under no top-level pathway, so no PDF of the book prints them.
+
+- **The book (SC-003),** on main after T049 and #180, from those figures:
+  - **Time:** 17 min 59 s, against `event-pdf`'s 1 h 18 min 41 s.
+  - **Size:** 29 PDFs, 21,500 pages (`event-pdf`: 23,541) and 693 MB (1.42 GB). The
+    largest PDF is 3,492 pages and 167 MB.
+  - **Faults:** `check-book`'s eight checks found none.
+  - **Characters:** FR-017's substitutions were made 1,104 times (U+2011 1,096, U+FB01 5,
+    U+05F3 2, U+02D9 1).
+  - **Figures below FR-016's floor:** 839 print below it (R4); the user accepted on
+    4 Nov 2026 that readers zoom in.
+
+  | Stage                                 | Measured | Budget (above) |
+  | ------------------------------------- | -------- | -------------- |
+  | Preflight                             | 13 s     | 4 min          |
+  | Figures, read and inlined (summed)    | 1.5 min  | 44 min         |
+  | Printing (summed over four at once)   | 15.4 min | 13 min         |
+  | Join, links, outline, stamps (summed) | 3.6 min  | 6 min          |
+  | The contents' second pass (summed)    | 45 s     | 2 min          |
+  | The parts, wall time                  | 6.9 min  | —              |
+  | `check-book`                          | 10.8 min | 9 min          |
+
+  Two stages are over their budgets: printing by 2.4 minutes (summed), and `check-book`
+  by 1.8 minutes. The whole run is a quarter of SC-003's budget, so neither matters
+  against it. `check-book`'s margin rested on an inference (above), which was short.
+
+- **Memory:**
+  - The largest process peaked at 2.3 GB resident.
+  - The run's whole scope, Chromium included, peaked between 3.5 and 4.9 GB across the
+    five runs below, each under the 6 GB cap. Which peak belongs to which run was not
+    kept, so only the range is recorded.
+- **Joins and object streams (T029's question, left here):** both are measured on the
+  book as it was with T008's landscape rule (41,993 pages):
+
+  | Setting                       | Wall time   | Size   |
+  | ----------------------------- | ----------- | ------ |
+  | One join, object streams off  | 20 min 55 s | 749 MB |
+  | Two joins, object streams off | 20 min 47 s | 749 MB |
+  | One join, object streams on   | 28 min 32 s | 640 MB |
+  - **Two joins:** gained nothing measurable (8 s). The joins summed 4.8 minutes with one and
+    5.6 with two, against 18 minutes of printing.
+  - **Object streams:** saved 15% of the size at 36% more time. The joins took 2.7 times as long,
+    and printing beside them slowed by about two-thirds.
+  - **Kept:** `--joins 1` and object streams off. T012 is not needed: one real join fits
+    beside printing with room.
+
+- **The layout trials** behind T049, on the same graph and figures (R4):
+  - T008's rule: 41,993 pages, 20 min 47 s with two joins;
+  - reactions in the text column: 24,251 pages, 18 min 58 s;
+  - every figure in the text column: 21,538 pages, 18 min 14 s;
+  - then #180's margin fix: 21,500 pages, as above.
+- **Not yet done (T031):**
+  - SC-004 needs the three readers on a desktop;
+  - the landings check on the real book (T026's note) is still to run.
 
 ## R8. The checks: by meaning, with tools under loose licences
 
