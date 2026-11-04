@@ -230,8 +230,21 @@ pathway, and a file on one side only is reported as a difference.
 
 - **Output:** a JSON report of the differences by part and kind, with counts. Names
   appear only as counts and hashes (FR-013).
-- **`--expected <file>`:** the recorded differences. With it, the exit is 1 only for a
-  difference not recorded.
+  - Each difference has its `file`, its `part` (`file`, `cover`, `introduction`,
+    `analysis`, `sections`, `section`, `figure`, `contents` or `short-entries`), a `field`
+    where the part has several (a section's `summation`, the cover's `names`), its `kind`
+    (`value`, `count`, `text`, `order`, `missing` from the new side, `extra` on it, `kind`
+    or `target`), a `count`, and the sections it is in by stable identifier.
+  - Each side's value is given only where it names no one: the cover's title and flags,
+    the introduction's numbers, the analysis's properties, and the cover's names as a
+    count and a hash. A section's text is never printed.
+  - A list in another order is a difference of its own kind, `order`.
+- **`--expected <file>`:** the recorded differences, as `{ "differences": [...] }`, each
+  with a `part`, a `kind` and a `reason`, and optionally a `field`, a `file` and `events`
+  (a record naming events covers only those). Each difference it covers is reported with
+  its reason. With it, the exit is 1 only for a difference not recorded.
+- **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments, a
+  reference and a new side not both PDFs or both folders, or a file that cannot be read.
 
 ## `pdf-export serve`
 
