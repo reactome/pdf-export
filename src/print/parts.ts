@@ -122,7 +122,7 @@ export function figureSizes(figures: FigureSvgs): Sizes {
 const LINE = 15;
 /** Characters on a line of body text, 481.9 pt wide (inference, not measured). */
 const CHARACTERS = 90;
-/** A figure's margins in portrait (pages.css). */
+/** A figure's margins, above and below (pages.css). */
 const FIGURE_MARGINS = 20;
 
 /** Points for a run of text, at least a line. */
@@ -169,7 +169,10 @@ export class Flow {
     if (size) {
       const height = size.height + FIGURE_MARGINS;
       if (this.#used + height > PORTRAIT.height) this.#end();
-      this.#used += height;
+      // the figure itself always fits now (figure.ts makes none taller than the text area);
+      // a margin that would run past the page's foot is dropped at the break, as Chromium
+      // drops it, so a figure as tall as the text area fills its page and no more
+      this.#used = Math.min(this.#used + height, PORTRAIT.height);
     }
     let after = 0;
     for (const summation of section.summations) {

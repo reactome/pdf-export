@@ -847,8 +847,8 @@ is ignored, not a missing file.
   outline, stamping and save at about 3 ms a page with pdf-lib's object streams off
   (about 10 with them on), scale to about 2–3 and 1–1.5 minutes for the book's 23,541
   pages, within 13 and 6 (inference: light synthetic files, T005's SVGs). How many pages
-  the new layout prints, which depends on how many reactions are wide enough for a
-  landscape page, is for T029 and T031 to measure (R4).
+  the new layout prints was left to T031, which found the landscape rule doubled the book;
+  with every figure in the text column (T049) it is 21,538 pages (R4).
 
 - **Go or no-go, first:** the first task measures the render service's throughput at the
   book's scale, on the machine the release would use, with its concurrency raised and
