@@ -1,5 +1,5 @@
-// The layout, printed (spec 001 T018, FR-016): the same margins on every page, a landscape
-// figure's included; no figure split across pages; running headers and numbers in a single
+// The layout, printed (spec 001 T018, FR-016): the same margins on every page; no figure
+// split across pages, and none on a page turned for it (T049); running headers and numbers in a single
 // PDF; and in the book, each probe printed as the link T026 will find. Printed by Chromium
 // from a file, as T019 prints (research R4).
 import assert from 'node:assert/strict';
@@ -103,7 +103,7 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
     folder = mkdtempSync(join(tmpdir(), 'pdf-export-layout-'));
     const figures = fixtureFigures(...built.book, built.pathway);
     // the pathway's own figure taller than what is left of its page after its heading, and
-    // a reaction's too wide for legible labels in portrait
+    // a reaction's wider than the text
     figures.set(figureKey(figureOf(built.pathway, 'R-HSA-90000100')), marked(400, 1200, 'TALL'));
     figures.set(figureKey(figureOf(built.pathway, 'R-HSA-90000220')), marked(1500, 400, 'WIDE'));
     options = {
@@ -209,7 +209,7 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
     );
   });
 
-  test('no figure is split across pages; a wide one has a landscape page of its own', async () => {
+  test('no figure is split across pages; a wide one stays in the text, and no page is turned', async () => {
     const { pages } = await print(layoutSingle(built.pathway, options).html, true);
     // after the cover, which draws the pathway's figure too, whole
     const pageOf = (text: string) =>
@@ -219,15 +219,15 @@ describe('the layout, printed', { skip: skipWithoutGraph }, () => {
       assert.ok(start >= 0, `${mark} not printed`);
       assert.equal(pageOf(`${mark}END`), start, `${mark} split across pages`);
     }
+    // its page holds the reaction's text as well (T049): it is not a page of its own
     const wide = pages[pageOf('WIDESTART')];
-    assert.ok(wide && wide.width > wide.height, 'the wide figure is not on a landscape page');
-    // alone on its page, with the page's header and number
-    assert.deepEqual(
-      wide.items.map((item) => item.text).sort(),
-      ['WIDESTART', 'WIDEEND', 'beta pathway', String(pageOf('WIDESTART') + 1)].sort()
+    assert.ok(wide, 'the wide figure is not printed');
+    const own = ['WIDESTART', 'WIDEEND', 'beta pathway', String(pageOf('WIDESTART') + 1)];
+    assert.ok(
+      wide.items.some((item) => !own.includes(item.text)),
+      'the wide figure is alone on its page'
     );
-    for (const page of pages)
-      if (page !== wide) assert.ok(page.height > page.width, 'a portrait page turned');
+    for (const page of pages) assert.ok(page.height > page.width, 'a page turned');
   });
 
   test("the book's probes print as links, one for each target; a single PDF has none", async () => {

@@ -1,8 +1,8 @@
 // A figure on the page (spec 001 T018, FR-016, research R4): inlined, its ids prefixed with
 // the section's anchor, linked to its interactive form on the website, and printed as large
-// as the page allows: in the portrait text, or on a landscape page of its own where that
-// prints it larger. One whose smallest label still prints below FLOOR_PT is listed for the
-// run report. The rule is T008's, from release 98's sizes; curators may change it (R4).
+// as the portrait text column allows, never on a landscape page (T049: a reader zooms, or
+// follows the link). One whose smallest label prints below FLOOR_PT is listed for the run
+// report.
 import type { Figure } from '../model/types.ts';
 import { prefixIds } from '../figures/prefix.ts';
 import { attribute } from './html.ts';
@@ -15,17 +15,17 @@ export const PAGE = {
   margin: 56.69,
 } as const;
 
-/** The text area of a portrait page, and of a landscape one. */
+/** The text area of a page. */
 export const PORTRAIT = {
   width: PAGE.width - 2 * PAGE.margin,
   height: PAGE.height - 2 * PAGE.margin,
 };
-export const LANDSCAPE = { width: PORTRAIT.height, height: PORTRAIT.width };
 
 /**
  * Below this, a figure's smallest label is listed in the run report (FR-016). Not a floor
- * the layout can keep: at release 98, 93% of diagrams print their labels below 5 pt even on
- * a landscape page, as today's book does, and are read by zooming or on the website (R4).
+ * the layout keeps: at release 98, 839 of the book's 19,076 figures (most of them large
+ * diagrams) print their labels below it in the text column, and are read by zooming or on
+ * the website (T049, R4).
  */
 export const FLOOR_PT = 1;
 
@@ -224,7 +224,6 @@ function markupOf(svg: string): { markup: string; stray: number } {
 export interface Placement {
   /** Points on the page for each of the SVG's pixels. */
   scale: number;
-  landscape: boolean;
   /** Its smallest label prints below FLOOR_PT, at its largest: listed for the run report. */
   belowFloor: boolean;
   /**
@@ -236,19 +235,13 @@ export interface Placement {
 }
 
 /**
- * Where and how large a figure prints: as large as fits the text area, never larger than
- * its own size, in portrait, or on a landscape page of its own where that prints it larger
- * (most diagrams, being wider than tall, and every illustration).
+ * How large a figure prints: as large as fits the text area, never larger than its own
+ * size.
  */
 export function place({ width, height, smallestLabel, unreadLabels }: Measured): Placement {
-  const fit = (area: { width: number; height: number }) =>
-    Math.min(area.width / width, area.height / height, NATURAL);
-  const portrait = fit(PORTRAIT);
-  const landscape = fit(LANDSCAPE);
-  const scale = Math.max(portrait, landscape);
+  const scale = Math.min(PORTRAIT.width / width, PORTRAIT.height / height, NATURAL);
   return {
     scale,
-    landscape: landscape > portrait,
     belowFloor: smallestLabel !== null && scale * smallestLabel < FLOOR_PT,
     // a label whose size could not be read may be the smallest: it is not taken as legible
     unmeasured: smallestLabel === null || unreadLabels > 0,
@@ -275,10 +268,9 @@ export function figureHtml(
       : ` viewBox="0 0 ${String(measured.width)} ${String(measured.height)}"`;
     return `<svg${kept}${box} width="${size(measured.width)}" height="${size(measured.height)}" role="img" aria-label="${attribute(label)}">`;
   });
-  const classes = placement.landscape ? 'figure landscape' : 'figure';
   // the whole figure links to its interactive form, where its labels can be read
   return {
-    html: `<div class="${classes}"><a class="figure-link" href="${attribute(href)}">${sized}</a></div>`,
+    html: `<div class="figure"><a class="figure-link" href="${attribute(href)}">${sized}</a></div>`,
     placement,
   };
 }

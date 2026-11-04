@@ -83,10 +83,9 @@ export interface BookRun {
   laying?: (doc: Document, places: readonly Place[] | null) => void;
 }
 
-/** A figure as it prints: on a landscape page of its own, or its height in the portrait text. */
+/** A figure as it prints: its height in the text. */
 export interface FigureSize {
-  landscape: boolean;
-  /** Points, in portrait. */
+  /** Points. */
   height: number;
 }
 
@@ -111,8 +110,7 @@ export function figureSizes(figures: FigureSvgs): Sizes {
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(`The figure ${key}: ${message}`, { cause: error });
         }
-        const { landscape, scale } = placeFigure(measured);
-        size = { landscape, height: measured.height * scale };
+        size = { height: measured.height * placeFigure(measured).scale };
       }
       sizes.set(key, size);
     }
@@ -132,13 +130,11 @@ const text = (characters: number) => LINE * Math.max(1, Math.ceil(characters / C
 
 /**
  * Pages filled by places in turn, estimated from the model and the figures' sizes, as a
- * part's pages are known only once it is printed. Text flows down portrait pages; a
- * portrait figure is never split, so one that does not fit begins a page; a landscape
- * figure ends the portrait page it follows, takes a page of its own, and what follows it
- * begins a new page (pages.css's named page `wide`). Text is counted in lines (the name,
+ * part's pages are known only once it is printed. Text flows down the pages; a figure is
+ * never split, so one that does not fit begins a page. Text is counted in lines (the name,
  * its facts, the summations with their markup taken out, events before and after, two
- * lines a reference, a line an edit), so a section with a portrait figure or none is
- * within about a page; test/print/parts.test.ts holds it to that on the fixture.
+ * lines a reference, a line an edit), so a section is within about a page;
+ * test/print/parts.test.ts holds it to that on the fixture.
  */
 export class Flow {
   readonly #sizes: Sizes;
@@ -170,10 +166,7 @@ export class Flow {
     }
     this.#flow(24 + 2 * LINE + facts * (LINE + 2) + 8);
     const size = section.figure ? this.#sizes(section.figure) : null;
-    if (size?.landscape) {
-      this.#end();
-      this.#ended += 1;
-    } else if (size) {
+    if (size) {
       const height = size.height + FIGURE_MARGINS;
       if (this.#used + height > PORTRAIT.height) this.#end();
       this.#used += height;

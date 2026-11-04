@@ -336,10 +336,22 @@ synthetic documents, on this host under load.
   are numbered as the book's are: a first print with placeholders, its anchors' pages
   read back, and a second print. A reaction alone, or depth 0, has no contents list and
   is printed once. The second print is in SC-005's budget (R7).
-- **Figure size** (FR-016, T008): a figure prints as large as the page allows, never
-  split: in the portrait text, or on a landscape page of its own where that prints it
-  larger. Its labels' size follows from its scale (the smallest label, not the first); one
-  whose labels print below 1 pt even so is listed in the run report.
+- **Figure size** (FR-016, T008, T049): a figure prints as large as the portrait text
+  column allows, never split and never on a landscape page. Its labels' size follows from
+  its scale (the smallest label, not the first); one whose labels print below 1 pt even so
+  is listed in the run report.
+  - **Since T049** (user, 4 Nov 2026), replacing the decision below: release 98's real
+    book showed what the landscape rule cost. Reactions are wide, short strips (most
+    1,100–1,250 px by 270–550 px; 16,183 of 16,187 wider than the text's 642 px at their
+    own size), so nearly every one went to a landscape page of its own, mostly blank: the
+    book was 41,993 pages, 19,601 of them landscape, against `event-pdf`'s 23,541. Measured
+    on the same graph and figures (T031): with reactions in the text column and the rest as
+    before, 24,251 pages (2,727 landscape); with every figure in the text column, 21,538
+    pages, 716 MB, in 18 min 12 s, every check passing. The user chose the last: a reader
+    zooms in (the figures are vector) or follows the figure's link to the website. Its
+    cost: 839 figures (4.4%), mostly large diagrams, print their smallest labels below
+    1 pt, against 297 with landscape pages. The rest of this item is the earlier rule's
+    record.
   - **Planned first:** a 5 pt floor, diagrams' node labels being 12 px in the render
     service's SVG (measured in its cache on 30 Oct 2026: 140–165 labels a diagram at 12 px,
     compartments' at 80 px, a few at 16 px). 5 pt allows about 1,155 of the SVG's pixels
@@ -406,8 +418,8 @@ synthetic documents, on this host under load.
     screens are wider than tall, so a wide figure on a landscape page fills more of one;
     no page makes most diagrams' labels readable unzoomed, so every figure links to its
     interactive form on the website (FR-003), where they are. The rule is in `src/layout/figure.ts`: the constant `FLOOR_PT` (the report's threshold)
-    and the orientation chosen in `place()`, so curators who prefer another, such as
-    portrait unless the labels would fall below a size, change it there. `measure()` reads an illustration's lettering
+    and the scale chosen in `place()`, so curators who prefer another change it there
+    (T049 took the orientation out). `measure()` reads an illustration's lettering
     (`src/layout/lettering.ts`) as it reads text's sizes, the smaller of the two counting;
     a label whose outlines are not read (a relative command, an arc, a viewport that is
     not a plain scale) counts as unread, so the figure is reported as unmeasured.
