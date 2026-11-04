@@ -471,9 +471,12 @@ describe('pdf-export figures', { skip }, () => {
     // stopped as the silence ended, the figures in flight with it: their pauses cut short,
     // not waited out, timed from the drawing's start, after the preflight. These timings
     // were a timeout of 0.4 s and a pause of 0.6 s, the bound 2.3 s for a silence of 2 s and
-    // pauses ending at 2.4 s, which a loaded host missed; these leave 0.8 s either side. The
-    // time carries the check: a stop leaves no retry to count (a figure checks for a stop
-    // before each try), so a run that waits out its pauses asks for no more figures
+    // pauses ending at 2.4 s, which a loaded host missed. With these, a run ended at 7.5 s,
+    // at 8.05 s at most with its event loop held 600 ms of every second, and a run waiting
+    // out its pauses at 8.8 s: the bound of 8.3 s is about 0.25 s above the one and 0.45 s
+    // below the other. The time carries the check: a stop leaves no retry to count (a
+    // figure checks for a stop before each try), so a run waiting out its pauses asks for
+    // no more figures
     assert.ok(drawing !== undefined && ended - drawing < 8300, String(ended - (drawing ?? 0)));
     assert.deepEqual(figureLines(run), []);
   });

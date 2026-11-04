@@ -227,7 +227,8 @@ describe('pdf-export book', { skip }, () => {
    */
   const signalled = async (
     ready: (run: { parent: string; temporary: string; pid: number }) => boolean,
-    signals: readonly NodeJS.Signals[] = ['SIGTERM']
+    signals: readonly NodeJS.Signals[] = ['SIGTERM'],
+    near?: (run: { parent: string; temporary: string; pid: number }) => boolean
   ) => {
     const { parent, report, args } = place();
     const temporary = scratch();
@@ -242,12 +243,26 @@ describe('pdf-export book', { skip }, () => {
     );
     try {
       const deadline = Date.now() + 90_000;
-      while (!ready({ parent, temporary, pid: child.pid ?? 0 })) {
+      const run = { parent, temporary, pid: child.pid ?? 0 };
+      // a folder read as the run ends and removes it is not yet the moment: the next look
+      // finds the run ended
+      const holds = (moment: typeof ready): boolean => {
+        try {
+          return moment(run);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+          throw error;
+        }
+      };
+      while (!holds(ready)) {
         assert.ok(child.exitCode === null, 'the run ended before it was signalled');
         assert.ok(Date.now() < deadline, 'never ready to be signalled');
-        // a short sleep, not setImmediate: a poll that spins takes the CPU the run needs on a
-        // loaded host, and each moment is a state that lasts (a folder made, a process spawned)
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // a short sleep until the run is near its moment, and then a spin: a poll that spins
+        // all the while takes the CPU the run needs on a loaded host, and one that sleeps
+        // throughout signals after a moment that does not last (the launcher's folders made,
+        // not yet registered for removal: a few milliseconds)
+        if (near && holds(near)) await new Promise((resolve) => setImmediate(resolve));
+        else await new Promise((resolve) => setTimeout(resolve, 10));
       }
       for (const signal of signals) child.kill(signal);
       const kill = setTimeout(() => child.kill('SIGKILL'), 30_000);
@@ -670,6 +685,8 @@ describe('pdf-export book', { skip }, () => {
     });
   };
   type Moment = (run: { parent: string; temporary: string; pid: number }) => boolean;
+  /** Near the launch's moments: the printer's pages' folder, made just before the launch. */
+  const launching: Moment = ({ temporary }) => begun(temporary, 'pdf-export-');
   const moments: Record<string, Moment> = {
     // the printer's pages' folder, made just before the browser is launched
     'as the launch begins': ({ temporary }) => begun(temporary, 'pdf-export-'),
@@ -700,23 +717,31 @@ describe('pdf-export book', { skip }, () => {
       ['SIGINT'],
     ]),
     ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
-      `twice as the launcher's artifacts' folder appears (${String(n)})`,
+      `as the launcher's artifacts' folder appears (${String(n)})`,
       moments['as the browser launches'] ?? (() => false),
       ['SIGINT', 'SIGINT'],
     ]),
     ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
-      `twice as the browser is spawned (${String(n)})`,
+      `as the browser is spawned (${String(n)})`,
       spawned,
       ['SIGINT', 'SIGINT'],
     ]),
   ];
+  /** The signals sent, as said: `SIGTERM`, or `two SIGINTs`. */
+  const said = (sent: NodeJS.Signals[]): string =>
+    sent.length === 1 ? sent.join('') : `two ${sent[0] ?? ''}s`;
   for (const [moment, ready, sent] of cases) {
-    test(`a run stopped by ${sent.join(' and ')} ${moment}: exit 128 and its number, its report written, nothing left`, async () => {
+    test(`a run stopped by ${said(sent)} ${moment}: exit 128 and its number, its report written, nothing left`, async () => {
       assert.ok(
         ready !== spawned || childrenReadable,
         "a process's children cannot be read (/proc/<pid>/task/<pid>/children)"
       );
-      const run = await signalled(ready, sent);
+      // every moment but the last is the launch's
+      const run = await signalled(
+        ready,
+        sent,
+        ready === moments['after a part has printed'] ? undefined : launching
+      );
       const [first = 'SIGTERM'] = sent;
       const code = 128 + osConstants.signals[first];
       assert.deepEqual([run.code, run.signal], [code, null]);
