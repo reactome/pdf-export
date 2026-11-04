@@ -1859,7 +1859,11 @@ test(
           [closed ? 0 : code, null],
           `${name}: ${stderr}`
         );
-        if (code !== 0 && child.exitCode === code && signals.length === 1) atLaunch += 1;
+        if (code !== 0 && child.exitCode === code && signals.length === 1) {
+          // at once: not held until the service served, then exited
+          assert.ok(!stderr.includes('serving at'), `${name}: exited ${String(code)} once serving`);
+          atLaunch += 1;
+        }
         assert.deepEqual(readdirSync(temporary), [], name);
       }
       // the launch's moments are not all seen late: a signal before it serves exits at once
