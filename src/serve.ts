@@ -451,7 +451,7 @@ export async function startService(
     const figures = await drawFigures(doc, token === null ? undefined : decodeURIComponent(token), {
       characters,
       deadline,
-      files: token === null ? (folder?.files() ?? null) : null,
+      files: token === null ? (folder?.files(doc.release.version) ?? null) : null,
     });
     going();
     const laid = layoutSingle(onRequestStrings(doc, characters), {

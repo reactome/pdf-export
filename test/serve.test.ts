@@ -33,6 +33,7 @@ import {
   SettingsError,
   serveSettings,
   startService,
+  type ServeLimits,
   type ServeSettings,
   type Service,
   type ServicePrinter,
@@ -104,7 +105,8 @@ async function closedPort(): Promise<number> {
  * row), failing on request, as a graph that cannot answer does, and never answering a query
  * that matches `hanging`, as a stalled read does, until its transaction timeout, nor one
  * matching `blackhole` at all (a silent connection) until `unblock`, and ending one matching
- * `late` `lateByMs` after its transaction timeout, as an answer slow to come back. With
+ * `late` `lateByMs` after its transaction timeout, as an answer slow to come back, and failing
+ * the next read matching `failOnce`, once. With
  * `holdMs`, every read is held that long before it is read, or ended at its transaction
  * timeout as the database would end it; the reads held at once are counted (`inFlight`, its
  * most `maxInFlight`), each read's timeout is kept (`timeouts`), and every query asked
@@ -118,6 +120,7 @@ function plantingGraph(): Graph & {
   unblock: () => void;
   late: RegExp | null;
   lateByMs: number;
+  failOnce: RegExp | null;
   queries: string[];
   holdMs: number;
   inFlight: number;
@@ -137,6 +140,7 @@ function plantingGraph(): Graph & {
     },
     late: null as RegExp | null,
     lateByMs: 0,
+    failOnce: null as RegExp | null,
     queries: [] as string[],
     holdMs: 0,
     inFlight: 0,
@@ -148,6 +152,10 @@ function plantingGraph(): Graph & {
       options?: ReadOptions
     ): Promise<T[]> {
       graph.queries.push(query);
+      if (graph.failOnce?.test(query)) {
+        graph.failOnce = null;
+        throw new Error('the read failed, once');
+      }
       if (graph.failing) {
         throw new Error('Could not reach bolt://graph.invalid:7687 for /data/graph.db');
       }
@@ -898,7 +906,7 @@ describe("the figures' folder", { skip: skipWithoutGraph }, () => {
     return dir;
   };
 
-  const start = (figures: string | null) =>
+  const start = (figures: string | null, limits: Partial<ServeLimits> = {}) =>
     startService(
       {
         bind: '127.0.0.1',
@@ -911,7 +919,7 @@ describe("the figures' folder", { skip: skipWithoutGraph }, () => {
         site: 'https://site.invalid',
         concurrency: 2,
       },
-      { graph, log: (line) => lines.push(line), limits: { folderPollMs: 100 } }
+      { graph, log: (line) => lines.push(line), limits: { folderPollMs: 100, ...limits } }
     );
 
   /** The health answer's `figures`, once it is `state`, or the last seen after 10 s. */
@@ -948,6 +956,8 @@ describe("the figures' folder", { skip: skipWithoutGraph }, () => {
     render.reset();
     analysis.reset();
     graph.planted.clear();
+    graph.hanging = null;
+    graph.failOnce = null;
     graph.queries.length = 0;
     lines.length = 0;
   });
@@ -1138,6 +1148,66 @@ describe("the figures' folder", { skip: skipWithoutGraph }, () => {
       writeFileSync(join(dir, MANIFEST), readFileSync(join(folder(), MANIFEST)));
       assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
       assert.equal(fullChecks(), 3);
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('a changed folder is not used while it is checked: checking, every figure drawn', async () => {
+    const dir = folder();
+    // the check's reads end at the deadline, so the one held here ends soon after the test
+    const service = await start(dir, { deadlineMs: 5_000 });
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      // the next check's book held at its first read; the manifest changed (another build)
+      graph.hanging = /MATCH \(p:TopLevelPathway/;
+      writeFileSync(join(dir, MANIFEST), readFileSync(join(folder({ build: 'other' }), MANIFEST)));
+      assert.deepEqual(await figuresOnceIt(service.url, 'checking'), { state: 'checking' });
+      const response = await fetch(`${service.url}/event/${REACTION}.pdf`);
+      assert.equal(response.status, 200);
+      const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+      assert.ok(!text.includes('Folder'), 'not read');
+      assert.deepEqual(drawn(), [`/render/${REACTION}.svg?layout=reaction`]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('a check that fails is tried again at a later poll', async () => {
+    graph.failOnce = /MATCH \(p:TopLevelPathway/;
+    const service = await start(folder());
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      assert.ok(
+        lines.some((line) => line.startsWith('figures-folder: the checks failed')),
+        lines.join('\n')
+      );
+      assert.equal(fullChecks(), 2, 'built again');
+    } finally {
+      await service.close();
+    }
+  });
+
+  test("a graph of another release than the folder's, before the next poll: drawn on request", async () => {
+    // polled once, at the start, within this test
+    const service = await start(folder(), { folderPollMs: 600_000 });
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      graph.planted.set(
+        `"release":${String(print.release)}`,
+        `"release":${String(print.release + 1)}`
+      );
+      const response = await fetch(`${service.url}/event/${REACTION}.pdf`);
+      assert.equal(response.status, 200);
+      const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+      assert.ok(!text.includes('Folder'), 'not read');
+      assert.deepEqual(drawn(), [`/render/${REACTION}.svg?layout=reaction`]);
+      assert.ok(
+        lines.includes(
+          `figures-folder: the graph is release ${String(print.release + 1)}, the folder ${String(print.release)}; drawn on request`
+        ),
+        lines.join('\n')
+      );
     } finally {
       await service.close();
     }
@@ -1727,6 +1797,8 @@ test(
         130,
       ]),
     ];
+    /** The cases signalled during the launch that exited at once, 128 and the signal. */
+    let atLaunch = 0;
     try {
       for (const [name, ready, signals, code] of cases) {
         const temporary = mkdtempSync(join(root, 'tmp-'));
@@ -1777,15 +1849,21 @@ test(
         }
         // a moment during the launch (a launcher's folder there, a browser spawned) holds for
         // the browser's life, so on a loaded host it can first be seen once the service
-        // serves: then one signal closes it, as the child says, and exits 0
-        const closed = signals.length === 1 && stderr.includes(`stopping on ${signals[0] ?? ''}`);
+        // serves: then one signal closes it, the child saying so after it said it serves,
+        // and exits 0. A signal before it serves never waits for it to serve.
+        const serving = stderr.indexOf('serving at');
+        const stopping = stderr.indexOf(`stopping on ${signals[0] ?? ''}`);
+        const closed = signals.length === 1 && serving >= 0 && stopping > serving;
         assert.deepEqual(
           [child.exitCode, child.signalCode],
           [closed ? 0 : code, null],
           `${name}: ${stderr}`
         );
+        if (code !== 0 && child.exitCode === code && signals.length === 1) atLaunch += 1;
         assert.deepEqual(readdirSync(temporary), [], name);
       }
+      // the launch's moments are not all seen late: a signal before it serves exits at once
+      assert.ok(atLaunch > 0, 'no signal during the launch exited at once');
     } finally {
       await render.close();
       await analysis.close();

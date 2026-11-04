@@ -66,11 +66,20 @@ export class ServedFolder {
   }
 
   /**
-   * The folder's files as they are now, for one PDF: null while the folder is not ready;
-   * else a lookup giving a figure's file, or null for a figure the folder lacks.
+   * The folder's files as they are now, for one PDF whose graph read gave `release`: null
+   * while the folder is not ready, or was checked against another release (a graph swapped
+   * since the last poll); else a lookup giving a figure's file, or null for a figure the
+   * folder lacks.
    */
-  files(): ((figure: Figure) => string | null) | null {
+  files(release: number): ((figure: Figure) => string | null) | null {
     if (this.#state.state !== 'ready') return null;
+    // a graph swapped since the last poll: the PDF's own read of the release says so first
+    if (this.#state.release !== release) {
+      this.#options.log(
+        `figures-folder: the graph is release ${String(release)}, the folder ${String(this.#state.release)}; drawn on request`
+      );
+      return null;
+    }
     const files = this.#files;
     const { folder } = this.#options;
     return (figure) => {

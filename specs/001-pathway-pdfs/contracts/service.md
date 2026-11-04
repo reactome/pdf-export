@@ -36,8 +36,11 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   is not used, and every figure is drawn on request until one that passes is in place, as
   it is while the checks run. A figure the folder lacks (another species' event), or whose
   file cannot be read, is drawn on request and logged (`not-in-folder <figure>`). A folder
-  changed on disk is noticed at the next read, so for up to a minute a PDF can read a
-  folder put in place since the last checks. With a token, every figure is drawn on request, with the
+  changed on disk is noticed at the next read, so for up to a minute (longer while a poll
+  waits on the graph) a PDF can read a folder put in place since the last checks. A graph
+  of another release is noticed at once: each PDF's own read of the release must be the
+  one the folder was checked against, or its figures are drawn on request; a change of
+  checksum alone, within a release, is noticed only at the next poll. With a token, every figure is drawn on request, with the
   analysis's overlay (SC-005). A PDF can so mix figures from the folder with figures
   drawn on request by another render build; contracts/figures.md lists what the
   fingerprint cannot see.
