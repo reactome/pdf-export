@@ -934,12 +934,15 @@ is ignored, not a missing file.
   by default (T011, R4; T029 raises it only if two real joins fit).
 
 **Measured on the real book (T031, 4 Nov 2026),** on the private copy of release 98's
-graph on this host, as the baseline above. Each run capped at 6 GB of memory with no
-swap.
+graph on this host, as the baseline above. Each book run was capped at 6 GB of memory
+with no swap, not R4's 4 GiB (below). Wall times are the process's, by `/usr/bin/time`,
+a second or two over the run report's `seconds` (so 18 min 14 s here is the 18 min 12 s
+of R4's T049 note).
 
 - **The figures (SC-010):** `figures` drew all 19,076 figures the book needs, through a
   loopback render service reading the release's files locally (`RENDER_FILES`), in
-  5 h 47 min. That is longer than the 3.5 hours inferred above.
+  5 h 47 min. That is longer than the 3.5 hours inferred above. The render service's
+  concurrency for this run was not recorded.
 
   | Kind          | Figures | Mean time each |
   | ------------- | ------- | -------------- |
@@ -982,10 +985,11 @@ swap.
   against it. `check-book`'s margin rested on an inference (above), which was short.
 
 - **Memory:**
-  - The largest process peaked at 2.3 GB resident.
-  - The run's whole scope, Chromium included, peaked between 3.5 and 4.9 GB across the
-    five runs below, each under the 6 GB cap. Which peak belongs to which run was not
-    kept, so only the range is recorded.
+  - The largest single process peaked at 2.4 GB (2.24 GiB) resident, in the final run.
+  - The run's whole scope, Chromium and page cache included, peaked between 3.5 and
+    4.9 GB (3.25–4.53 GiB) across the five runs with a recorded peak (all but the first
+    of the joins' table below), each under the 6 GB cap. Which peak belongs to which run
+    was not kept, so only the range is recorded.
 - **Joins and object streams (T029's question, left here):** both are measured on the
   book as it was with T008's landscape rule (41,993 pages):
 
@@ -998,11 +1002,15 @@ swap.
     5.6 with two, against 18 minutes of printing.
   - **Object streams:** saved 15% of the size at 36% more time. The joins took 2.7 times as long,
     and printing beside them slowed by about two-thirds.
-  - **Kept:** `--joins 1` and object streams off. T012 is not needed: one real join fits
-    beside printing with room.
+  - **Kept:** `--joins 1` and object streams off.
+  - **T012 is not settled.** R4 and T029 set its trigger as one real join not fitting
+    beside printing under a **4 GiB** cap. These runs had 6 GB, and at least one scope's
+    peak (4.53 GiB) was over 4 GiB, though that peak counts page cache, which the kernel
+    reclaims under a cap. So one real join is shown to fit in 6 GB, not in 4 GiB. Until
+    the book is run again under 4 GiB, it is given 6 GB, and T012 stays the fallback.
 
 - **The layout trials** behind T049, on the same graph and figures (R4):
-  - T008's rule: 41,993 pages, 20 min 47 s with two joins;
+  - T008's rule: 41,993 pages, 20 min 55 s;
   - reactions in the text column: 24,251 pages, 18 min 58 s;
   - every figure in the text column: 21,538 pages, 18 min 14 s;
   - then #180's margin fix: 21,500 pages, as above.

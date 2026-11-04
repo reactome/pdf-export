@@ -564,9 +564,9 @@ passes.
   - **Done so far (4 Nov 2026; research R7, "Measured on the real book"):**
     - **Figures:** all 19,076 drawn in 5 h 47 min, accepted by the user (SC-010).
     - **The book:** 17 min 59 s against `event-pdf`'s 1 h 18 min 41 s (SC-003); 29 PDFs and 21,500 pages; `check-book` found no faults.
-    - **Stages:** two are over their budgets, printing (summed) and `check-book`, by about 2 minutes each.
+    - **Stages:** two are over their budgets, printing (summed) and `check-book`, by 2.4 and 1.8 minutes.
     - **Memory:** the scope peaked at 3.5–4.9 GB, under the 6 GB cap.
-    - **Joins and object streams:** measured; `--joins 1` and object streams off stay, and T012 is not needed.
+    - **Joins and object streams:** measured; `--joins 1` and object streams off stay. One real join fits beside printing in 6 GB; under R4's 4 GiB it is not shown, so the book is given 6 GB and T012 stays the fallback.
     - **Layout:** the landscape rule doubled the book, which led to T049.
   - **Left:** SC-004's three readers (a desktop is needed) and the landings check above.
   - **From #180's review (low, recorded):**
