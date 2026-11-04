@@ -196,12 +196,16 @@ FR-011's check, alone. Also run by `book`.
     `not-in-outline`: no outline entry, at any depth, does both; an event whose section is
     not found at all is these two faults and `no-name`;
   - `no-name`: the section's heading does not read its name. The heading is its leading
-    text set larger than its page's body text (the size most of the page's characters are
-    set at) by at least 15:14, the ratio of 11.25 pt to the body's 10.5 (the smallest
-    heading is 12 pt): measured against the page, not in points, so a page Chromium printed
-    scaled down (which the layout should never make, as nothing in it is wider than the text
-    column) still reads its names, its own scale not a fault; `no-stable-id`: its text
-    holds no `Stable identifier` followed by its stable identifier;
+    text set larger than the section's own body text by at least 15:14, the ratio of
+    11.25 pt to the body's 10.5 (the smallest heading is 12 pt). The body text is the
+    section's `Stable identifier` label, which every section prints; for a section without
+    it, the size most of its page's characters are set at, leaving out the text inside a
+    figure's link (a diagram's labels). Measured against the section, not in points, so a
+    part Chromium printed scaled down still reads its names, its scale not a fault: the
+    layout keeps realistic content inside the text column (long tokens may break, a table's
+    columns narrow to their longest words), but a table of very many columns can still be
+    wider; `no-stable-id`: its text holds no `Stable identifier` followed by its stable
+    identifier;
   - `missing-figure`: a pathway's or reaction's section with a figure by the Figure rules,
     whose source is in `--files` (its diagram's two files, its EHLD; a reaction's is the
     graph), has no link to that figure's interactive form below its heading. The figure is

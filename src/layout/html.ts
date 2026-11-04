@@ -6,14 +6,73 @@
 
 import type { Figure } from '../model/types.ts';
 
-/** Text for an element's content. */
-export function text(value: string): string {
+/** Text escaped for markup, as it is. */
+export function plainText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Text for an attribute's value, quoted with double quotes. */
+/**
+ * A token longer than this, with no space in it, may break every BREAK_EVERY characters:
+ * the pages break words only where they may (`overflow-wrap: break-word`, pages.css), so
+ * that a table's short columns keep their words whole, and a token longer than the text
+ * column (a run of letters, a long address) would otherwise overflow it, and Chromium then
+ * prints its whole part scaled down.
+ */
+export const LONG_TOKEN = 40;
+export const BREAK_EVERY = 20;
+
+/**
+ * Units of text (characters as a reader sees them, and a markup run's character references)
+ * with `<wbr>` between every BREAK_EVERY of a token longer than LONG_TOKEN: a break
+ * opportunity, which adds no character to the printed text.
+ */
+function breakTokens(units: readonly string[], escape: (unit: string) => string): string {
+  let out = '';
+  let token: string[] = [];
+  const flush = () => {
+    for (let i = 0; i < token.length; i++) {
+      if (token.length > LONG_TOKEN && i > 0 && i % BREAK_EVERY === 0) out += '<wbr>';
+      out += escape(token[i] ?? '');
+    }
+    token = [];
+  };
+  for (const unit of units) {
+    if (/^\s$/u.test(unit)) {
+      flush();
+      out += escape(unit);
+    } else {
+      token.push(unit);
+    }
+  }
+  flush();
+  return out;
+}
+
+/** Characters as a reader sees them: a break never parts a mark from its letter. */
+const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
+const graphemes = (value: string): string[] =>
+  Array.from(GRAPHEMES.segment(value), (part) => part.segment);
+
+/** Text for an element's content, escaped, a long token given places to break. */
+export function text(value: string): string {
+  return breakTokens(graphemes(value), plainText);
+}
+
+/**
+ * A run of markup's text (raw: its character references as they are) given places to break
+ * in a long token, as `text` gives plain text: for `markupText`'s runs of a summation.
+ */
+export function markupBreaks(run: string): string {
+  // each character reference one unit, every other text by its characters
+  const units = run
+    .split(/(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu)
+    .flatMap((part, i) => (i % 2 === 1 ? [part] : graphemes(part)));
+  return breakTokens(units, (unit) => unit);
+}
+
+/** Text for an attribute's value, quoted with double quotes: no breaks, which are markup. */
 export function attribute(value: string): string {
-  return text(value).replace(/"/g, '&quot;');
+  return plainText(value).replace(/"/g, '&quot;');
 }
 
 /** Text for a CSS string, quoted with double quotes, inside a style element. */

@@ -13,9 +13,9 @@
 // (two events of one name), or the first such entry (a heading that lost its link, whose
 // first link is then a reaction's figure's); failing both, at that first link. It runs to
 // the next section found. Its name is the text of its heading, the leading text there set
-// larger than its page's body text (so a page printed scaled down still reads it); its
-// stable identifier the text after `Stable identifier` in it; its figure the link to the
-// figure's interactive form below its heading. An entry of the outline or the contents list
+// larger than its own body text (its `Stable identifier` label, so a page printed scaled
+// down still reads it); its stable identifier the text after that label; its figure the
+// link to the figure's interactive form below its heading. An entry of the outline or the contents list
 // is the event's when it lands on its section's heading and reads its name, compared
 // without white space or the characters never drawn; the contents list's entries are the
 // links before the first section. A link is broken when it lands on no page of its PDF, is
@@ -35,7 +35,7 @@ import {
   type GraphSettings,
 } from '../graph/connection.ts';
 import { releaseInfo } from '../graph/queries.ts';
-import { BookCharacters } from '../layout/characters.ts';
+import { BookCharacters, NEVER_DRAWN } from '../layout/characters.ts';
 import { PAGE } from '../layout/figure.ts';
 import { Links, PLACEHOLDER, PROBE } from '../layout/html.ts';
 import { buildBook } from '../model/build.ts';
@@ -74,7 +74,7 @@ export interface BookCheck {
 }
 
 /**
- * A heading is set at least this much larger than its page's body text: between the body's
+ * A heading is set at least this much larger than its section's body text: between the body's
  * 10.5 pt and the smallest heading's 12 pt (src/layout/pages.css: body-medium, and
  * title-medium for h3 to h6), as a ratio, so a page Chromium printed scaled down (anything
  * wider than the text column, which the layout should never print) still reads its headings.
@@ -124,8 +124,6 @@ interface OutlineItem {
 interface Read {
   /** Every page's pieces of text, in reading order. */
   pieces: Piece[];
-  /** Each page's body size: the size most of its text's characters are set at. */
-  body: number[];
   /** Every link, in reading order. */
   links: Link[];
   /** Every outline entry, at any depth. */
@@ -137,8 +135,8 @@ interface Read {
  * characters never drawn (FR-017's NEVER_DRAWN: controls and default-ignorables, a soft
  * hyphen, a joiner, a variation selector) left out, as the printed text has none of them.
  */
-const folded = (text: string): string =>
-  text.normalize('NFKC').replace(/[\s\p{Cc}\p{Default_Ignorable_Code_Point}]+/gu, '');
+const folded = (text: string): string => text.normalize('NFKC').replace(UNPRINTED, '');
+const UNPRINTED = new RegExp(`${NEVER_DRAWN.source}+`, 'gu');
 
 /** The label a section's stable identifier follows, as read. */
 const LABEL = folded('Stable identifier');
@@ -184,11 +182,9 @@ async function readPdf(path: string): Promise<Read> {
     const doc = await task.promise;
     const pieces: Piece[] = [];
     const links: Link[] = [];
-    const body: number[] = [];
     for (let i = 0; i < doc.numPages; i++) {
       const page = await doc.getPage(i + 1);
       const [, , , height = 0] = page.view;
-      const bySize = new Map<number, number>();
       for (const item of (await page.getTextContent()).items) {
         if (!('str' in item) || item.str.trim() === '') continue;
         const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = item.transform as number[];
@@ -196,10 +192,7 @@ async function readPdf(path: string): Promise<Read> {
         if (y <= PAGE.margin || y >= height - PAGE.margin) continue;
         const size = Math.max(Math.hypot(a, b), Math.hypot(c, d));
         pieces.push({ page: i, x, y, size, str: item.str });
-        const rounded = Math.round(size * 100) / 100;
-        bySize.set(rounded, (bySize.get(rounded) ?? 0) + item.str.length);
       }
-      body.push([...bySize].sort(([, m], [, n]) => n - m)[0]?.[0] ?? 0);
       for (const annot of (await page.getAnnotations()) as unknown[]) {
         if (!isRecord(annot) || annot['subtype'] !== 'Link') continue;
         const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = (annot['rect'] as number[] | undefined) ?? [];
@@ -234,7 +227,7 @@ async function readPdf(path: string): Promise<Read> {
     // null, not an empty list, for a PDF with no outline, whatever its type says
     const top = (await doc.getOutline()) as Parameters<typeof walk>[0] | null;
     await walk(top ?? []);
-    return { pieces: pieces.sort(byReading), body, links: links.sort(byReading), outline };
+    return { pieces: pieces.sort(byReading), links: links.sort(byReading), outline };
   } finally {
     await task.destroy();
   }
@@ -283,7 +276,7 @@ function checkPdf(
   file: string,
   pathway: string,
   events: readonly Expected[],
-  { pieces, body, links, outline }: Read,
+  { pieces, links, outline }: Read,
   sourced: (stId: string, figure: Figure) => boolean
 ): string[] {
   const site = new Links(true, '', new Set());
@@ -327,6 +320,33 @@ function checkPdf(
     if (first && !later(first, link)) break;
     if (link.landing) entries.push({ landing: link.landing, text: folded(linkText(link, pieces)) });
   }
+  // a page's body size, for a section with no `Stable identifier` label: the size most of
+  // its characters are set at, leaving out what is inside a figure's link (its labels)
+  const figureAddresses = events.flatMap((event) =>
+    event.figure ? [site.figure(event.figure, event.stId)] : []
+  );
+  const figureLinks = links.filter(
+    (link) => link.uri !== null && figureAddresses.some((address) => link.uri?.endsWith(address))
+  );
+  const bodies = new Map<number, number>();
+  const bodyOf = (page: number): number => {
+    let size = bodies.get(page);
+    if (size === undefined) {
+      const counts = new Map<number, number>();
+      const boxes = figureLinks.filter((link) => link.page === page).map((link) => link.rect);
+      for (const piece of between(pieces, { page, y: Infinity }, { page: page + 1, y: Infinity })) {
+        const inside = boxes.some(
+          ([x1, y1, x2, y2]) => piece.x >= x1 && piece.x <= x2 && piece.y >= y1 && piece.y <= y2
+        );
+        if (inside) continue;
+        const rounded = Math.round(piece.size * 100) / 100;
+        counts.set(rounded, (counts.get(rounded) ?? 0) + piece.str.length);
+      }
+      size = [...counts].sort(([, m], [, n]) => n - m)[0]?.[0] ?? 0;
+      bodies.set(page, size);
+    }
+    return size;
+  };
   // where the outline's entries and the contents' land, by the name each reads, once
   const byName = new Map<string, { outline: Spot[]; contents: Spot[] }>();
   const named = (name: string) => {
@@ -341,8 +361,18 @@ function checkPdf(
     if (item.landing) named(folded(item.title)).outline.push(item.landing);
   for (const entry of entries) named(entry.text).contents.push(entry.landing);
   /** Whether the section starting at `spot` gives `stId` as its stable identifier: its first. */
+  // where a section may start: each event's first link to its page, and each outline entry
+  // with an event's name, so a candidate's section is read only up to the next
+  const eventNames = new Set(events.map((event) => folded(event.name)));
+  const possible = [
+    ...firstLinks.values(),
+    ...outline.flatMap((item) =>
+      item.landing && eventNames.has(folded(item.title)) ? [item.landing] : []
+    ),
+  ].sort(byReading);
   const identifies = (spot: Spot, stId: string): boolean => {
-    const after = between(pieces, spot, undefined);
+    const next = possible.find((other) => later(other, spot) && !near(other, spot));
+    const after = between(pieces, spot, next);
     const at = after.findIndex((piece) => folded(piece.str).startsWith(LABEL));
     const read = folded(after[at]?.str ?? '');
     return read === LABEL + stId || (read === LABEL && folded(after[at + 1]?.str ?? '') === stId);
@@ -389,8 +419,12 @@ function checkPdf(
     }
     const text = between(pieces, start, next);
     const heading: Piece[] = [];
+    // measured against the section's own body text: its `Stable identifier` label, which
+    // every section prints; or else its page's commonest size outside its figures
+    const label = text.find((piece) => folded(piece.str).startsWith(LABEL));
+    const body = label?.size ?? bodyOf(start.page);
     for (const piece of text) {
-      if (piece.size < (body[piece.page] ?? 0) * HEADING_RATIO) break;
+      if (piece.size < body * HEADING_RATIO) break;
       heading.push(piece);
     }
     if (folded(heading.map((p) => p.str).join('')) !== name) {

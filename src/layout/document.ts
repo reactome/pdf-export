@@ -16,7 +16,7 @@ import {
   coverHtml,
   introductionHtml,
 } from './front.ts';
-import { Links, attribute, cssString, text } from './html.ts';
+import { Links, attribute, cssString, plainText } from './html.ts';
 import { placeHtml, type Report } from './section.ts';
 import { themeCss } from './theme.ts';
 
@@ -167,7 +167,7 @@ function page(
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${text(title)}</title>
+<title>${plainText(title)}</title>
 <style>${css.fonts}</style>
 <style>${css.theme}</style>
 <style>${css.pages}</style>

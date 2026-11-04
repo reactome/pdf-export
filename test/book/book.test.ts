@@ -992,15 +992,20 @@ describe('pdf-export book', { skip }, () => {
     assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
   });
   test('nothing overflows the text column: a wide table and a long unbroken token print every part at full size', async () => {
-    // release 98 has 28 human summations holding a table; a table of several columns of long
-    // words, and a token of 140 characters unbroken, in a summation and in a name, are wider
-    // than the text column, and Chromium shrank the whole part to fit them (#160's review)
-    const word = (n: number) => `Longwordcolumn${String(n)}withoutspaces`;
+    // release 98 has 28 human summations holding a table: one of four columns of long words
+    // (as wide as such a table is), and a token of 140 characters unbroken, in a summation
+    // and in a name, were wider than the text column, and Chromium shrank the whole part to
+    // fit them (#160's review)
+    const words = ['Phosphofructokinase', 'Glyceraldehydes', 'Triosephosphate', 'Dihydroxyacetone'];
     const row = (cells: string[]) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
-    const table = `<table>${row([1, 2, 3, 4, 5, 6].map(word))}${row([7, 8, 9, 10, 11, 12].map(word))}</table>`;
+    const table = `<table>${row(words)}${row([...words].reverse())}</table>`;
     const token = 'X'.repeat(140);
     const plants: [string, string][] = [
-      ['A third placeholder summation, first by order.', `<p>${token}</p>${table}`],
+      // the token in a table's cell too, where only its places to break let the column narrow
+      [
+        'A third placeholder summation, first by order.',
+        `<p>${token}</p>${table.replace('</table>', `${row(['Token', token])}</table>`)}`,
+      ],
       ['Reaction eight', `Reaction eight ${token}`],
     ];
     const { out, args } = place();
@@ -1074,5 +1079,68 @@ describe('pdf-export book', { skip }, () => {
     const run = await book([...place().args, '--parallel', '2'], { open: planting(plants) });
     assert.deepEqual(run.left, [], 'left in its temporary folder');
     assert.equal(run.code, 0, run.err + run.out);
+  });
+  test("a figure of many small labels on a heading's page does not set the page's body size", async () => {
+    // Alpha pathway's diagram given 300 labels at 8 px: on its page, most characters are the
+    // figure's, so a heading read against the page's commonest size took the facts in
+    const labels = Array.from(
+      { length: 300 },
+      (_, i) =>
+        `<text x="${String(10 + (i % 20) * 25)}" y="${String(10 + Math.floor(i / 20) * 10)}" style="font: normal 400 8px Roboto">label number ${String(i)}</text>`
+    ).join('');
+    const figures = folder((stId, svg) =>
+      stId === 'R-HSA-90000200' ? svg.replace('</g></svg>', `${labels}</g></svg>`) : svg
+    );
+    const run = await book([...place(figures).args, '--parallel', '2']);
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+  });
+
+  test("a table's short columns keep their words whole beside a long one", async () => {
+    // an edit's names, 30 of them, beside its date and action; a summation's table of a
+    // name beside a column of prose: the short columns' words are never broken
+    const names = Array.from({ length: 30 }, (_, i) => `Placeholder${String(i + 10)}, P.`).join(
+      '; '
+    );
+    const prose =
+      'catalyses the transfer of a phosphate group in a step of the pathway that is described here at length '.repeat(
+        3
+      );
+    const rows = Array.from(
+      { length: 4 },
+      () => `<tr><td>Phosphofructokinase</td><td>${prose}</td></tr>`
+    ).join('');
+    const plants: [string, string][] = [
+      ['Placeholder09, P.', names],
+      ['A third placeholder summation, first by order.', `<table>${rows}</table>`],
+    ];
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '2'], { open: planting(plants) });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    const pieces: string[] = [];
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if ('str' in item && item.str.trim() !== '') pieces.push(item.str.trim());
+          }
+        }
+      });
+    }
+    // the edit history's header and dates, and the summation's names, each whole
+    assert.ok(pieces.includes('Date') && pieces.includes('Action'), 'no whole header');
+    assert.deepEqual(
+      pieces.filter((p) => /^(Da|Dat|te|Ac|Act|ion|tion)$/.test(p)),
+      []
+    );
+    const dates = pieces.filter((p) => p.startsWith('20') && p.includes('-'));
+    assert.ok(dates.length > 0);
+    for (const date of dates) assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(pieces.filter((p) => p === 'Phosphofructokinase').length, 4);
+    assert.deepEqual(
+      pieces.filter((p) => p !== 'Phosphofructokinase' && p.startsWith('Phospho')),
+      []
+    );
   });
 });
