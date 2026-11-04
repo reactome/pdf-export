@@ -599,7 +599,7 @@ passes.
 
   Tests on fixture PDFs: each part's difference is caught, and no name is printed.
 
-  - **Done (#PR):** `pdf-export compare <reference> <new> [--expected <file>]`, wired into `src/cli.ts`, as contracts/cli.md now has it rather than this task's `<today's folder> <new.pdf>`: the book is a folder of PDFs, so each side is a PDF or a folder, a folder compared file by file by name, and a file on one side only is a difference.
+  - **Done (#165):** `pdf-export compare <reference> <new> [--expected <file>]`, wired into `src/cli.ts`, as contracts/cli.md now has it rather than this task's `<today's folder> <new.pdf>`: the book is a folder of PDFs, so each side is a PDF or a folder, a folder compared file by file by name, and a file on one side only is a difference.
     - **Reading** (`src/compare/read.ts`): pdf.js's lines of text (pieces sharing a baseline), links and figures. A page's top and bottom 50 pt (running headers, page numbers) and the text inside a figure (a vector diagram's labels) are left out. A figure is a cluster of images and painted paths, neither thin nor the whole page, at least 60 pt each way, so a raster diagram and a vector one are both found.
     - **Reducing** (`src/compare/reduce.ts`), with no knowledge of which program wrote the file:
       - the cover: its title (its largest text), a diagram below it, an excerpt note, and its distinct names, counted and hashed (the names are a run of characters joined by U+2060 or no-break spaces where U+2060 is there to read, research R2; otherwise parted by semicolons, as pdf-export writes them);
