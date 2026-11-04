@@ -18,17 +18,35 @@ export class Printer {
   readonly #folder: string;
   #count = 0;
 
-  private constructor(browser: Browser, folder: string) {
+  readonly #onExit: () => void;
+
+  private constructor(browser: Browser, folder: string, onExit: () => void) {
     this.#browser = browser;
     this.#folder = folder;
+    this.#onExit = onExit;
   }
 
   static async start(): Promise<Printer> {
     const folder = mkdtempSync(join(tmpdir(), 'pdf-export-'));
-    try {
-      return new Printer(await chromium.launch(), folder);
-    } catch (error) {
+    // its folder removed as the process exits if it is not closed first (a run stopped by a
+    // signal), from before the browser is launched
+    const onExit = () => {
       rmSync(folder, { recursive: true, force: true });
+    };
+    process.once('exit', onExit);
+    try {
+      // the browser launcher's own signal handlers off: on SIGINT it closes every browser
+      // and exits (130) itself, racing the command's own handler, which must remove its
+      // folder and write its report first (`book`, T029), or close its service (`serve`);
+      // both end the browser through the launcher's exit handler, which stays
+      return new Printer(
+        await chromium.launch({ handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false }),
+        folder,
+        onExit
+      );
+    } catch (error) {
+      process.off('exit', onExit);
+      onExit();
       throw error;
     }
   }
@@ -113,6 +131,7 @@ export class Printer {
       await this.#browser.close();
     } finally {
       rmSync(this.#folder, { recursive: true, force: true });
+      process.off('exit', this.#onExit);
     }
   }
 }

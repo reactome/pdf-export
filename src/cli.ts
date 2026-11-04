@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // pdf-export's command line (contracts/cli.md). Its commands come with spec 001's tasks:
 // serve (T022) runs the single-event service; preflight (T024) runs the book's preflight
-// alone; figures (T046) draws the book's figures into a folder; book, check-book and compare
-// are to come.
+// alone; figures (T046) draws the book's figures into a folder; book (T029) writes the
+// book; check-book and compare are to come.
+import { constants as osConstants } from 'node:os';
+
+import { privateTemporary } from './print/temporary.ts';
 
 export const USAGE = `Usage: pdf-export <command> [options]
 
@@ -36,15 +39,35 @@ export async function serve(args: readonly string[]): Promise<number> {
     process.stderr.write(`${error.message}\n\n${USAGE}`);
     return 2;
   }
-  const service = await startService(settings);
-  process.stderr.write(`serving at ${service.url}\n`);
-  await new Promise<void>((resolve) => {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const)
-      process.once(signal, () => {
-        resolve();
-      });
+  // the process's private temporary folder, first, its removal on exit registered with it:
+  // the printer and every browser it starts write theirs in it (src/print/temporary.ts)
+  const temporary = privateTemporary('serve');
+  // the handlers set before the service is started, as `on`, never `once`: a signal while it
+  // starts, or a second while it closes, exits at once (128 and its number), so the exit
+  // handlers run, the browser launcher's ending its browser and this one removing the
+  // folder; the first once it serves closes it. SIGHUP too: the launcher no longer handles
+  // it (src/print/print.ts)
+  const state: { serving: boolean; stop: () => void } = { serving: false, stop: () => undefined };
+  const stopped = new Promise<void>((resolve) => {
+    state.stop = resolve;
   });
-  await service.close();
+  const onSignal = (signal: NodeJS.Signals) => {
+    if (!state.serving) process.exit(128 + osConstants.signals[signal]);
+    state.serving = false;
+    state.stop();
+  };
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+  for (const signal of signals) process.on(signal, onSignal);
+  try {
+    const service = await startService(settings);
+    state.serving = true;
+    process.stderr.write(`serving at ${service.url}\n`);
+    await stopped;
+    await service.close();
+  } finally {
+    for (const signal of signals) process.off(signal, onSignal);
+    temporary.remove();
+  }
   return 0;
 }
 
@@ -52,6 +75,12 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   if (args[0] === 'serve') {
     process.exitCode = await serve(args.slice(1));
+  } else if (args[0] === 'book') {
+    const { bookCommand } = await import('./book/command.ts');
+    process.exitCode = await bookCommand(args.slice(1), process.env, {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
   } else if (args[0] === 'preflight') {
     const { preflightCommand } = await import('./preflight/command.ts');
     process.exitCode = await preflightCommand(args.slice(1), process.env, {

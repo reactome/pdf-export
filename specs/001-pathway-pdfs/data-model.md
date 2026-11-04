@@ -170,6 +170,12 @@ cause (`unanswered`, `failed`, `refused`, `invalid` or `label`, contracts/figure
 - Release files missing, by name, from the preflight.
 - Characters FR-017's list replaced, by code point and count; characters off the list, by
   code point and stable identifier (a fault in the book, U+FFFD in a PDF made on request).
-- Each stage's time, against research R7's budget.
-- Each FR-011 check, and its result.
+- Each stage's time, against research R7's budget: the preflight's and the parts' wall
+  time, and the figures' reads, the prints, the joins (with links, outline, stamps and
+  save) and the contents' second prints each summed over the slots, so above their wall
+  time where they overlap (T029).
+- The join's settings: `--joins`, `--parallel` and whether object streams are on
+  (research R4).
+- Each FR-011 check, and its result (none until `check-book`, T030).
+- The book's faults, each as `preflight` prints it, and the error that stopped it, if any.
 - No names (FR-013).

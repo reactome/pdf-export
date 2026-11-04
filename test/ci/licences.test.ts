@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 
 import {
   allowed,
@@ -76,8 +76,15 @@ test('an exception that matches nothing installed is reported, to be removed', (
   assert.deepEqual(unusedExceptions([{ name: 'ngx-reactome-style' }]), []);
 });
 
+/** The test's folders, each removed once the file's tests are done. */
+const folders: string[] = [];
+after(() => {
+  for (const folder of folders) rmSync(folder, { recursive: true, force: true });
+});
+
 test('a shipped font without its licence file is an offender, found by its location', () => {
   const root = mkdtempSync(join(tmpdir(), 'licences-'));
+  folders.push(root);
   mkdirSync(join(root, 'node_modules/@fontsource/roboto'), { recursive: true });
   mkdirSync(join(root, 'node_modules/@fontsource/noto-sans'), { recursive: true });
   writeFileSync(join(root, 'node_modules/@fontsource/roboto/OFL.txt'), 'SIL Open Font License 1.1');

@@ -5,7 +5,10 @@
 // done past it, a hanging graph, figure or print among them), a browser that dies, the
 // health answer, and FR-017's characters in the texts and the labels, logged once per PDF.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, describe, test } from 'node:test';
@@ -1137,3 +1140,131 @@ describe('a print stopped by its signal', () => {
     }
   });
 });
+
+/**
+ * Whether a process has a browser among its children (Linux's /proc, its `children` file
+ * needing CONFIG_PROC_CHILDREN; false where it cannot be read).
+ */
+function browserSpawned(pid: number): boolean {
+  let children: string[];
+  try {
+    children = readFileSync(`/proc/${String(pid)}/task/${String(pid)}/children`, 'utf8')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  } catch {
+    return false;
+  }
+  return children.some((child) => {
+    try {
+      return /chrom|headless/i.test(readFileSync(`/proc/${child}/comm`, 'utf8'));
+    } catch {
+      return false;
+    }
+  });
+}
+
+test(
+  'pdf-export serve stops on a signal at any moment: exit 0 once serving, 128 and its number before or while closing, its TMPDIR left empty',
+  { skip: skipWithoutGraph },
+  async () => {
+    // the browser launcher's own handlers are off (src/print/print.ts); serve's own close
+    // the service, and a signal before it serves, or one while it closes, exits at once,
+    // the process's private temporary folder removed as it exits
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const root = mkdtempSync(join(tmpdir(), 'pdfx-serve-'));
+    type Ready = (run: { pid: number; stderr: string; temporary: string }) => boolean;
+    // a folder named so in TMPDIR, or in a folder of its (the process's private one)
+    const made =
+      (prefix: string): Ready =>
+      ({ temporary }) =>
+        readdirSync(temporary, { withFileTypes: true }).some(
+          (entry) =>
+            entry.name.startsWith(prefix) ||
+            (entry.isDirectory() &&
+              readdirSync(join(temporary, entry.name)).some((name) => name.startsWith(prefix)))
+        );
+    const serving: Ready = ({ stderr }) => stderr.includes('serving at');
+    const spawned: Ready = ({ pid }) => browserSpawned(pid);
+    const cases: [string, Ready, NodeJS.Signals[], number][] = [
+      ['SIGINT once serving', serving, ['SIGINT'], 0],
+      ['SIGTERM once serving', serving, ['SIGTERM'], 0],
+      ['SIGHUP once serving', serving, ['SIGHUP'], 0],
+      // as the launcher makes its folders, before it has registered them for removal
+      ...[1, 2].map((n): [string, Ready, NodeJS.Signals[], number] => [
+        `SIGTERM as the launcher's artifacts' folder appears (${String(n)})`,
+        made('playwright-artifacts-'),
+        ['SIGTERM'],
+        143,
+      ]),
+      ...[1, 2].map((n): [string, Ready, NodeJS.Signals[], number] => [
+        `SIGTERM as the browser's profile appears (${String(n)})`,
+        made('playwright_chromiumdev_profile-'),
+        ['SIGTERM'],
+        143,
+      ]),
+      ...[1, 2].map((n): [string, Ready, NodeJS.Signals[], number] => [
+        `SIGTERM as its browser is spawned (${String(n)})`,
+        spawned,
+        ['SIGTERM'],
+        143,
+      ]),
+      ...[1, 2].map((n): [string, Ready, NodeJS.Signals[], number] => [
+        `SIGINT twice once serving (${String(n)})`,
+        serving,
+        ['SIGINT', 'SIGINT'],
+        130,
+      ]),
+    ];
+    try {
+      for (const [name, ready, signals, code] of cases) {
+        const temporary = mkdtempSync(join(root, 'tmp-'));
+        const port = await closedPort();
+        const child = spawn(
+          process.execPath,
+          [
+            fileURLToPath(new URL('../src/cli.ts', import.meta.url)),
+            'serve',
+            ...['--port', String(port), '--files', FILES, '--site', 'https://site.example'],
+            ...['--render', render.url, '--analysis', analysis.url],
+          ],
+          { env: { ...process.env, TMPDIR: temporary }, stdio: ['ignore', 'ignore', 'pipe'] }
+        );
+        let stderr = '';
+        child.stderr.on('data', (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+        const ended = new Promise<void>((resolve) =>
+          child.once('exit', () => {
+            resolve();
+          })
+        );
+        const kill = setTimeout(() => child.kill('SIGKILL'), 60_000);
+        try {
+          const deadline = Date.now() + 60_000;
+          while (!ready({ pid: child.pid ?? 0, stderr, temporary })) {
+            assert.equal(child.exitCode, null, `${name}: ended before it was signalled`);
+            assert.ok(Date.now() < deadline, `${name}: never ready to be signalled`);
+            await new Promise((resolve) => setImmediate(resolve));
+          }
+          // a second signal 20 ms after the first, while the service closes (its browser's
+          // close takes longer), as two sent at once can arrive as one
+          for (const [i, signal] of signals.entries()) {
+            if (i > 0) await new Promise((resolve) => setTimeout(resolve, 20));
+            child.kill(signal);
+          }
+          await ended;
+        } finally {
+          clearTimeout(kill);
+        }
+        assert.deepEqual([child.exitCode, child.signalCode], [code, null], `${name}: ${stderr}`);
+        assert.deepEqual(readdirSync(temporary), [], name);
+      }
+    } finally {
+      await render.close();
+      await analysis.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+);

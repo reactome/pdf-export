@@ -32,6 +32,12 @@ export const FLOOR_PT = 1;
 /** No figure is drawn larger than the render service's own size: a CSS pixel, 0.75 pt. */
 const NATURAL = 0.75;
 
+/**
+ * The figures' SVGs by figureKey, as the layout reads them: a map, or, in the book, the
+ * figures' folder read as each is asked for (src/book/figures.ts).
+ */
+export type FigureSvgs = Pick<ReadonlyMap<string, string>, 'get'>;
+
 /** What the figures are looked up by: one drawing serves every section it is the figure of. */
 export function figureKey(figure: Figure): string {
   return figure.kind === 'ancestor'

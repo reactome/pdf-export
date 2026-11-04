@@ -402,6 +402,52 @@ describe("the book's preflight", { skip }, () => {
     assert.deepEqual(both, ['out', 'err']);
   });
 
+  test("the checks' graph failing to open is exit 2, and a graph failing to close keeps the exit code", async () => {
+    const call = async (open: (settings: GraphSettings) => Graph, figures: string) => {
+      const out: string[] = [];
+      const err: string[] = [];
+      const code = await preflightCommand(
+        ['--files', FILES, '--figures', figures],
+        { NEO4J_URI: process.env['NEO4J_URI'] },
+        { out: (text) => out.push(text), err: (text) => err.push(text), open }
+      );
+      return { code, out: out.join(''), err: err.join('') };
+    };
+    // the second open, the checks', throws at once: an error, not a rejection of the command
+    let opened = 0;
+    const secondThrows = (settings: GraphSettings): Graph => {
+      opened += 1;
+      if (opened === 2) throw new Error('the planted open failure');
+      return openGraph(settings);
+    };
+    const thrown = await call(secondThrows, folder());
+    assert.equal(thrown.code, 2);
+    assert.equal(thrown.out, '');
+    assert.match(thrown.err, /^The preflight stopped: the planted open failure\n$/);
+    // every close rejects, after closing: the exit code is the checks', 0 and then 1
+    const closeRejects = (settings: GraphSettings): Graph => {
+      const real = openGraph(settings);
+      return {
+        read: <T>(query: string, params?: Record<string, unknown>) => real.read<T>(query, params),
+        close: async () => {
+          await real.close();
+          throw new Error('the planted close failure');
+        },
+      };
+    };
+    const clean = await call(closeRejects, folder());
+    assert.equal(clean.code, 0);
+    assert.equal(clean.out, '');
+    assert.equal(
+      clean.err,
+      'The graph did not close: the planted close failure\n'.repeat(2),
+      "both graphs, the start's and the checks'"
+    );
+    const faulty = await call(closeRejects, scratch());
+    assert.equal(faulty.code, 1);
+    assert.equal(faulty.out, 'fault incomplete-folder\n');
+  });
+
   test('pdf-export preflight: exit 0 with no fault, 1 with each fault a line, 2 on bad arguments or no graph', async () => {
     const env: Record<string, string | undefined> = { NEO4J_URI: process.env['NEO4J_URI'] };
     const call = async (args: string[], environment = env) => {

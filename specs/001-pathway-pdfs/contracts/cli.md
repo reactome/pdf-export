@@ -64,9 +64,9 @@ the figures already drawn by `figures`.
 | `--site`     | `REACTOME_SITE`                | the website's address, for links to its pages; never fetched                       |
 | `--species`  |                                | default `Homo sapiens` (spec: the book's scope)                                    |
 | `--out`      |                                | the folder written; default `TheReactomeBook`                                      |
-| `--parallel` |                                | parts printed and PDFs joined at once, the largest PDFs first; default 4           |
-| `--joins`    |                                | of those, PDFs joined at once; default 1 (research R4: T029 raises it if 2 fit)    |
-| `--report`   |                                | where the run report (data-model.md) is written, as JSON                           |
+| `--parallel` |                                | parts printed and PDFs joined at once, largest PDFs first; default 4, at most 64   |
+| `--joins`    |                                | of those, PDFs joined at once; default 1, at most `--parallel` (R4: T031 settles)  |
+| `--report`   |                                | where the run report (data-model.md) is written, as JSON, however the run ends     |
 
 - **The preflight,** before anything is printed (and the character check's second half,
   on reading each figure, below): from the graph and the EHLD summary it
@@ -103,9 +103,27 @@ the figures already drawn by `figures`.
   run is whole: a failure in any PDF writes none, and the step is run again.
 - **Exit 1:** a fault from the preflight or FR-011. The report names each one by stable
   identifier or file name, never a person.
-- **Exit 2:** bad arguments; an `--out` that is not absent or empty, as for `figures`
-  (an old book is never replaced in place); the graph cannot be reached at the start; or
-  any other error during the preflight, as `preflight` exits on one (below).
+- **Exit 2:** bad arguments; a `--report` that exists already (left untouched, and no
+  report written), whose folder cannot be made, or that is inside `--out`; an `--out` that
+  is not absent or empty, as for `figures` (an old book is never replaced in place), that
+  cannot be read, whose folder cannot be written, or that is a symbolic link, on another
+  device than its folder or a mount point (the finished book cannot be moved onto it); the
+  graph cannot be reached at the start; any other error during the preflight, as
+  `preflight` exits on one (below); or any other error while the book is printed (a
+  print or a join that fails, or a PDF refused at its contents, links, outline or
+  stamps), after printing the faults found before it. A refused PDF is never saved, and
+  no other PDF of the run is kept: no book is written.
+- **A signal** (SIGINT, SIGTERM, SIGHUP) stops the run at once, from its start: no book
+  or temporary folder is left, the report is written naming the signal, and the exit is
+  128 and the signal's number. It exits rather than raising the signal again, as the
+  exit handlers that end the browser and remove its folders run only on an exit. A
+  signal while the browser is starting is acted on once it has started, and a second
+  signal then stops the run at once.
+- **A private temporary folder:** the run makes one in TMPDIR at its start and points
+  everything it starts at it (the printer's pages, the browser launcher's folders and the
+  browser itself, by TMPDIR), and removes it, whole, as the process exits, after the
+  launcher has ended the browser; so a signal at any moment leaves nothing in TMPDIR. The
+  browser launcher's own signal handling is off, as in `serve`.
 
 ## `pdf-export preflight`
 
@@ -178,3 +196,9 @@ The single-event service (contracts/service.md).
 | `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                                                                           |
 | `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                                                                                   |
 | `--concurrency`                |                    | PDFs made at once; default 2                                                                                                                                      |
+
+- **Signals:** the handlers are set before the service starts. The first SIGINT, SIGTERM or
+  SIGHUP once it serves closes it and exits 0; one before it serves, or another while it
+  closes, exits at once with 128 and the signal's number. Like `book`, it makes a private
+  temporary folder at its start for the printer and the browsers it starts, removed as
+  the process exits, so it leaves nothing in TMPDIR however it is stopped.

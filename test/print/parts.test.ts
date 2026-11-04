@@ -66,7 +66,8 @@ const THRESHOLD = 1;
 describe('parts', { skip: skipWithoutGraph }, () => {
   let built: Built;
   let started: Printer | undefined;
-  let options: LayoutOptions;
+  // the fixture's figures as a map, which a test copies and changes
+  let options: LayoutOptions & { figures: ReadonlyMap<string, string> };
   /** Each part printed, by its HTML. */
   const printed = new Map<string, Uint8Array>();
   /** Each PDF joined, saved, by its title. */

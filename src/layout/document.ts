@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 
 import type { AnalysisProperties, Document, Found, Place } from '../model/types.ts';
+import type { FigureSvgs } from './figure.ts';
 import { fontFaceCss } from './fonts.ts';
 import {
   FRONT,
@@ -46,7 +47,7 @@ export interface LayoutOptions {
   /** The cover's date. */
   date: Date;
   /** The figures' SVGs, by figureKey. A section whose figure is missing is written without it. */
-  figures: ReadonlyMap<string, string>;
+  figures: FigureSvgs;
   styles: Styles;
   /** A single event's analysis: its properties and what it found, by stable identifier. */
   analysis?: { properties: AnalysisProperties; found: ReadonlyMap<string, Found> } | null;

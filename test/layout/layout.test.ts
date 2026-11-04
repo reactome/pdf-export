@@ -44,7 +44,8 @@ const ids = (html: string) => new Set([...html.matchAll(/\sid="([^"]*)"/g)].map(
 
 describe('the layout', { skip: skipWithoutGraph }, () => {
   let built: Built;
-  let options: LayoutOptions;
+  // the fixture's figures as a map, which a test copies and changes
+  let options: LayoutOptions & { figures: ReadonlyMap<string, string> };
   before(async () => {
     built = await buildFixture();
     options = {

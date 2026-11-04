@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { prefixIds } from '../figures/prefix.ts';
 import type { AnalysisProperties, ContentsEntry, Document } from '../model/types.ts';
-import { coverFigureHtml, figureKey } from './figure.ts';
+import { coverFigureHtml, figureKey, type FigureSvgs } from './figure.ts';
 import { Links, attribute, text } from './html.ts';
 import {
   ABOUT_REACTOME,
@@ -42,12 +42,7 @@ const LOGO = prefixIds(readFileSync(new URL('logo.svg', import.meta.url), 'utf8'
   '<svg role="img" aria-label="Reactome"'
 );
 
-export function coverHtml(
-  doc: Document,
-  links: Links,
-  figures: ReadonlyMap<string, string>,
-  date: Date
-): string {
+export function coverHtml(doc: Document, links: Links, figures: FigureSvgs, date: Date): string {
   const { cover } = doc;
   const parts = [`<div class="logo">${LOGO}</div>`, `<p class="title">${text(cover.title)}</p>`];
   if (cover.release !== null) {
