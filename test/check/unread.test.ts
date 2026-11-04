@@ -3,6 +3,7 @@
 // the contents' reader `book` uses likewise. A file system's error says its message. The
 // planted word stands for a name the book's PDFs hold.
 import assert from 'node:assert/strict';
+import { inspect } from 'node:util';
 import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,11 +31,13 @@ describe('a PDF pdf.js cannot read, its error quoting it', () => {
     assert.ok(error instanceof UnreadPdf, 'not an UnreadPdf');
     // pdf.js's own error quoted the word: the planted PDF is one it reads as intended
     assert.ok(
-      error.cause instanceof Error && error.cause.message.includes(PLANTED),
+      error.pdfError() instanceof Error && (error.pdfError() as Error).message.includes(PLANTED),
       "pdf.js's error did not quote the planted word"
     );
     assert.ok(!error.message.includes(PLANTED), 'the planted word is in its message');
     assert.equal(error.message, `A PDF not read (${error.kind})`);
+    // printed whole, as console.error or an uncaught error prints it: no cause, no word
+    assert.ok(!inspect(error).includes(PLANTED), 'the planted word is in the error printed whole');
   });
 
   /** check-book on a folder of the fixture's book's names, each file written by `write`. */
