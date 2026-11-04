@@ -527,7 +527,7 @@ of pages with today's book.
   that runs before the book's, and the book reads them from that step's folder. The
   step's time on the machine the release gives it is measured and agreed with the
   release's owners (research R7: about 3.5 hours on an 8-core host at concurrency 8, as the render service
-  is today).
+  is today; measured by T031 at 5 h 47 min, which the user accepted on 4 Nov 2026).
 
 ## Assumptions
 
@@ -543,8 +543,9 @@ of pages with today's book.
   is pointed at the new release's graph and makes the folder available to it; a folder
   of another release is not used.
 - **The figures' step:** drawing the figures before the book adds a step of its own,
-  about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). Its
-  machine and time are open, to be agreed with the release's owners (SC-010).
+  about 3.5 hours on an 8-core host at concurrency 8, as the render service is today (research R7, from 200 figures). T031
+  measured 5 h 47 min on this host, which the user accepted on 4 Nov 2026; the release may
+  give it a larger machine (SC-010).
 - **The release's check:** the check of FR-011 joins the release's file-list check,
   which, with the files named as today's, can keep running. Its size tolerance compares
   the new PDFs with `event-pdf`'s at the switch, sizes no one has measured (new look,
