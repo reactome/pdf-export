@@ -575,6 +575,46 @@ describe('what a library writes to the console', () => {
     assert.equal(err, '8 message(s) from a library withheld (TypeError)\n');
   });
 
+  test("each of the console's writing methods is held", async () => {
+    // the list is the test's own, so a method dropped from the code's list fails here
+    const writing = [
+      'log',
+      'info',
+      'warn',
+      'error',
+      'debug',
+      'trace',
+      'dir',
+      'dirxml',
+      'table',
+      'group',
+      'groupCollapsed',
+      'groupEnd',
+      'count',
+      'countReset',
+      'time',
+      'timeEnd',
+      'timeLog',
+      'assert',
+    ];
+    for (const name of writing) {
+      let err = '';
+      const said = await spied(() =>
+        withConsoleHeld(
+          () => {
+            const method = Reflect.get(console, name) as (...args: unknown[]) => void;
+            if (name === 'assert') method.call(console, false, PLANTED);
+            else method.call(console, PLANTED);
+            return Promise.resolve();
+          },
+          (t) => (err += t)
+        )
+      );
+      assert.deepEqual(said, [], name);
+      assert.ok(!err.includes(PLANTED), name);
+    }
+  });
+
   test("the console's members that do not write are left alone", async () => {
     const members = ['Console', 'context', 'createTask', 'profile', 'timeStamp'];
     const before = members.map((name) => Reflect.get(console, name) as unknown);

@@ -11,18 +11,26 @@ export const errorKind = (error: unknown): string => {
 
 /**
  * A PDF pdf.js could not read. Its message names the file, where it is given, and pdf.js's
- * error by its kind (`kind`) alone; pdf.js's own error is its `cause`, never printed.
+ * error by its kind (`kind`) alone. pdf.js's own error is kept in a private field, read
+ * with `pdfError()`, and not as `cause`: Node prints an error's `cause` wherever it prints
+ * the error whole (`console.error`, an uncaught error), enumerable or not, and pdf.js's
+ * message may quote the file.
  */
 export class UnreadPdf extends Error {
   override name = 'UnreadPdf';
   /** pdf.js's error's kind and code. */
   readonly kind: string;
+  readonly #error: unknown;
 
-  constructor(cause: unknown, path?: string) {
-    const kind = errorKind(cause);
-    super(path === undefined ? `A PDF not read (${kind})` : `${path} not read (${kind})`, {
-      cause,
-    });
+  constructor(error: unknown, path?: string) {
+    const kind = errorKind(error);
+    super(path === undefined ? `A PDF not read (${kind})` : `${path} not read (${kind})`);
     this.kind = kind;
+    this.#error = error;
+  }
+
+  /** pdf.js's own error, for a debugger: never to be printed. */
+  pdfError(): unknown {
+    return this.#error;
   }
 }
