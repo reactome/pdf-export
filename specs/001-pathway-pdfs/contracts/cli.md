@@ -238,7 +238,8 @@ pathway, and a file on one side only is reported as a difference.
   - **What may be printed:** no text read from a PDF is printed unless it has one of these
     shapes: a count, yes or no, a release number, one of a fixed list (the analysis's
     types and resources, the parts, fields and kinds), a stable identifier
-    (`R-[A-Z]{3}-\d+`), an analysis token of the form the analysis service issues, or one
+    (`R-[A-Z]{3}-\d+`), an analysis token of the form the analysis service issues (printed
+    in its one canonical form, so copies encoded otherwise are one token), or one
     of Reactome's species. Anything else is printed as a hash and a length, and the
     cover's names as a count and a hash (FR-013). The hashes are salted once a run, so
     they say which values are equal within a report and cannot be checked against a
@@ -260,8 +261,11 @@ pathway, and a file on one side only is reported as a difference.
 - **`--reference-margin <pt>`:** the depth of the bands at the top and bottom of the
   reference's pages read as margins (running headers, page numbers), 50 by default, as
   pdf-export's own; T040 sets it for `event-pdf`'s files from their real margins.
-- **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments or
-  a reference and a new side not both PDFs or both folders.
+- **Standard error:** paths, and an error's kind and code, never its message. pdf.js's
+  warnings, which quote a file's content, are off, and anything a library writes to the
+  console during a comparison is withheld: counted, with the kinds of the errors it passed.
+- **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments, a
+  path that does not exist, or a reference and a new side not both PDFs or both folders.
 - **What it does not know yet:** the reducer reads parts by their labels, pdf-export's
   and other words for them; `event-pdf`'s own labels, margins, contents form and names'
   separator are not known here, and are for T040 to add from its real files. A label not

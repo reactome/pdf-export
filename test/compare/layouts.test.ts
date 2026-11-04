@@ -105,6 +105,7 @@ ${label ? `<p>${label}</p>` : ''}
     for (const [name, heading, label] of [
       ['a section labelled Identifier:, under its heading', true, 'Identifier: R-HSA-9000001'],
       ['a section labelled Identifier:, with no heading', false, 'Identifier: R-HSA-9000001'],
+      ['a section under its heading, with no stable identifier', true, ''],
       ['text with neither a heading nor a stable identifier', false, ''],
     ] as const) {
       test(name, async () => {
@@ -135,6 +136,28 @@ ${label ? `<p>${label}</p>` : ''}
         }
       });
     }
+  });
+
+  test('a table with a shaded header and hairline borders is read, not taken as a figure', async () => {
+    const rows = Array.from(
+      { length: 8 },
+      (_, i) => `<tr><td>P0000${String(i)}</td><td>P0000${String(i)}</td><td>UniProt</td></tr>`
+    ).join('');
+    const read = await reduced(
+      page(
+        `<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p><p>A summation, written for these tests.</p>
+<p>Entities found</p>
+<table style="border-collapse: collapse; width: 100%"><tr style="background: #dddddd"><th>Identifier</th><th>Maps to</th><th>Resource</th></tr>${rows}</table>
+</section>`,
+        'td, th { border: 0.5pt solid #888888; padding: 2pt 4pt; text-align: left }'
+      )
+    );
+    assert.equal(read.sections.length, 1);
+    const section = read.sections[0];
+    assert.equal(section?.figure, 'none');
+    assert.equal(section.parts.find((p) => p.part === 'entities')?.items.length, 8);
   });
 
   test('a reference laid out unlike the sample: facts in a table, contents first, vector figures, numbered references in brackets', async () => {

@@ -9,11 +9,12 @@
 // - **Links:** each link's box, its address or where in the PDF it lands.
 // - **Figures:** the boxes of what is drawn: images, and painted paths that are neither thin
 //   (a rule, a table's border) nor the whole page, clustered where they lie within
-//   FIGURE_GAP_PT of each other, a thin path joining only the clusters it touches (a
-//   diagram's connector); a cluster at least FIGURE_MIN_PT each way is a figure. A raster
-//   diagram is one image; a vector one is many paths. A table drawn with thick or shaded
-//   cells could be read as one, its text then left out (for T040 to check on `event-pdf`).
-import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
+//   FIGURE_GAP_PT of each other, a line of thin paths joining the clusters it touches only
+//   where it touches two or more (a diagram's connector, never a table's borders); a cluster
+//   at least FIGURE_MIN_PT each way is a figure. A raster diagram is one image; a vector one
+//   is many paths. A table with thick borders or shaded rows near one another could be read
+//   as one, its text then left out (for T040 to check on `event-pdf`).
+import { getDocument, OPS, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 /**
  * The bands at a page's top and bottom read as margins, by default: within pdf-export's 20 mm
@@ -194,12 +195,19 @@ function clustered(boxes: readonly Box[], gap: number): Box[] {
   return clusters;
 }
 
+/** The shapes a thin path joins must be at least this big each way, as a diagram's nodes are. */
+const NODE_PT = 4;
+
+/** How near a thin path must come to a shape to touch it. */
+const TOUCH_PT = 1;
+
 /**
  * The figures among a page's shapes. The shapes that are neither thin nor all of the page
- * are clustered within FIGURE_GAP_PT; a thin shape (a diagram's connector, a line drawn as
- * a path) joins a cluster only where it touches one, so a rule or a table's border near a
- * figure is not taken in, while a connector bridges the shapes it joins. A cluster at least
- * FIGURE_MIN_PT each way is a figure.
+ * are clustered within FIGURE_GAP_PT. Thin paths that touch one another are one line (a
+ * connector drawn in segments); a line joins the clusters it touches only where it touches
+ * two or more, each at least NODE_PT each way, as a connector joins a diagram's nodes. A
+ * table's hairline borders, which touch at most its one shaded header, join nothing, nor
+ * does a rule beside a figure. A cluster at least FIGURE_MIN_PT each way is a figure.
  */
 export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
   const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
@@ -208,12 +216,33 @@ export function figureBoxes(boxes: readonly Box[], width: number, height: number
     kept.filter((b) => !thin(b)),
     FIGURE_GAP_PT
   );
-  let lines = kept.filter(thin);
-  for (let joined = true; joined && clusters.length > 0;) {
-    const touching = lines.filter((line) => clusters.some((c) => near(c, line, 1)));
-    joined = touching.length > 0;
-    lines = lines.filter((line) => !touching.includes(line));
-    if (joined) clusters = clustered([...clusters, ...touching], 1);
+  // the thin paths, as lines of paths that touch
+  const lines = kept.filter(thin);
+  const group = lines.map((_, i) => i);
+  const root = (i: number): number => {
+    let r = i;
+    while (group[r] !== r) r = group[r] ?? r;
+    group[i] = r;
+    return r;
+  };
+  for (let a = 0; a < lines.length; a++) {
+    for (let b = a + 1; b < lines.length; b++) {
+      const [la, lb] = [lines[a], lines[b]];
+      if (la && lb && near(la, lb, TOUCH_PT)) group[root(a)] = root(b);
+    }
+  }
+  const joined = new Map<number, Box[]>();
+  lines.forEach((line, i) => {
+    joined.set(root(i), [...(joined.get(root(i)) ?? []), line]);
+  });
+  for (const paths of joined.values()) {
+    const node = (c: Box) => c.x2 - c.x1 >= NODE_PT && c.y2 - c.y1 >= NODE_PT;
+    const touched = clusters.filter(
+      (c) => node(c) && paths.some((path) => near(c, path, TOUCH_PT))
+    );
+    if (touched.length < 2) continue;
+    const merged = [...touched, ...paths].reduce(union);
+    clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
   }
   clusters = clustered(clusters, FIGURE_GAP_PT);
   return clusters.filter((c) => c.x2 - c.x1 >= FIGURE_MIN_PT && c.y2 - c.y1 >= FIGURE_MIN_PT);
@@ -296,7 +325,8 @@ export async function readLayout(
   { margin = MARGIN_BAND_PT }: { margin?: number } = {}
 ): Promise<Layout> {
   // not copied: pdf.js takes the buffer it is given, which the caller gives up
-  const task = getDocument({ data });
+  // pdf.js's warnings off: they quote the file's content (`Unknown command "…"`)
+  const task = getDocument({ data, verbosity: VerbosityLevel.ERRORS });
   try {
     const doc = await task.promise;
     const layout: Layout = { pages: [], lines: [], links: [], figures: [] };

@@ -24,7 +24,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { printedDocument } from '../book/book.ts';
 import {
@@ -177,7 +177,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** A PDF's text, links and outline, read with pdf.js. */
 async function readPdf(path: string): Promise<Read> {
-  const task = getDocument({ data: new Uint8Array(readFileSync(path)) });
+  // pdf.js's warnings off: they quote the file's content, and the book holds names
+  const task = getDocument({
+    data: new Uint8Array(readFileSync(path)),
+    verbosity: VerbosityLevel.ERRORS,
+  });
   try {
     const doc = await task.promise;
     const pieces: Piece[] = [];

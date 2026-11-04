@@ -25,7 +25,7 @@ import {
   type PDFContext,
   type PDFObject,
 } from '@cantoo/pdf-lib';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { layoutBookFront, type LayoutOptions } from '../layout/document.ts';
 import { probeTargets, type Target } from './links.ts';
@@ -57,7 +57,8 @@ export interface Landed {
 /** Where each target landed in a PDF, from its named destinations. */
 export async function landed(pdf: Uint8Array, targets: Iterable<string>): Promise<Landed> {
   // pdf.js may take the buffer over, so it is given a copy
-  const task = getDocument({ data: pdf.slice() });
+  // pdf.js's warnings off: they quote the file's content, which holds names
+  const task = getDocument({ data: pdf.slice(), verbosity: VerbosityLevel.ERRORS });
   try {
     const doc = await task.promise;
     const pages = new Map<string, number>();

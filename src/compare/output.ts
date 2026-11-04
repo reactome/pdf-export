@@ -117,8 +117,8 @@ export function shaped(value: unknown, shape: Shape): string | number | null {
       return oneOf(read, SPECIES);
     case 'token':
       try {
-        canonicalToken(read);
-        return read;
+        // in its one canonical form: copies encoded otherwise are one token
+        return canonicalToken(read);
       } catch {
         return null;
       }

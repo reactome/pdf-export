@@ -482,11 +482,42 @@ export function compareSettings(args: readonly string[]): CompareSettings {
 }
 
 /** An error as it may be printed: its kind and code, never its message, which may quote a file. */
-const errorKind = (error: unknown): string => {
+export const errorKind = (error: unknown): string => {
   if (!(error instanceof Error)) return 'error';
   const code = (error as { code?: unknown }).code;
   return typeof code === 'string' && /^[A-Z_]+$/.test(code) ? `${error.name} ${code}` : error.name;
 };
+
+const CONSOLE = ['log', 'info', 'warn', 'error', 'debug'] as const;
+
+/**
+ * `run`, with the console's methods held for its length: a library writing to the console
+ * (pdf.js's warnings quote a file's content) is not printed, only counted, and said once on
+ * standard error with the kinds of the errors it passed, never its words.
+ */
+export async function withConsoleHeld<T>(
+  run: () => Promise<T>,
+  err: (text: string) => void
+): Promise<T> {
+  // the methods as they are, put back as they were
+  const saved = CONSOLE.map((name) => [name, Reflect.get(console, name) as unknown] as const);
+  let count = 0;
+  const kinds = new Set<string>();
+  const held = (...args: unknown[]) => {
+    count++;
+    for (const arg of args) if (arg instanceof Error) kinds.add(errorKind(arg));
+  };
+  for (const name of CONSOLE) console[name] = held;
+  try {
+    return await run();
+  } finally {
+    for (const [name, method] of saved) Reflect.set(console, name, method);
+    if (count > 0) {
+      const of = kinds.size > 0 ? ` (${[...kinds].sort().join(', ')})` : '';
+      err(`${String(count)} message(s) from a library withheld${of}\n`);
+    }
+  }
+}
 
 /**
  * `pdf-export compare <reference> <new> [--expected <file>] [--reference-margin <pt>]`: the
@@ -513,12 +544,17 @@ export async function compareCommand(
   }
   let result: { differences: Difference[]; unmatched: number[] };
   try {
-    const found = await comparePaths(settings.reference, settings.neu, {
-      referenceMargin: settings.referenceMargin,
-      unreadable: (path, error) => {
-        err(`Not read: ${path} (${errorKind(error)})\n`);
-      },
-    });
+    const { reference, neu, referenceMargin } = settings;
+    const found = await withConsoleHeld(
+      () =>
+        comparePaths(reference, neu, {
+          referenceMargin,
+          unreadable: (path, error) => {
+            err(`Not read: ${path} (${errorKind(error)})\n`);
+          },
+        }),
+      err
+    );
     result = applyRecorded(found, recorded);
   } catch (error) {
     err(

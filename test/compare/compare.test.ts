@@ -406,7 +406,8 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       writeFileSync(join(news, 'Whole.pdf'), ours);
       const { code, out, err } = await run([refs, news]);
       assert.equal(code, 1);
-      assert.match(err, /^Not read: .*Broken\.pdf \(\w+/);
+      // the error's kind alone, never its message
+      assert.match(err, /^Not read: .*Broken\.pdf \([A-Za-z]+(?: [A-Z_]+)?\)\n$/);
       assertNoName(out + err, 'the report of an unreadable file');
       const report = JSON.parse(out) as { differences: Difference[] };
       assert.deepEqual(

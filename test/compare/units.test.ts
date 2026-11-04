@@ -6,7 +6,20 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { applyRecorded, commonSubsequence, compareReduced } from '../../src/compare/compare.ts';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { PDFDocument, PDFOperator, type PDFOperatorNames } from '@cantoo/pdf-lib';
+
+import {
+  applyRecorded,
+  commonSubsequence,
+  compareCommand,
+  compareReduced,
+  errorKind,
+  withConsoleHeld,
+} from '../../src/compare/compare.ts';
 import {
   Output,
   SPECIES,
@@ -16,6 +29,7 @@ import {
 } from '../../src/compare/output.ts';
 import {
   figureBoxes,
+  readLayout,
   type Box,
   type Layout,
   type Line,
@@ -444,5 +458,170 @@ describe('the constants a layout is read by', () => {
     ];
     assert.equal(figureBoxes(two(20), 595, 842).length, 1);
     assert.equal(figureBoxes(two(45), 595, 842).length, 2);
+  });
+});
+
+describe('what a library writes to the console', () => {
+  const PLANTED = 'PlaceholderPersonJaneQExample';
+
+  /** A PDF whose page's content holds the planted word as an operator pdf.js does not know. */
+  async function planted(): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    doc.addPage().pushOperators(PDFOperator.of(PLANTED as unknown as PDFOperatorNames));
+    return doc.save();
+  }
+
+  /** What reaches the console and standard error while `run` runs, and what it returns. */
+  async function captured<T>(run: () => Promise<T>): Promise<{ text: string; value: T }> {
+    let text = '';
+    const warn = Reflect.get(console, 'warn') as unknown;
+    const log = Reflect.get(console, 'log') as unknown;
+    const write = Reflect.get(process.stderr, 'write') as unknown;
+    const keep = (...args: unknown[]) => {
+      text += args.map(String).join(' ');
+    };
+    Reflect.set(console, 'warn', keep);
+    Reflect.set(console, 'log', keep);
+    Reflect.set(process.stderr, 'write', (chunk: unknown) => {
+      text += String(chunk);
+      return true;
+    });
+    try {
+      const value = await run();
+      return { text, value };
+    } finally {
+      Reflect.set(console, 'warn', warn);
+      Reflect.set(console, 'log', log);
+      Reflect.set(process.stderr, 'write', write);
+    }
+  }
+
+  test('pdf.js reads a PDF quoting its content without a word: its warnings are off', async () => {
+    const bytes = await planted();
+    let said = '';
+    const warn = Reflect.get(console, 'warn') as unknown;
+    Reflect.set(console, 'warn', (...args: unknown[]) => {
+      said += args.map(String).join(' ');
+    });
+    try {
+      await readLayout(bytes);
+    } finally {
+      Reflect.set(console, 'warn', warn);
+    }
+    assert.ok(!said.includes(PLANTED), 'pdf.js printed the planted word');
+  });
+
+  test('compare prints none of it, on standard error or the console', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'pdf-export-console-'));
+    try {
+      const file = join(folder, 'planted.pdf');
+      writeFileSync(file, await planted());
+      let err = '';
+      let out = '';
+      const { text } = await captured(() =>
+        compareCommand([file, file], { out: (t) => (out += t), err: (t) => (err += t) })
+      );
+      assert.ok(!(text + err + out).includes(PLANTED), 'the planted word was printed');
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  test("a library's console messages are held while compare runs: counted, kinds only", async () => {
+    let err = '';
+    const warn = Reflect.get(console, 'warn') as unknown;
+    await withConsoleHeld(
+      () => {
+        console.warn(`Unknown command "${PLANTED}"`);
+        console.error(new TypeError(`no ${PLANTED}`));
+        return Promise.resolve();
+      },
+      (t) => (err += t)
+    );
+    assert.equal(err, '2 message(s) from a library withheld (TypeError)\n');
+    assert.equal(Reflect.get(console, 'warn'), warn);
+    assert.equal(errorKind(new RangeError(PLANTED)), 'RangeError');
+    const coded = Object.assign(new Error(PLANTED), { code: 'ENOENT' });
+    assert.equal(errorKind(coded), 'Error ENOENT');
+  });
+});
+
+describe('figures and tables', () => {
+  const square = (x: number, y: number, side = 70): Box => ({
+    page: 0,
+    x1: x,
+    y1: y,
+    x2: x + side,
+    y2: y + side,
+  });
+
+  test('a connector joins the shapes at its two ends into one figure', () => {
+    const connector: Box = { page: 0, x1: 170, y1: 134.75, x2: 230, y2: 135.25 };
+    assert.equal(figureBoxes([square(100, 100), square(230, 100)], 595, 842).length, 2);
+    assert.equal(figureBoxes([square(100, 100), connector, square(230, 100)], 595, 842).length, 1);
+  });
+
+  test('a rule between two figures, touching neither, joins nothing', () => {
+    const rule: Box = { page: 0, x1: 60, y1: 219.75, x2: 500, y2: 220.25 };
+    assert.equal(figureBoxes([square(100, 130), rule, square(100, 240)], 595, 842).length, 2);
+  });
+
+  test('a rule from a figure to a mark too small to be a node does not widen the figure', () => {
+    const rule: Box = { page: 0, x1: 170, y1: 134.75, x2: 500, y2: 135.25 };
+    const mark: Box = { page: 0, x1: 500, y1: 133.5, x2: 503, y2: 136.5 };
+    const [figure] = figureBoxes([square(100, 100), rule, mark], 595, 842);
+    assert.equal(figure?.x2, 170);
+  });
+
+  test("a table's shaded header and hairline borders are not a figure", () => {
+    const shapes: Box[] = [{ page: 0, x1: 60, y1: 600, x2: 540, y2: 616 }];
+    for (let row = 0; row <= 9; row++) {
+      const y = 616 - row * 16;
+      shapes.push({ page: 0, x1: 60, y1: y - 0.25, x2: 540, y2: y + 0.25 });
+    }
+    for (const x of [60, 220, 380, 540]) {
+      shapes.push({ page: 0, x1: x - 0.25, y1: 472, x2: x + 0.25, y2: 616 });
+    }
+    assert.equal(figureBoxes(shapes, 595, 842).length, 0);
+  });
+});
+
+describe('the analysis and the cover, by their meaning', () => {
+  const reduced = (rows: string[]) =>
+    reduce({
+      pages: [0, 1].map(() => ({ width: 595, height: 842 })),
+      lines: [
+        { page: 1, y: 790, x: 57, size: 18, text: 'Analysis' },
+        ...rows.map((text, i) => ({ page: 1, y: 770 - i * 14, x: 57, size: 10.5, text })),
+      ],
+      links: [],
+      figures: [],
+    }).analysis ?? {};
+
+  test('identifiers found as `x of y` are counts; any other form is withheld whole', () => {
+    assert.deepEqual(reduced(['Identifiers found: 3 of 5']), {
+      identifiersFound: { value: 3 },
+      identifiersTotal: { value: 5 },
+    });
+    const odd = reduced(['Identifiers found: 3 of 5 of 7']);
+    assert.ok(!('value' in (odd['identifiersFound'] ?? { value: 0 })), 'kept as a value');
+  });
+
+  test('a token encoded otherwise is the same token, printed in its one form', () => {
+    const twice = TOKEN.replaceAll('%3D', '%253D');
+    assert.deepEqual(reduced([`Token: ${twice}`]), reduced([`Token: ${TOKEN}`]));
+    assert.equal(new Output('x').value('analysis token', twice), TOKEN);
+  });
+
+  test("a cover's title is said to be its file's name, or not, side by side", () => {
+    const titled = (title: string): Reduced => ({
+      ...sections(),
+      cover: { ...sections().cover, title: { hash: hash(title), length: title.length } },
+    });
+    const [d] = compareReduced('Alpha.pdf', titled('Alpha'), titled('Beta'), {
+      reference: 'today/Alpha.pdf',
+      new: 'new/Alpha.pdf',
+    });
+    assert.deepEqual([d?.reference, d?.new], ['same', 'differs']);
   });
 });
