@@ -585,6 +585,11 @@ passes.
 
   Record the outcome here.
 
+- [x] T049 [US6] Every figure in the portrait text, never on a landscape page (FR-016, research R4; the user's decision, 4 Nov 2026, from T031's book). — #179.
+  - **Why:** T008's rule gave a figure a landscape page of its own wherever that printed it larger. Release 98's reactions are wide, short strips, so nearly every one took a mostly blank page, and the book was 41,993 pages against `event-pdf`'s 23,541. Trial runs on the same graph and figures: reactions in the column, 24,251 pages; every figure in the column, 21,538 pages (the user's choice: readers zoom, or follow the figure's link).
+  - **Done:** `place()` (`src/layout/figure.ts`) scales a figure to the text column, at most its own size, with no orientation; `LANDSCAPE`, the `landscape` placement, the `figure landscape` class, `pages.css`'s named page `wide` and the page estimate's landscape branch (`src/print/parts.ts`) are gone.
+  - **Tests:** a wide figure is scaled to the text's width and its HTML has no landscape class (`test/layout/figure.test.ts`); printed, a wide figure shares its page with text and no page is turned (`test/layout/print.test.ts`); the page estimate's boundary and largest-first tests no longer rest on landscape figures (`test/print/parts.test.ts`); the stamps' placement is checked on every page, not on landscape ones (`test/print/stamp.test.ts`).
+
 ---
 
 ## Phase 6: User Story 3 — figures in the new website's look (P2)

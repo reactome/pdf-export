@@ -203,7 +203,7 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     }
   });
 
-  test("placed, sized and centred as a single PDF's margin boxes, portrait and landscape", async () => {
+  test("placed, sized and centred as a single PDF's margin boxes, on every page", async () => {
     // the single PDF's header's baseline from the page's top, its number's from the bottom
     const boxes = single.slice(1).map((page) => {
       const [header, number] = [page.header[0], page.footer[0]];
@@ -212,11 +212,9 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
     });
     const [first] = boxes;
     assert.ok(first);
-    let landscape = 0;
     for (const [name, { after }] of stamped) {
       for (const [i, page] of (await pagesOf(after)).entries()) {
         if (i === 0) continue;
-        if (page.width > page.height) landscape += 1;
         const label = `${name}, page ${String(i + 1)}`;
         for (const [items, fromEdge, expected] of [
           [page.header, (item: Item) => page.height - item.y, first.top],
@@ -233,8 +231,6 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
         }
       }
     }
-    // Gamma's landscape figures' pages, stamped as a portrait page is
-    assert.ok(landscape >= 2, String(landscape));
   });
 
   test("in the theme's colour and size, in an embedded subset of Roboto", async () => {
@@ -320,14 +316,11 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
   });
 
   test('the stamps put ink in the margins, which were blank, and none on the cover', async () => {
-    let landscape = 0;
     for (const [name, { before, after }] of stamped) {
       const pages = await pagesOf(after);
-      for (const [i, page] of pages.entries()) {
-        // the cover, the first page after it, and every landscape page
-        const wide = page.width > page.height;
-        if (i > 1 && !wide) continue;
-        if (wide) landscape += 1;
+      for (const i of pages.keys()) {
+        // the cover, the first page after it, and the last
+        if (i > 1 && i < pages.length - 1) continue;
         const label = `${name}, page ${String(i + 1)}`;
         assert.deepEqual(await inkInMargins(before, i + 1), { top: 0, bottom: 0 }, label);
         const ink = await inkInMargins(after, i + 1);
@@ -335,7 +328,6 @@ describe('page numbers and running headers', { skip: skipWithoutGraph }, () => {
         else assert.ok(ink.top > 20 && ink.bottom > 5, `${label}: ${JSON.stringify(ink)}`);
       }
     }
-    assert.ok(landscape >= 2, String(landscape));
   });
 
   test("a pathway's name is stamped after FR-017's substitutions", async () => {

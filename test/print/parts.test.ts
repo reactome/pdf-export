@@ -172,8 +172,8 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test('the pages estimated are the pages printed: each section alone, and each PDF', async () => {
-    // a section alone prints its estimate rounded up (Gamma's two landscape figures, three
-    // pages and two, among them); a PDF's sections together, within a page
+    // a section alone prints its estimate rounded up; a PDF's sections together, within a
+    // page
     const sizes = figureSizes(options.figures);
     const printer = started;
     assert.ok(printer);
@@ -202,22 +202,22 @@ describe('parts', { skip: skipWithoutGraph }, () => {
 
   test('a figure as tall as the text area prints no page more, and is estimated', async () => {
     // a section with text after its figure (Reaction one: a summation, references), its
-    // figure drawn as tall as the text area allows: landscape, 1,300 by 900, and portrait,
-    // 600 by 1,400; each page holds text, the figure's own a label
+    // figure drawn as tall as the text area allows: 600 by 1,400, and 1,000 by 1,600, which
+    // is wide too; each page holds text, the figure's own a label
     const alpha = bookPdf(built, 'Alpha pathway');
     const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
     assert.ok(place?.full && place.section.figure);
     const key = figureKey(place.section.figure);
     const printer = started;
     assert.ok(printer);
-    for (const [width, height, landscape] of [
-      [1300, 900, true],
-      [600, 1400, false],
+    for (const [width, height] of [
+      [600, 1400],
+      [1000, 1600],
     ] as const) {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}"><rect width="${String(width)}" height="${String(height)}" fill="#eee"/><text x="20" y="40" font-size="12">tall figure</text></svg>`;
       const figures = new Map(options.figures).set(key, svg);
       const sizes = figureSizes(figures);
-      assert.equal(sizes(place.section.figure)?.landscape, landscape);
+      assert.ok(Math.abs((sizes(place.section.figure)?.height ?? 0) - PORTRAIT.height) < 1e-6);
       const pages = await pagesOf(
         await printer.part(layoutBookPart(alpha, [place], { ...options, figures }).html)
       );
@@ -233,22 +233,17 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test("a figure's link is as wide as the figure, not the text, and centred", async () => {
-    // Reaction one's figure, narrower than the text, in portrait, and drawn again 1,000 by
-    // 900 with 8 px labels, which prints on a landscape page narrower than its text: each
-    // link's rectangle is its figure's, centred on the page, told from the name's link to
-    // the same page by its height
+    // Reaction one's figure, narrower than the text, and drawn again 600 by 1,400, as tall
+    // as the text and narrower than it: each link's rectangle is its figure's, centred on
+    // the page, told from the name's link to the same page by its height
     const alpha = bookPdf(built, 'Alpha pathway');
     const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
     assert.ok(place?.full && place.section.figure);
     const key = figureKey(place.section.figure);
     const printer = started;
     assert.ok(printer);
-    const wide = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900"><rect width="1000" height="900" fill="#eee"/><text x="20" y="40" font-size="8">wide figure</text></svg>`;
-    for (const [figures, landscape] of [
-      [options.figures, false],
-      [new Map(options.figures).set(key, wide), true],
-    ] as const) {
-      assert.equal(figureSizes(figures)(place.section.figure)?.landscape, landscape);
+    const tall = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1400"><rect width="600" height="1400" fill="#eee"/><text x="20" y="40" font-size="8">tall figure</text></svg>`;
+    for (const figures of [options.figures, new Map(options.figures).set(key, tall)]) {
       const html = layoutBookPart(alpha, [place], { ...options, figures }).html;
       const figure =
         /<a class="figure-link" href="([^"]*)"><svg\b[^>]*\swidth="([\d.]+)pt" height="([\d.]+)pt"/.exec(
@@ -258,8 +253,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
       const href = figure[1].replace(/&amp;/g, '&');
       const width = Number(figure[2]);
       const height = Number(figure[3]);
-      const text = landscape ? PORTRAIT.height : PORTRAIT.width;
-      assert.ok(width < text - 50, String(width));
+      assert.ok(width < PORTRAIT.width - 50, String(width));
       const task = getDocument({ data: (await printer.part(html)).slice() });
       try {
         const doc = await task.promise;
@@ -279,8 +273,8 @@ describe('parts', { skip: skipWithoutGraph }, () => {
         const { rect, pageWidth } = rects[0] ?? { rect: [], pageWidth: 0 };
         const [x1 = 0, , x2 = 0] = rect;
         assert.ok(Math.abs(x2 - x1 - width) < 2, `${String(x2 - x1)} for ${String(width)}`);
-        // landscape on a landscape page; centred, as the margins are the same each side
-        assert.equal(pageWidth > 800, landscape, String(pageWidth));
+        // on an upright page; centred, as the margins are the same each side
+        assert.ok(pageWidth < 600, String(pageWidth));
         const centre = (x1 + x2) / 2;
         assert.ok(
           Math.abs(centre - pageWidth / 2) < 2,
@@ -311,9 +305,10 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test('a part ends at the boundary where it reaches the threshold, not after', () => {
-    // a section with a landscape figure and nothing after it: exactly two pages
+    // a section with nothing after its figure, the figure with its margins (20 pt,
+    // pages.css) as tall as the text area: its heading's page, and the figure's, exactly
     const gamma = bookPdf(built, 'Gamma pathway');
-    const sizes = figureSizes(options.figures);
+    const sizes = () => ({ height: PORTRAIT.height - 20 });
     const two = gamma.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000310');
     assert.ok(two);
     assert.equal(estimatePages(two, sizes), 2);
@@ -348,7 +343,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
       },
     });
     assert.equal(most, 3);
-    // the first join (Gamma's, the largest PDF printed first) starts before the later
+    // the first join (the largest PDF's, printed first) starts before the later
     // PDFs' prints are all started
     assert.ok(events.indexOf('join') < events.lastIndexOf('print'), events.join(' '));
   });
@@ -417,7 +412,14 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test('the largest PDF, by its estimated pages, is printed first', async () => {
-    // Gamma, its two landscape figures making it the largest, before Alpha and beta
+    // Gamma, its figures drawn as tall as the text area making it the largest, before Alpha
+    // and beta
+    const gamma = bookPdf(built, 'Gamma pathway');
+    const tall = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1400"><rect width="600" height="1400" fill="#eee"/><text x="20" y="40" font-size="12">tall</text></svg>`;
+    const figures = new Map(options.figures);
+    for (const place of gamma.places) {
+      if (place.full && place.section.figure) figures.set(figureKey(place.section.figure), tall);
+    }
     const titles: string[] = [];
     const blank = await blankPrinter(0);
     await printBook(built.book, {
@@ -427,7 +429,7 @@ describe('parts', { skip: skipWithoutGraph }, () => {
           return blank.part(html);
         },
       },
-      layout: options,
+      layout: { ...options, figures },
       settings: { threshold: THRESHOLD, parallel: 1, joins: 1 },
       joined: () => Promise.resolve(),
     });

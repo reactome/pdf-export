@@ -434,11 +434,12 @@ of pages with today's book.
   - a running header naming the top-level pathway (in the book) or the event (in a
     single-event PDF), or on front pages (introduction, analysis properties,
     contents) that part's name, and a page number on every page but the cover;
-  - no figure split across pages, and each printed as large as the page allows: in the
-    portrait text, or on a landscape page of its own where that prints it larger (user's
-    decision, 3 Nov 2026: at release 98 most diagrams' labels print below 5 pt on any page,
-    as today's book's do, and are read by zooming or on the website); a figure whose labels
-    print below the size the plan sets for the run report is listed there;
+  - no figure split across pages, and each printed in the portrait text, as large as the
+    text column allows, never on a page turned for it (user's decision, 4 Nov 2026,
+    replacing that of 3 Nov, which gave a wide figure a landscape page of its own: that
+    doubled the book's pages, and a reader zooms in, or follows the figure's link to the
+    website); a figure whose labels print below the size the plan sets for the run report
+    is listed there;
   - a cover in the website's style (User Story 6, scenario 3).
 - **FR-017**: Characters no embedded typeface draws (user's decision, 30 Oct 2026), in
   the text the layout writes and in the figures' labels alike:

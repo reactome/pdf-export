@@ -5,15 +5,11 @@
  * and no elevation (the theme's shadows use colours outside its palette, SC-009).
  */
 
-/* The same margins on every page, a landscape figure's page included. */
+/* The same margins on every page. */
 @page {
   size: A4;
   margin: 20mm;
 }
-@page wide {
-  size: A4 landscape;
-}
-
 html {
   /*
    * Roboto, then the Noto fonts for what it lacks (FR-015). Noto Sans Symbols 2 comes before
@@ -179,7 +175,6 @@ h6 {
 /*
  * A figure is never split across pages. Chromium moves an SVG no taller than a page to the
  * next page whole, and figure.ts makes none taller; break-inside keeps the wrapper with it.
- * A wide one takes a landscape page of its own.
  */
 .figure {
   break-inside: avoid;
@@ -199,10 +194,6 @@ h6 {
 .figure-link {
   width: fit-content;
   margin: 0 auto;
-}
-.figure.landscape {
-  page: wide;
-  margin: 0;
 }
 
 .summation table,
