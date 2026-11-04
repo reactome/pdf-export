@@ -55,6 +55,7 @@ export async function serve(args: readonly string[]): Promise<number> {
   const onSignal = (signal: NodeJS.Signals) => {
     if (!state.serving) process.exit(128 + osConstants.signals[signal]);
     state.serving = false;
+    process.stderr.write(`stopping on ${signal}\n`);
     state.stop();
   };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
