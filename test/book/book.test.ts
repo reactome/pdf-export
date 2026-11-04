@@ -41,6 +41,7 @@ import {
   type GraphOptions,
   type GraphSettings,
 } from '../../src/graph/connection.ts';
+import { CHECKS } from '../../src/check/book.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
@@ -283,7 +284,6 @@ describe('pdf-export book', { skip }, () => {
   });
 
   test('exit 0 on the fixture: one PDF per top-level pathway and no other, finished, with no render service asked', async () => {
-    // provisional until check-book (T030) checks the book
     const { parent, out, report, args } = place();
     // two at once, not the default four, to spare the memory of a test run's other prints
     const run = await book([...args, '--parallel', '2', '--joins', '2']);
@@ -317,6 +317,13 @@ describe('pdf-export book', { skip }, () => {
       written.stages.map((stage) => stage.stage),
       ['preflight', 'figures', 'print', 'join', 'contents', 'parts', 'check-book']
     );
+    // FR-011's check run, every check passed (T030)
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: 0 }))
+    );
+    assert.ok((written.stages.at(-1)?.seconds ?? 0) > 0, 'check-book not timed');
+    assert.equal(written.signal, null);
     for (const pdf of written.pdfs) {
       const path = join(out, pdf.file);
       const bytes = readFileSync(path);
@@ -878,5 +885,110 @@ describe('pdf-export book', { skip }, () => {
     assert.deepEqual(run.left, [], 'left in its temporary folder');
     assert.deepEqual(readdirSync(parent), []);
     assert.equal(readReport(report).outcome, 'faults');
+  });
+  test("a fault FR-011's check finds: exit 1, its line, and no book", async () => {
+    // a printer that drops Reaction eight's name from its heading, as a layout might
+    const { parent, report, args } = place();
+    const printed: string[] = [];
+    const run = await book([...args, '--parallel', '2'], {
+      startPrinter: async () => {
+        const printer = await counting(printed)();
+        return {
+          part: (html) => printer.part(html.replace('>Reaction eight</a></h', '></a></h')),
+          close: () => printer.close(),
+        };
+      },
+    });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 1, run.err);
+    assert.equal(run.out, 'fault no-name "beta pathway.pdf" R-HSA-90000132\n');
+    assert.deepEqual(readdirSync(parent), []);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'faults');
+    assert.deepEqual(written.faults, ['no-name "beta pathway.pdf" R-HSA-90000132']);
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: check === 'no-name' ? 1 : 0 }))
+    );
+  });
+
+  test('a signal once the book is in place: the book written, exit 0, the signal in the report', async () => {
+    const { parent, out, report, args } = place();
+    class Exited extends Error {
+      readonly code: number;
+      constructor(code: number) {
+        super(`exit ${String(code)}`);
+        this.code = code;
+      }
+    }
+    const before = process.listenerCount('SIGTERM');
+    // sent as the run says the book is written, after it is moved into place
+    const run = book(args, {
+      err: (text) => {
+        if (text.startsWith('The book: ')) process.emit('SIGTERM', 'SIGTERM');
+      },
+      exit: (code) => {
+        throw new Exited(code);
+      },
+    });
+    const exited = await run.then(
+      () => null,
+      (error: unknown) => error
+    );
+    assert.ok(exited instanceof Exited, `not stopped by the signal: ${String(exited)}`);
+    assert.equal(exited.code, 0);
+    assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
+    assert.deepEqual(readdirSync(parent), ['TheReactomeBook']);
+    assert.deepEqual(readdirSync(out).sort(), BOOK);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'written');
+    assert.equal(written.signal, 'SIGTERM');
+    assert.equal(written.error, null);
+    assert.equal(written.pdfs.length, 3);
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: 0 }))
+    );
+  });
+
+  test('an exception escaping the run still removes its temporary folder and handlers', async () => {
+    // a graph whose close fails, and an `err` that throws on being told so: the exception
+    // escapes between the run's start and its end
+    const { args } = place();
+    const temporary = scratch();
+    const was = process.env['TMPDIR'];
+    process.env['TMPDIR'] = temporary;
+    const before = process.listenerCount('SIGTERM');
+    try {
+      await assert.rejects(
+        bookCommand(
+          args,
+          { NEO4J_URI: process.env['NEO4J_URI'] },
+          {
+            out: () => undefined,
+            err: (text) => {
+              if (text.includes('did not close')) throw new Error('err failed');
+            },
+            open: (settings, options) => {
+              const graph = openGraph(settings, options);
+              return {
+                read: (query, params, readOptions) => graph.read(query, params, readOptions),
+                close: async () => {
+                  await graph.close();
+                  throw new Error('close failed');
+                },
+              };
+            },
+          }
+        ),
+        /err failed/
+      );
+      assert.equal(process.env['TMPDIR'], temporary, 'TMPDIR not restored');
+    } finally {
+      if (was === undefined) delete process.env['TMPDIR'];
+      else process.env['TMPDIR'] = was;
+    }
+    assert.deepEqual(readdirSync(temporary), [], 'left in its temporary folder');
+    assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
   });
 });

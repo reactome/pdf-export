@@ -176,6 +176,9 @@ cause (`unanswered`, `failed`, `refused`, `invalid` or `label`, contracts/figure
   time where they overlap (T029).
 - The join's settings: `--joins`, `--parallel` and whether object streams are on
   (research R4).
-- Each FR-011 check, and its result (none until `check-book`, T030).
+- Each FR-011 check (`check-book`, T030), with its count of faults, none a pass; none
+  when the run stopped before the check. Its faults are among the book's faults.
+- The signal that stopped the run, if one did; once the book is in place, the outcome is
+  still the book written.
 - The book's faults, each as `preflight` prints it, and the error that stopped it, if any.
 - No names (FR-013).

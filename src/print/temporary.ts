@@ -7,7 +7,10 @@
 // that lets the exit handlers run (the commands' handlers exit, never die by the signal)
 // leaves nothing, whichever of those folders had been made by then. Its exit handler is kept
 // the last: the launcher's own, added when a browser is spawned, kills the browser first,
-// as one still running could write into its profile again after the folder had gone.
+// as one still running could write into its profile again after the folder had gone. One
+// is live in a process at a time: TMPDIR is the process's, and a second would leave it
+// naming a folder the first had removed, and the two exit handlers each moving itself last
+// on the other's every move.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,12 +22,20 @@ export interface PrivateTemporary {
   remove(): void;
 }
 
+/** The live folder's path, or null. */
+let live: string | null = null;
+
 /**
  * A private temporary folder in TMPDIR, named for `purpose`, TMPDIR set to it, and an exit
- * handler removing it, registered before anything else is started.
+ * handler removing it, registered before anything else is started. Throws while another is
+ * live in the process.
  */
 export function privateTemporary(purpose: string): PrivateTemporary {
+  if (live !== null) {
+    throw new Error(`A private temporary folder is live in this process already: ${live}`);
+  }
   const root = mkdtempSync(join(tmpdir(), `pdf-export.${purpose}-`));
+  live = root;
   const was = process.env['TMPDIR'];
   const onExit = () => {
     rmSync(root, { recursive: true, force: true });
@@ -51,11 +62,13 @@ export function privateTemporary(purpose: string): PrivateTemporary {
     remove() {
       if (removed) return;
       removed = true;
+      live = null;
       process.off('newListener', keepLast);
       process.off('exit', onExit);
-      onExit();
       if (was === undefined) delete process.env['TMPDIR'];
       else process.env['TMPDIR'] = was;
+      // last, so a removal that fails leaves the process as it was before
+      onExit();
     },
   };
 }

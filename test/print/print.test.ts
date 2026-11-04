@@ -2,6 +2,9 @@
 // embedded and no other, the outline nested, internal links landing on their targets, and
 // every contents number its target's page.
 import assert from 'node:assert/strict';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 
 import { PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
@@ -325,4 +328,30 @@ test('either a new page count or a moved target is a moved print', () => {
     movedPages(first, at(5, ['a', 2], ['b', 5]), ['a', 'b']),
     '5 pages, then 5; moved: b'
   );
+});
+
+// with or without the fixture graph: a printer leaves nothing in TMPDIR once closed, its pages'
+// folder among it (the book's tests read TMPDIR only after the run's private folder, which
+// holds the printer's, is gone, so they cannot see a printer that leaves its own)
+test("a printer's close removes its pages' folder", async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'pdfx-printer-'));
+  const was = process.env['TMPDIR'];
+  process.env['TMPDIR'] = temporary;
+  try {
+    const printer = await Printer.start();
+    try {
+      assert.ok(
+        readdirSync(temporary).some((name) => name.startsWith('pdf-export-')),
+        'no folder of its own'
+      );
+      await printer.part('<!doctype html><p>A page</p>');
+    } finally {
+      await printer.close();
+    }
+    assert.deepEqual(readdirSync(temporary), []);
+  } finally {
+    if (was === undefined) delete process.env['TMPDIR'];
+    else process.env['TMPDIR'] = was;
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
