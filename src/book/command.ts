@@ -7,9 +7,11 @@
 // 2 on bad arguments, a `--report` that exists or cannot be written, an `--out` that is not
 // absent or empty, in a folder the run cannot write, or a mount point, a graph that cannot
 // be read at the start, or any other error, after printing the faults found before it; a
-// signal is 128 and its number. The run report (data-model.md) is written to `--report`
-// however the run ends once its arguments and report are accepted, a signal's included.
-// FR-011's check (`check-book`, T030) is not yet run: exit 0 is provisional.
+// signal is 128 and its number, but once the book is in place, when it is 0. FR-011's check
+// (`check-book`, T030) runs on the book's folder before it is moved into place: its faults
+// are exit 1, and no book is written. The run report (data-model.md) is written to
+// `--report` however the run ends once its arguments and report are accepted, a signal's
+// included.
 import {
   accessSync,
   constants as fsConstants,
@@ -28,6 +30,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 
 import { graphSettings, openGraph, type Graph, type GraphSettings } from '../graph/connection.ts';
 import { releaseInfo, type ReleaseInfo } from '../graph/queries.ts';
+import { checkBook, type CheckResult } from '../check/book.ts';
 import { BookCharacters } from '../layout/characters.ts';
 import { codePointName } from '../layout/fonts.ts';
 import type { Figure } from '../model/types.ts';
@@ -211,6 +214,11 @@ export interface RunReport {
   faults: string[];
   /** The error that stopped the run, if one did. */
   error: string | null;
+  /**
+   * The signal that stopped the run, if one did: with the outcome `written` when it came once
+   * the book was in place, and `error` before.
+   */
+  signal: NodeJS.Signals | null;
   seconds: number;
   stages: StageTime[];
   pdfs: PdfWritten[];
@@ -234,8 +242,8 @@ export interface RunReport {
     /** Characters no font draws, each as its fault: code point and stable identifier. */
     uncovered: string[];
   };
-  /** FR-011's checks, each and its result: `check-book` (T030), not yet run. */
-  checks: null;
+  /** FR-011's checks, each with its count of faults (none a pass); null if not run. */
+  checks: CheckResult[] | null;
 }
 
 /** A printer that can be closed: the Printer (src/print/print.ts). */
@@ -252,6 +260,8 @@ export interface BookIo {
   threshold?: number;
   /** The covers' date. */
   date?: Date;
+  /** How a signal ends the process (a test's stands in for `process.exit`). */
+  exit?: (code: number) => never;
 }
 
 /** `pdf-export book`: its exit code; faults to `out`, errors to `err`. */
@@ -285,9 +295,10 @@ export async function bookCommand(
       return false;
     }
   };
+  // the report is written before the private folder is removed (in the `finally` below), so
+  // a removal that fails cannot keep it from being written
   const end = (code: number, error: unknown = null): number => {
     for (const signal of SIGNALS) process.off(signal, onSignal);
-    temporary.remove();
     for (const fault of report.faults) out(`fault ${fault}\n`);
     if (error !== null) {
       report.error = message(error);
@@ -302,8 +313,13 @@ export async function bookCommand(
   // the exit handlers run: the printer's, which removes its pages' folder
   // (src/print/print.ts), and the browser launcher's, which ends the browser and removes its
   // profile. A signal while the browser is launching is held until the launch ends, as the
-  // launcher registers its folders for removal only once the browser has started.
+  // launcher registers its folders for removal only once the browser has started. Once the
+  // book is in place (checked, and renamed), a signal stops nothing: the report says the
+  // book was written, naming the signal, and the exit is 0.
+  const exit = io.exit ?? ((code: number) => process.exit(code));
+  /** The book's folder while it is written, null before and once it is in place. */
   let folder: string | null = null;
+  let placed = false;
   // set by the handler, read after the launch: an object, as a closure sets it
   const signals: { held: boolean; signalled: NodeJS.Signals | null } = {
     held: false,
@@ -312,12 +328,18 @@ export async function bookCommand(
   const stop = (signal: NodeJS.Signals): void => {
     // the run's private temporary folder is removed by its exit handler, after the browser
     // launcher's has ended the browser (src/print/temporary.ts)
+    report.signal = signal;
+    if (placed) {
+      report.outcome = 'written';
+      err(`The book was written; then stopped by ${signal}\n`);
+      exit(writeReport() ? 0 : 2);
+    }
     if (folder !== null) rmSync(folder, { recursive: true, force: true });
     report.outcome = 'error';
     report.error = `stopped by ${signal}`;
     err(`The book was not written: ${report.error}\n`);
     writeReport();
-    process.exit(128 + osConstants.signals[signal]);
+    exit(128 + osConstants.signals[signal]);
   };
   const onSignal = (signal: NodeJS.Signals): void => {
     // a second signal stops the run at once, held or not: a launch that hangs would
@@ -328,133 +350,148 @@ export async function bookCommand(
     }
     signals.signalled = signal;
   };
-  for (const signal of SIGNALS) process.on(signal, onSignal);
-
-  // an earlier run's report is never replaced, and no report is written for the refusal;
-  // checked, and its folder made, once the handlers are set, so a signal from the moment
-  // its folder exists finds them
-  const unreportable =
-    settings.report === null ? null : reportProblem(settings.report, settings.out);
-  if (unreportable) {
-    for (const signal of SIGNALS) process.off(signal, onSignal);
-    temporary.remove();
-    err(`${unreportable}\n`);
-    return 2;
-  }
-
-  const problem = outProblem(settings.out);
-  if (problem) return end(2, problem);
-
-  // the start's check, its own driver retrying briefly, as `preflight`'s (T024)
-  let start: Graph | undefined;
-  let release: ReleaseInfo;
+  // everything from here in a `try`: an exception escaping the run still lets the handlers
+  // go and removes the private folder, after the report is written
   try {
-    start = open(settings.graph, { connectionTimeoutMs: 5000, retryTimeMs: 0 });
-    release = await releaseInfo(start);
-  } catch (error) {
-    await closing(start, err);
-    return end(2, `the graph cannot be read: ${message(error)}`);
-  }
-  await closing(start, err);
-  report.release = release.release;
-  report.checksum = release.checksum;
+    for (const signal of SIGNALS) process.on(signal, onSignal);
 
-  // the preflight, with the driver's own retries; its faults kept check by check
-  const preflightStarted = performance.now();
-  const faults: string[] = [];
-  let docs;
-  let stopped: { error: unknown } | null = null;
-  let graph: Graph | undefined;
-  try {
-    graph = open(settings.graph);
-    docs = (await preflight(graph, release, settings, faults)).docs;
-  } catch (error) {
-    stopped = { error };
-  } finally {
-    await closing(graph, err);
-  }
-  report.stages.push({
-    stage: 'preflight',
-    seconds: seconds(performance.now() - preflightStarted),
-    budget: 4 * 60,
-    measured: 'wall',
-  });
-  noteFaults(report, faults);
-  if (stopped) return end(2, `the preflight stopped: ${message(stopped.error)}`);
-  if (faults.length > 0 || !docs) return end(1);
-  for (const record of expectedFigures(docs).values()) report.figures.byKind[record.kind] += 1;
-
-  // the book, printed into a folder beside its name and moved into place at the end
-  const target = resolve(settings.out);
-  let printer: BookPrinter | undefined;
-  let written: Written | undefined;
-  let failure: unknown = null;
-  const characters = new BookCharacters();
-  try {
-    folder = mkdtempSync(join(dirname(target), `.${basename(target)}-`));
-    signals.held = true;
-    try {
-      printer = await (io.startPrinter ?? startPrinter)();
-    } finally {
-      // a signal held through the launch acts now, whether it began the browser or not
-      signals.held = false;
-      if (signals.signalled !== null) stop(signals.signalled);
+    // an earlier run's report is never replaced, and no report is written for the refusal;
+    // checked, and its folder made, once the handlers are set, so a signal from the moment
+    // its folder exists finds them
+    const unreportable =
+      settings.report === null ? null : reportProblem(settings.report, settings.out);
+    if (unreportable) {
+      err(`${unreportable}\n`);
+      return 2;
     }
-    written = await writeBook(docs, characters, {
-      figures: settings.figures,
-      site: settings.site,
-      folder,
-      parts: {
-        threshold: io.threshold ?? PARTS.threshold,
-        parallel: settings.parallel,
-        joins: settings.joins,
-      },
-      printer,
-      date: io.date ?? new Date(),
-    });
-    renameSync(folder, target);
-  } catch (error) {
-    failure = error;
-  } finally {
+
+    const problem = outProblem(settings.out);
+    if (problem) return end(2, problem);
+
+    // the start's check, its own driver retrying briefly, as `preflight`'s (T024)
+    let start: Graph | undefined;
+    let release: ReleaseInfo;
     try {
-      await printer?.close();
+      start = open(settings.graph, { connectionTimeoutMs: 5000, retryTimeMs: 0 });
+      release = await releaseInfo(start);
     } catch (error) {
-      err(`The printer did not close: ${message(error)}\n`);
+      await closing(start, err);
+      return end(2, `the graph cannot be read: ${message(error)}`);
     }
-    if (failure !== null && folder !== null) rmSync(folder, { recursive: true, force: true });
+    await closing(start, err);
+    report.release = release.release;
+    report.checksum = release.checksum;
+
+    // the preflight, with the driver's own retries; its faults kept check by check
+    const preflightStarted = performance.now();
+    const faults: string[] = [];
+    let docs;
+    let stopped: { error: unknown } | null = null;
+    let graph: Graph | undefined;
+    try {
+      graph = open(settings.graph);
+      docs = (await preflight(graph, release, settings, faults)).docs;
+    } catch (error) {
+      stopped = { error };
+    } finally {
+      await closing(graph, err);
+    }
+    report.stages.push({
+      stage: 'preflight',
+      seconds: seconds(performance.now() - preflightStarted),
+      budget: 4 * 60,
+      measured: 'wall',
+    });
+    noteFaults(report, faults);
+    if (stopped) return end(2, `the preflight stopped: ${message(stopped.error)}`);
+    if (faults.length > 0 || !docs) return end(1);
+    for (const record of expectedFigures(docs).values()) report.figures.byKind[record.kind] += 1;
+
+    // the book, printed into a folder beside its name, checked (FR-011), and moved into place
+    const target = resolve(settings.out);
+    let printer: BookPrinter | undefined;
+    let written: Written | undefined;
+    let failure: unknown = null;
+    const characters = new BookCharacters();
+    // closed once the book is printed, so its browser is not held through the check
+    const closePrinter = async () => {
+      const open = printer;
+      printer = undefined;
+      try {
+        await open?.close();
+      } catch (error) {
+        err(`The printer did not close: ${message(error)}\n`);
+      }
+    };
+    try {
+      folder = mkdtempSync(join(dirname(target), `.${basename(target)}-`));
+      signals.held = true;
+      try {
+        printer = await (io.startPrinter ?? startPrinter)();
+      } finally {
+        // a signal held through the launch acts now, whether it began the browser or not
+        signals.held = false;
+        if (signals.signalled !== null) stop(signals.signalled);
+      }
+      written = await writeBook(docs, characters, {
+        figures: settings.figures,
+        site: settings.site,
+        folder,
+        parts: {
+          threshold: io.threshold ?? PARTS.threshold,
+          parallel: settings.parallel,
+          joins: settings.joins,
+        },
+        printer,
+        date: io.date ?? new Date(),
+      });
+      await closePrinter();
+      noteWritten(report, written);
+      // FR-011's check, on the folder before it is moved into place: a fault is exit 1, and
+      // the folder is removed with it
+      const checkStarted = performance.now();
+      const checked = await checkBook(folder, docs, settings.files);
+      report.checks = checked.checks;
+      report.stages.push({
+        stage: 'check-book',
+        seconds: seconds(performance.now() - checkStarted),
+        budget: 9 * 60,
+        measured: 'wall',
+      });
+      if (checked.faults.length > 0) throw new BookFaults(checked.faults);
+      renameSync(folder, target);
+      // in place: a signal from now on reports the book written (`stop`, above)
+      folder = null;
+      placed = true;
+    } catch (error) {
+      failure = error;
+    } finally {
+      await closePrinter();
+      if (failure !== null && folder !== null) rmSync(folder, { recursive: true, force: true });
+    }
+    report.characters.replaced = counts(written?.replaced ?? characters.replaced);
+    if (failure !== null) {
+      // faults found while printing or checking are exit 1, any other error exit 2, the
+      // faults printed first
+      const failures =
+        failure instanceof AggregateError ? (failure.errors as unknown[]) : [failure];
+      const others = failures.filter((f) => !(f instanceof BookFaults));
+      for (const f of failures) if (f instanceof BookFaults) noteFaults(report, [...f.faults]);
+      if (others.length > 0) return end(2, others.map(message).join('; '));
+      return end(1);
+    }
+    err(
+      `The book: ${String(report.total.pdfs)} PDFs, ${String(report.total.pages)} pages, in ${settings.out}\n`
+    );
+    return end(0);
+  } finally {
+    for (const signal of SIGNALS) process.off(signal, onSignal);
+    try {
+      temporary.remove();
+    } catch (error) {
+      err(`The run's temporary folder was not removed: ${message(error)}\n`);
+    }
   }
-  report.characters.replaced = counts(written?.replaced ?? characters.replaced);
-  if (failure !== null) {
-    // faults found while printing are exit 1, any other error exit 2, the faults printed first
-    const failures = failure instanceof AggregateError ? (failure.errors as unknown[]) : [failure];
-    const others = failures.filter((f) => !(f instanceof BookFaults));
-    for (const f of failures) if (f instanceof BookFaults) noteFaults(report, [...f.faults]);
-    if (others.length > 0) return end(2, others.map(message).join('; '));
-    return end(1);
-  }
-  if (!written) return end(2, 'nothing was written');
-  report.pdfs = written.pdfs;
-  report.total = {
-    pdfs: written.pdfs.length,
-    pages: written.pdfs.reduce((n, pdf) => n + pdf.pages, 0),
-    bytes: written.pdfs.reduce((n, pdf) => n + pdf.bytes, 0),
-  };
-  report.figures.belowFloor = written.layout.belowFloor;
-  report.figures.unmeasured = written.layout.unmeasured;
-  report.figures.missing = [...new Set([...report.figures.missing, ...written.layout.missing])];
-  const { ms } = written;
-  report.stages.push(
-    { stage: 'figures', seconds: seconds(ms.figures), budget: 44 * 60, measured: 'summed' },
-    { stage: 'print', seconds: seconds(ms.print), budget: 13 * 60, measured: 'summed' },
-    { stage: 'join', seconds: seconds(ms.join), budget: 6 * 60, measured: 'summed' },
-    { stage: 'contents', seconds: seconds(ms.contents), budget: 2 * 60, measured: 'summed' },
-    { stage: 'parts', seconds: seconds(ms.parts), budget: null, measured: 'wall' },
-    { stage: 'check-book', seconds: null, budget: 9 * 60, measured: 'wall' }
-  );
-  err(
-    `The book: ${String(report.total.pdfs)} PDFs, ${String(report.total.pages)} pages, in ${settings.out}\n`
-  );
-  return end(0);
 }
 
 /** The signals a run is stopped by, its folder removed and its report written first. */
@@ -468,6 +505,31 @@ const startPrinter = async (): Promise<BookPrinter> => {
 
 const seconds = (ms: number): number => Math.round(ms) / 1000;
 
+/**
+ * What the book's printing gives the report: each PDF (printed and checked; on a fault of the
+ * check, printed and then discarded), the figures, the characters replaced, and the stages.
+ */
+function noteWritten(report: RunReport, written: Written): void {
+  report.pdfs = written.pdfs;
+  report.total = {
+    pdfs: written.pdfs.length,
+    pages: written.pdfs.reduce((n, pdf) => n + pdf.pages, 0),
+    bytes: written.pdfs.reduce((n, pdf) => n + pdf.bytes, 0),
+  };
+  report.characters.replaced = counts(written.replaced);
+  report.figures.belowFloor = written.layout.belowFloor;
+  report.figures.unmeasured = written.layout.unmeasured;
+  report.figures.missing = [...new Set([...report.figures.missing, ...written.layout.missing])];
+  const { ms } = written;
+  report.stages.push(
+    { stage: 'figures', seconds: seconds(ms.figures), budget: 44 * 60, measured: 'summed' },
+    { stage: 'print', seconds: seconds(ms.print), budget: 13 * 60, measured: 'summed' },
+    { stage: 'join', seconds: seconds(ms.join), budget: 6 * 60, measured: 'summed' },
+    { stage: 'contents', seconds: seconds(ms.contents), budget: 2 * 60, measured: 'summed' },
+    { stage: 'parts', seconds: seconds(ms.parts), budget: null, measured: 'wall' }
+  );
+}
+
 function emptyReport(settings: BookSettings): RunReport {
   return {
     release: null,
@@ -475,6 +537,7 @@ function emptyReport(settings: BookSettings): RunReport {
     outcome: 'error',
     faults: [],
     error: null,
+    signal: null,
     seconds: 0,
     stages: [],
     pdfs: [],

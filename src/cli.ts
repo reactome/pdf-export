@@ -2,7 +2,7 @@
 // pdf-export's command line (contracts/cli.md). Its commands come with spec 001's tasks:
 // serve (T022) runs the single-event service; preflight (T024) runs the book's preflight
 // alone; figures (T046) draws the book's figures into a folder; book (T029) writes the
-// book; check-book and compare are to come.
+// book; check-book (T030) checks a written book for FR-011's faults; compare is to come.
 import { constants as osConstants } from 'node:os';
 
 import { privateTemporary } from './print/temporary.ts';
@@ -84,6 +84,12 @@ if (import.meta.main) {
   } else if (args[0] === 'preflight') {
     const { preflightCommand } = await import('./preflight/command.ts');
     process.exitCode = await preflightCommand(args.slice(1), process.env, {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
+  } else if (args[0] === 'check-book') {
+    const { checkBookCommand } = await import('./check/book.ts');
+    process.exitCode = await checkBookCommand(args.slice(1), process.env, {
       out: (text) => process.stdout.write(text),
       err: (text) => process.stderr.write(text),
     });

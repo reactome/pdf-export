@@ -41,6 +41,7 @@ import {
   type GraphOptions,
   type GraphSettings,
 } from '../../src/graph/connection.ts';
+import { CHECKS } from '../../src/check/book.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
@@ -283,7 +284,6 @@ describe('pdf-export book', { skip }, () => {
   });
 
   test('exit 0 on the fixture: one PDF per top-level pathway and no other, finished, with no render service asked', async () => {
-    // provisional until check-book (T030) checks the book
     const { parent, out, report, args } = place();
     // two at once, not the default four, to spare the memory of a test run's other prints
     const run = await book([...args, '--parallel', '2', '--joins', '2']);
@@ -317,6 +317,13 @@ describe('pdf-export book', { skip }, () => {
       written.stages.map((stage) => stage.stage),
       ['preflight', 'figures', 'print', 'join', 'contents', 'parts', 'check-book']
     );
+    // FR-011's check run, every check passed (T030)
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: 0 }))
+    );
+    assert.ok((written.stages.at(-1)?.seconds ?? 0) > 0, 'check-book not timed');
+    assert.equal(written.signal, null);
     for (const pdf of written.pdfs) {
       const path = join(out, pdf.file);
       const bytes = readFileSync(path);
@@ -878,5 +885,262 @@ describe('pdf-export book', { skip }, () => {
     assert.deepEqual(run.left, [], 'left in its temporary folder');
     assert.deepEqual(readdirSync(parent), []);
     assert.equal(readReport(report).outcome, 'faults');
+  });
+  test("a fault FR-011's check finds: exit 1, its line, and no book", async () => {
+    // a printer that drops Reaction eight's name from its heading, as a layout might
+    const { parent, report, args } = place();
+    const printed: string[] = [];
+    const run = await book([...args, '--parallel', '2'], {
+      startPrinter: async () => {
+        const printer = await counting(printed)();
+        return {
+          part: (html) => printer.part(html.replace('>Reaction eight</a></h', '></a></h')),
+          close: () => printer.close(),
+        };
+      },
+    });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 1, run.err);
+    assert.equal(run.out, 'fault no-name "beta pathway.pdf" R-HSA-90000132\n');
+    assert.deepEqual(readdirSync(parent), []);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'faults');
+    assert.deepEqual(written.faults, ['no-name "beta pathway.pdf" R-HSA-90000132']);
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: check === 'no-name' ? 1 : 0 }))
+    );
+  });
+
+  test('a signal once the book is in place: the book written, exit 0, the signal in the report', async () => {
+    const { parent, out, report, args } = place();
+    class Exited extends Error {
+      readonly code: number;
+      constructor(code: number) {
+        super(`exit ${String(code)}`);
+        this.code = code;
+      }
+    }
+    const before = process.listenerCount('SIGTERM');
+    // sent as the run says the book is written, after it is moved into place
+    const run = book(args, {
+      err: (text) => {
+        if (text.startsWith('The book: ')) process.emit('SIGTERM', 'SIGTERM');
+      },
+      exit: (code) => {
+        throw new Exited(code);
+      },
+    });
+    const exited = await run.then(
+      () => null,
+      (error: unknown) => error
+    );
+    assert.ok(exited instanceof Exited, `not stopped by the signal: ${String(exited)}`);
+    assert.equal(exited.code, 0);
+    assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
+    assert.deepEqual(readdirSync(parent), ['TheReactomeBook']);
+    assert.deepEqual(readdirSync(out).sort(), BOOK);
+    const written = readReport(report);
+    assert.equal(written.outcome, 'written');
+    assert.equal(written.signal, 'SIGTERM');
+    assert.equal(written.error, null);
+    assert.equal(written.pdfs.length, 3);
+    assert.deepEqual(
+      written.checks,
+      CHECKS.map((check) => ({ check, faults: 0 }))
+    );
+  });
+
+  test('an exception escaping the run still removes its temporary folder and handlers', async () => {
+    // a graph whose close fails, and an `err` that throws on being told so: the exception
+    // escapes between the run's start and its end
+    const { args } = place();
+    const temporary = scratch();
+    const was = process.env['TMPDIR'];
+    process.env['TMPDIR'] = temporary;
+    const before = process.listenerCount('SIGTERM');
+    try {
+      await assert.rejects(
+        bookCommand(
+          args,
+          { NEO4J_URI: process.env['NEO4J_URI'] },
+          {
+            out: () => undefined,
+            err: (text) => {
+              if (text.includes('did not close')) throw new Error('err failed');
+            },
+            open: (settings, options) => {
+              const graph = openGraph(settings, options);
+              return {
+                read: (query, params, readOptions) => graph.read(query, params, readOptions),
+                close: async () => {
+                  await graph.close();
+                  throw new Error('close failed');
+                },
+              };
+            },
+          }
+        ),
+        /err failed/
+      );
+      assert.equal(process.env['TMPDIR'], temporary, 'TMPDIR not restored');
+    } finally {
+      if (was === undefined) delete process.env['TMPDIR'];
+      else process.env['TMPDIR'] = was;
+    }
+    assert.deepEqual(readdirSync(temporary), [], 'left in its temporary folder');
+    assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
+  });
+  test('nothing overflows the text column: a wide table and a long unbroken token print every part at full size', async () => {
+    // release 98 has 28 human summations holding a table: one of four columns of long words
+    // (as wide as such a table is), and a token of 140 characters unbroken, in a summation
+    // and in a name, were wider than the text column, and Chromium shrank the whole part to
+    // fit them (#160's review)
+    const words = ['Phosphofructokinase', 'Glyceraldehydes', 'Triosephosphate', 'Dihydroxyacetone'];
+    const row = (cells: string[]) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+    const table = `<table>${row(words)}${row([...words].reverse())}</table>`;
+    const token = 'X'.repeat(140);
+    const plants: [string, string][] = [
+      // the token in a table's cell too, where only its places to break let the column narrow
+      [
+        'A third placeholder summation, first by order.',
+        `<p>${token}</p>${table.replace('</table>', `${row(['Token', token])}</table>`)}`,
+      ],
+      ['Reaction eight', `Reaction eight ${token}`],
+    ];
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '1'], { open: planting(plants), threshold: 1 });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    // every section's body text at 10.5 pt, and its headings at 12, 16.5 and 18
+    const sizes = { label: new Set<number>(), headings: new Set<number>() };
+    const headings = new Set(['Reaction one', 'Shared reaction', 'beta sub sub', 'Alpha pathway']);
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if (!('str' in item)) continue;
+            const t = item.transform as number[];
+            const size = Math.round(Math.hypot(t[2] ?? 0, t[3] ?? 0) * 100) / 100;
+            if (item.str === 'Stable identifier') sizes.label.add(size);
+            // a heading: at the text column's left edge, past the cover, set above the body
+            // (not the same name in a contents entry, a location or a figure's label)
+            const left = Math.abs((t[4] ?? 0) - PAGE.margin) < 2;
+            if (i > 1 && left && headings.has(item.str) && size > 10.5) sizes.headings.add(size);
+          }
+        }
+      });
+    }
+    assert.deepEqual([...sizes.label], [10.5]);
+    assert.deepEqual([...sizes.headings].sort(), [12, 16.5, 18]);
+  });
+  test("a part Chromium printed scaled down still reads its sections' names", async () => {
+    // a block wider than the text column planted in every part printed, as the layout's
+    // overflow once did: Chromium prints each part scaled down whole, its text below the
+    // theme's sizes, and the check reads each heading against its page's body text
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '2'], {
+      startPrinter: async () => {
+        const printer = await counting([])();
+        return {
+          part: (html) =>
+            printer.part(
+              html.replace('</body>', '<div style="width: 800px; height: 1px"></div></body>')
+            ),
+          close: () => printer.close(),
+        };
+      },
+    });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    // and it was scaled down: the label every section prints is below the body's 10.5 pt
+    const labels = new Set<number>();
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if (!('str' in item) || item.str !== 'Stable identifier') continue;
+            const t = item.transform as number[];
+            labels.add(Math.round(Math.hypot(t[2] ?? 0, t[3] ?? 0) * 100) / 100);
+          }
+        }
+      });
+    }
+    assert.ok(labels.size > 0 && [...labels].every((size) => size < 10), [...labels].join(' '));
+  });
+
+  test('a name holding characters never drawn reads as printed', async () => {
+    // a soft hyphen, a joiner, a variation selector and a control: the preflight lets them
+    // through (FR-017's NEVER_DRAWN), the book prints none of them, and the check reads the
+    // name without them
+    const plants: [string, string][] = [
+      ['Reaction eight', 'Reac\u00ADtion\u200D eight\uFE0F\u0007'],
+    ];
+    const run = await book([...place().args, '--parallel', '2'], { open: planting(plants) });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+  });
+  test("a figure of many small labels on a heading's page does not set the page's body size", async () => {
+    // Alpha pathway's diagram given 300 labels at 8 px: on its page, most characters are the
+    // figure's, so a heading read against the page's commonest size took the facts in
+    const labels = Array.from(
+      { length: 300 },
+      (_, i) =>
+        `<text x="${String(10 + (i % 20) * 25)}" y="${String(10 + Math.floor(i / 20) * 10)}" style="font: normal 400 8px Roboto">label number ${String(i)}</text>`
+    ).join('');
+    const figures = folder((stId, svg) =>
+      stId === 'R-HSA-90000200' ? svg.replace('</g></svg>', `${labels}</g></svg>`) : svg
+    );
+    const run = await book([...place(figures).args, '--parallel', '2']);
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+  });
+
+  test("a table's short columns keep their words whole beside a long one", async () => {
+    // an edit's names, 30 of them, beside its date and action; a summation's table of a
+    // name beside a column of prose: the short columns' words are never broken
+    const names = Array.from({ length: 30 }, (_, i) => `Placeholder${String(i + 10)}, P.`).join(
+      '; '
+    );
+    const prose =
+      'catalyses the transfer of a phosphate group in a step of the pathway that is described here at length '.repeat(
+        3
+      );
+    const rows = Array.from(
+      { length: 4 },
+      () => `<tr><td>Phosphofructokinase</td><td>${prose}</td></tr>`
+    ).join('');
+    const plants: [string, string][] = [
+      ['Placeholder09, P.', names],
+      ['A third placeholder summation, first by order.', `<table>${rows}</table>`],
+    ];
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '2'], { open: planting(plants) });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    const pieces: string[] = [];
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if ('str' in item && item.str.trim() !== '') pieces.push(item.str.trim());
+          }
+        }
+      });
+    }
+    // the edit history's header and dates, and the summation's names, each whole
+    assert.ok(pieces.includes('Date') && pieces.includes('Action'), 'no whole header');
+    assert.deepEqual(
+      pieces.filter((p) => /^(Da|Dat|te|Ac|Act|ion|tion)$/.test(p)),
+      []
+    );
+    const dates = pieces.filter((p) => p.startsWith('20') && p.includes('-'));
+    assert.ok(dates.length > 0);
+    for (const date of dates) assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(pieces.filter((p) => p === 'Phosphofructokinase').length, 4);
+    assert.deepEqual(
+      pieces.filter((p) => p !== 'Phosphofructokinase' && p.startsWith('Phospho')),
+      []
+    );
   });
 });

@@ -29,6 +29,14 @@ body {
   font-size: var(--mat-sys-body-medium-size);
   line-height: var(--mat-sys-body-medium-line-height);
   font-weight: var(--mat-sys-body-medium-weight);
+  /*
+   * Kept inside the text column: Chromium prints a page holding anything wider scaled down
+   * whole, its text below the theme's sizes (T030's reviews). A word too long for its line
+   * may break (`break-word`), and a token longer than 40 characters is given places to break
+   * (`<wbr>`, html.ts), so a table's columns may narrow to its longest word and no further:
+   * `anywhere` let them narrow to a character, and broke a short column's every word.
+   */
+  overflow-wrap: break-word;
 }
 a {
   color: var(--mat-sys-primary);
@@ -202,6 +210,8 @@ table.edits,
 table.found {
   border-collapse: collapse;
   margin: 4pt 0 8pt;
+  /* no wider than the column while its columns can narrow to their longest words */
+  max-width: 100%;
 }
 th {
   text-align: left;
@@ -216,6 +226,10 @@ td {
 }
 tr {
   break-inside: avoid;
+}
+/* an edit's date whole, as a hyphen is a place a line may break */
+table.edits td:first-child {
+  white-space: nowrap;
 }
 .references {
   margin: 0 0 8pt;
