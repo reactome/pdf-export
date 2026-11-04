@@ -24,14 +24,49 @@ export const BREAK_EVERY = 20;
 /**
  * The spaces a token ends at: those Chromium breaks a line at, measured
  * (`ci/measure/breaks.ts`): tab, line feed, carriage return (a carriage return and line
- * feed are one grapheme), space, U+1680, U+2000 to U+2006, U+2008 to U+200A (the en, em,
- * thin and hair spaces among them), U+200B (zero width), U+2028, U+2029, U+205F and U+3000.
- * The others `\s` holds join their neighbours, and a token runs through them: U+000B,
- * U+000C, U+00A0 (no-break), U+2007 (figure), U+202F and U+FEFF. A space left out of this
- * list would join two words into one token, and a long one would break mid-word.
+ * feed are one grapheme), space, U+0085 (next line), U+1680, U+2000 to U+2006 (the en and
+ * em spaces among them), U+2008 to U+200A (the thin and hair spaces among them), U+200B
+ * (zero width), U+2028, U+2029, U+205F and U+3000. The others `\s` holds join their
+ * neighbours, and a token runs through them: U+000B, U+000C, U+00A0 (no-break), U+2007
+ * (figure), U+202F and U+FEFF. A space left out of this list would join two words into one
+ * token, and a long one would break mid-word.
  */
 export const BREAKABLE_SPACE =
-  /^[\t\n\r \u1680\u2000-\u2006\u2008-\u200b\u2028\u2029\u205f\u3000]+$/u;
+  /^[\t\n\r \u0085\u1680\u2000-\u2006\u2008-\u200b\u2028\u2029\u205f\u3000]+$/u;
+
+/**
+ * The characters other than spaces Chromium breaks a line beside, measured
+ * (`ci/measure/breaks.ts`) between letters and digits alike: after a hyphen (`-`, U+2010),
+ * U+058A, U+2012 and U+2013 (figure and en dashes), U+2027, U+2E17, U+30FB, `?` and U+00AD
+ * (the soft hyphen, which prints a hyphen where it breaks); before
+ * U+1806; before and after U+2014 (the em dash). Not beside U+2011, the non-breaking
+ * hyphen, which FR-017 prints as `-` (characters.ts) before the layout sees it: Chromium
+ * then breaks after it as after any hyphen, so it is counted as one. Nor beside `/`, `|`
+ * or U+2212 (minus). Ideographs, between which Chromium breaks too, are not
+ * listed: a long run of them is only given `<wbr>`s where a break already was.
+ */
+const BREAKS_AFTER: ReadonlySet<number> = new Set([
+  0x2d, 0x3f, 0xad, 0x58a, 0x2010, 0x2012, 0x2013, 0x2014, 0x2027, 0x2e17, 0x30fb,
+]);
+const BREAKS_BEFORE: ReadonlySet<number> = new Set([0x1806, 0x2014]);
+
+/**
+ * Where a line may break beside a character as a reader sees it: a space ends a token and
+ * is not counted in it; a hyphen ends the run it closes; U+1806 starts one. A space with a
+ * combining mark is one grapheme, and breaks as the space does (Chromium ends the line
+ * after the mark, or for U+0020 before it, which leaves the mark uncounted: one character
+ * in a run, at most). A hyphen with a mark is taken to join: Chromium breaks after it
+ * before a letter but not before a digit, and a `<wbr>` too many is harmless.
+ */
+export function breakBeside(unit: string): 'space' | 'after' | 'before' | 'both' | 'none' {
+  const first = String.fromCodePoint(unit.codePointAt(0) ?? 0);
+  if (BREAKABLE_SPACE.test(first)) return 'space';
+  if (first !== unit) return 'none';
+  const point = first.codePointAt(0) ?? 0;
+  const after = BREAKS_AFTER.has(point);
+  const before = BREAKS_BEFORE.has(point);
+  return after && before ? 'both' : after ? 'after' : before ? 'before' : 'none';
+}
 
 /**
  * A unit of text: a character as a reader sees it, a character reference, or a tag, which
@@ -40,8 +75,8 @@ export const BREAKABLE_SPACE =
 interface Unit {
   readonly text: string;
   readonly tag?: 'joins' | 'ends';
-  /** A character reference to a space a line breaks at. */
-  readonly space?: boolean;
+  /** The character a numeric character reference stands for, where a line may break. */
+  readonly stands?: string;
 }
 
 /**
@@ -78,11 +113,17 @@ function breakTokens(units: readonly Unit[], escape: (unit: string) => string): 
     } else if (unit.tag === 'ends') {
       flush();
       out += unit.text;
-    } else if (unit.space === true || BREAKABLE_SPACE.test(unit.text)) {
-      flush();
-      out += escape(unit.text);
     } else {
+      const at = breakBeside(unit.stands ?? unit.text);
+      if (at === 'space') {
+        flush();
+        out += escape(unit.text);
+        continue;
+      }
+      // a run ends after a hyphen, which is counted in it
+      if (at === 'before' || at === 'both') flush();
       token.push(unit);
+      if (at === 'after' || at === 'both') flush();
     }
   }
   flush();
@@ -115,8 +156,9 @@ const TAG = /(<!--[\s\S]*?(?:-->|$)|<\/?([a-z][a-z0-9]*)(?:[^>"']|"[^"]*"|'[^']*
 const REFERENCE = /(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu;
 
 /**
- * The character a numeric reference stands for; a named one is left as it is, as the
- * sanitiser writes every character but `&`, `<`, `>` and `"` as itself.
+ * The character a numeric reference stands for; a named one is left as it is. Defensive:
+ * the sanitiser writes every character but `&`, `<`, `>` and `"` as itself, so no
+ * summation it has read holds a numeric reference, and only a direct call reaches this.
  */
 function referenced(reference: string): string {
   const hex = /^&#x([0-9a-f]+);$/iu.exec(reference)?.[1];
@@ -140,7 +182,7 @@ export function markupBreaks(markup: string): string {
   for (let i = 0; i < parts.length; i += 3) {
     const between = parts[i] ?? '';
     between.split(REFERENCE).forEach((part, j) => {
-      if (j % 2 === 1) units.push({ text: part, space: BREAKABLE_SPACE.test(referenced(part)) });
+      if (j % 2 === 1) units.push({ text: part, stands: referenced(part) });
       else units.push(...graphemes(part));
     });
     const tag = parts[i + 1];

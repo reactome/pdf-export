@@ -204,8 +204,9 @@ FR-011's check, alone. Also run by `book`.
     part Chromium printed scaled down still reads its names, its scale not a fault: the
     layout keeps realistic content inside the text column (long tokens may break, a table's
     columns narrow to their longest words), but a table whose longest words, side by side,
-    are wider than the column can still be wider. A token of up to 40 characters does not
-    break, and a longer one breaks into pieces of 13 to 20; how many columns are too many
+    are wider than the column can still be wider. A run of up to 40 characters between
+    places Chromium breaks a line (a space, or after a hyphen) does not break, and a longer
+    one breaks into pieces of 13 to 20; how many columns are too many
     depends on the letters. Measured (`ci/measure/breaks.ts`, lowercase text cut from
     biochemical words), roughly: five columns of 20- to 25-character words, four of 30,
     three of 35 to 40, and five to seven of longer tokens; of wider letters (`m` alone),

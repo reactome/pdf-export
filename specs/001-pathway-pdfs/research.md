@@ -955,8 +955,9 @@ embedded.
     column, which Chromium printed by scaling its whole part down below the theme's sizes,
     would have reached the real book: the layout now keeps realistic content inside the
     column (pages.css; a table whose longest words, side by side, are wider than the
-    column can still be wider: a token of up to 40 characters does not break, a longer one
-    breaks into pieces of 13 to 20. Measured by `ci/measure/breaks.ts`, a table of two
+    column can still be wider: a run of up to 40 characters between places Chromium
+    breaks a line (a space, or after a hyphen) does not break, a longer one breaks into
+    pieces of 13 to 20. Measured by `ci/measure/breaks.ts`, a table of two
     rows laid out by Chromium with the book's stylesheets and print media in a
     `.summation` 170 mm wide, the text column; its output in
     `ci/measure/results/2026-11-04/breaks/`. With lowercase text cut from biochemical
