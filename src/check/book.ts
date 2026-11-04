@@ -24,7 +24,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { printedDocument } from '../book/book.ts';
 import {
@@ -45,6 +45,7 @@ import { checkFiles, neededFiles, readSummary, SUMMARY } from '../preflight/file
 import { figureRecord } from '../preflight/folder.ts';
 import { fileName } from '../preflight/names.ts';
 import { bookPathways } from '../preflight/preflight.ts';
+import { UnreadPdf } from '../print/unread.ts';
 
 /** FR-011's checks, in the order their faults are listed (contracts/cli.md). */
 export const CHECKS = [
@@ -177,7 +178,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** A PDF's text, links and outline, read with pdf.js. */
 async function readPdf(path: string): Promise<Read> {
-  const task = getDocument({ data: new Uint8Array(readFileSync(path)) });
+  // pdf.js's warnings off: they quote the file's content, and the book holds names
+  const task = getDocument({
+    data: new Uint8Array(readFileSync(path)),
+    verbosity: VerbosityLevel.ERRORS,
+  });
   try {
     const doc = await task.promise;
     const pieces: Piece[] = [];
@@ -228,6 +233,9 @@ async function readPdf(path: string): Promise<Read> {
     const top = (await doc.getOutline()) as Parameters<typeof walk>[0] | null;
     await walk(top ?? []);
     return { pieces: pieces.sort(byReading), links: links.sort(byReading), outline };
+  } catch (error) {
+    // pdf.js's errors by their kind alone: their messages quote the file
+    throw new UnreadPdf(error, path);
   } finally {
     await task.destroy();
   }
@@ -639,6 +647,9 @@ export async function checkBookCommand(
     graph = undefined;
     checked = await checkBook(settings.folder, docs, settings.files);
   } catch (error) {
+    // a PDF not read, by its path and pdf.js's error's kind alone (UnreadPdf's message):
+    // pdf.js's own quotes the file, which holds names. A file system's error names its
+    // path, and the graph's holds no text of a PDF: both say their message
     err(`The check stopped: ${message(error)}\n`);
     return 2;
   } finally {
