@@ -124,7 +124,13 @@ describe('pdf-export figures', { skip }, () => {
     for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
   });
 
-  /** A run with the stubs, a new `--out` and a report beside it; `flags` added or replacing. */
+  /**
+   * A run with the stubs, a new `--out` and a report beside it; `flags` added or replacing.
+   * Its timeout is 10 s, as the stubs answer at once: one of 0.5 s was missed under load (a
+   * read after a figure timed out, stopping the run as `deployment-unanswered`), as the stubs
+   * answer from this process, and a process kept from a CPU for half a second misses it. A
+   * test of a timeout sets its own.
+   */
   const figures = async (
     flags: Record<string, string> = {},
     open?: (settings: GraphSettings, options?: GraphOptions) => Graph,
@@ -137,7 +143,7 @@ describe('pdf-export figures', { skip }, () => {
       '--content': content.url,
       '--out': join(work, 'figures'),
       '--parallel': '2',
-      '--timeout': '0.5',
+      '--timeout': '10',
       '--report': join(work, 'report.json'),
       ...flags,
     };
@@ -282,8 +288,9 @@ describe('pdf-export figures', { skip }, () => {
     const run = await figures({ '--timeout': '5' });
     assert.equal(run.code, 1);
     assert.equal(run.report.stopped?.reason, 'deployment-changed');
-    // not the held figure's two tries of 5 s
-    assert.ok(Date.now() - started < 2000, String(Date.now() - started));
+    // not the held figure's two tries of 5 s, nor even one: under 4 s, not 2, so a loaded
+    // host's pauses (the preflight's graph reads included) do not reach it
+    assert.ok(Date.now() - started < 4000, String(Date.now() - started));
     assert.ok(!run.files.includes(`${first ?? ''}.svg`));
   });
 
@@ -367,7 +374,8 @@ describe('pdf-export figures', { skip }, () => {
     render.onRender((stId) => {
       if (stId === REACTION) content.silence();
     });
-    const run = await figures({ '--parallel': '1' });
+    // the silent read ends by its timeout, 2 s: long enough for the reads before it
+    const run = await figures({ '--parallel': '1', '--timeout': '2' });
     assert.equal(run.code, 1);
     assert.ok(!run.files.includes(`${REACTION}.svg`));
     assert.ok(!hasComplete(run));
@@ -380,13 +388,16 @@ describe('pdf-export figures', { skip }, () => {
       if (++drawn === 3) render.silence();
     });
     const started = Date.now();
-    const run = await figures();
+    // the silent reads end by their timeout, 2 s: long enough for the reads before them
+    const run = await figures({ '--timeout': '2' });
     assert.equal(run.code, 1);
     assert.ok(!hasComplete(run));
     assert.equal(run.report.stopped?.reason, 'deployment-unanswered');
-    // without waiting through the rest: 18 figures at two tries of 0.5 s each would be 9 s
-    assert.ok(Date.now() - started < 3000, String(Date.now() - started));
+    // without waiting through the rest: the figures asked for are counted, and the time is
+    // bounded only loosely (a held figure's two tries and a read, 6 s; the rest, 18 figures
+    // two at once at two tries of 2 s, would be 36 s)
     assert.ok(renders().length < 8, String(renders().length));
+    assert.ok(Date.now() - started < 15_000, String(Date.now() - started));
     assert.match(run.err, /stopped: deployment-unanswered/);
   });
 
@@ -438,7 +449,7 @@ describe('pdf-export figures', { skip }, () => {
     render.slow(200);
     const started = Date.now();
     // 18 figures one at a time, 0.2 s each: 3.6 s, past five timeouts of 0.5 s
-    const run = await figures({ '--parallel': '1' });
+    const run = await figures({ '--parallel': '1', '--timeout': '0.5' });
     assert.ok(Date.now() - started > 2500);
     assert.equal(run.code, 1);
     assert.equal(run.report.stopped, null);
@@ -447,17 +458,23 @@ describe('pdf-export figures', { skip }, () => {
 
   test('no figure answered for five timeouts, its health answering, trips the breaker', async () => {
     // every figure slower than its timeout, ten at once (the count's 20 is never reached), a
-    // retry's pause of 0.6 s: each figure takes 1.4 s, the eighteen 2.8 s, and the breaker's
-    // silence is 2 s (five timeouts of 0.4 s, above three and the pause, 1.8 s)
-    render.slow(5000);
-    const run = await figures({ '--parallel': '10', '--timeout': '0.4' }, undefined, 600);
+    // retry's pause of 2.1 s: each figure takes 5.1 s, and the breaker's silence is 7.5 s
+    // (five timeouts of 1.5 s, above three and the pause, 6.6 s), when the other eight, begun
+    // at 5.1 s and a little more, are in the pause after their first try, until 8.7 s
+    render.slow(20_000);
+    const run = await figures({ '--parallel': '10', '--timeout': '1.5' }, undefined, 2100);
     const drawing = render.times.at(render.requests.findIndex((p) => p.startsWith('/render/')));
     const ended = Date.now();
     assert.equal(run.code, 1);
     assert.equal(run.report.stopped?.reason, 'breaker-silent');
-    assert.match(run.report.stopped.detail, /for 2 s$/);
-    // timed from the drawing's start, after the preflight
-    assert.ok(drawing !== undefined && ended - drawing < 2300, String(ended - (drawing ?? 0)));
+    assert.match(run.report.stopped.detail, /for 7\.5 s$/);
+    // stopped as the silence ended, the figures in flight with it: their pauses cut short,
+    // not waited out, timed from the drawing's start, after the preflight. These timings
+    // were a timeout of 0.4 s and a pause of 0.6 s, the bound 2.3 s for a silence of 2 s and
+    // pauses ending at 2.4 s, which a loaded host missed; these leave 0.8 s either side. The
+    // time carries the check: a stop leaves no retry to count (a figure checks for a stop
+    // before each try), so a run that waits out its pauses asks for no more figures
+    assert.ok(drawing !== undefined && ended - drawing < 8300, String(ended - (drawing ?? 0)));
     assert.deepEqual(figureLines(run), []);
   });
 
@@ -612,7 +629,8 @@ describe('pdf-export figures', { skip }, () => {
   test('a figure timing out once, and one answering 504 once, are drawn on their retry', async () => {
     render.refuse(REACTION, 'timeout', 1);
     render.refuse(ALPHA, 504, 1);
-    const run = await figures();
+    // the held try ends by its timeout, 2 s: long enough for the reads after each figure
+    const run = await figures({ '--timeout': '2' });
     assert.equal(run.code, 0, run.err);
     assert.ok(run.files.includes(`${REACTION}.svg`));
     assert.ok(run.files.includes(`${ALPHA}.svg`));
