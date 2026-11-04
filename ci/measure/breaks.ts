@@ -3,9 +3,12 @@
 //
 //   node ci/measure/breaks.ts
 //
-// 1. Spaces: each character JavaScript's `\s` matches, and U+180E, U+200B and U+2060, set
-//    between two runs of eight letters in a box too narrow for both: whether Chromium puts
-//    them on two lines. Each is compared with `BREAKABLE_SPACE`; any disagreement is exit 1.
+// 1. Breaks: each character JavaScript's `\s` matches, U+0085, U+180E, U+200B and U+2060,
+//    ASCII's punctuation, and hyphens and dashes, set between two runs of eight characters
+//    (letters, digits, and each both ways round) in a box too narrow for both: whether
+//    Chromium breaks the line after it, before it, both or not at all, and the same for a
+//    space or a hyphen with a combining mark. Each is compared with `breakBeside`
+//    (src/layout/html.ts), a space expected to break after; any disagreement is exit 1.
 // 2. Tables: a summation's table of two rows, every cell one token, laid out by Chromium
 //    with the book's stylesheets and print media, in a `.summation` as wide as the text
 //    column (A4 less two 20 mm margins, 170 mm); the token given its breaks by
@@ -18,7 +21,7 @@
 import { chromium } from 'playwright-core';
 
 import { pageStyles } from '../../src/layout/document.ts';
-import { BREAKABLE_SPACE, markupBreaks } from '../../src/layout/html.ts';
+import { breakBeside, markupBreaks } from '../../src/layout/html.ts';
 
 const hex = (code: number) => `U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
 
@@ -27,35 +30,75 @@ let disagree = 0;
 try {
   const page = await browser.newPage();
 
-  // 1. spaces
+  // 1. where a line breaks
   const codes: number[] = [];
   for (let code = 0; code <= 0xffff; code++)
     if (/\s/u.test(String.fromCharCode(code))) codes.push(code);
-  codes.push(0x180e, 0x200b, 0x2060);
+  codes.push(0x85, 0x180e, 0x200b, 0x2060);
+  for (let code = 0x21; code <= 0x7e; code++)
+    if (!/[a-z0-9]/i.test(String.fromCharCode(code))) codes.push(code);
+  codes.push(0xad, 0xb7, 0x58a, 0x1806, 0x2027, 0x2043, 0x2044, 0x2212, 0x2215, 0x2e17);
+  for (let code = 0x2010; code <= 0x2015; code++) codes.push(code);
+  codes.push(0x2e1a, 0x30fb);
+  // a combining acute accent after a space or a hyphen: one grapheme with it
+  const marked = [0x20, 0x2009, 0x2d, 0x2010].map(
+    (code) => String.fromCharCode(code) + String.fromCharCode(0x301)
+  );
+  const units = [...codes.map((code) => String.fromCharCode(code)), ...marked];
   await page.setContent(
     '<div id="box" style="width: 60px; font: 16px monospace; white-space: normal"></div>'
   );
-  // run in the page, as a string: this project's types have no DOM
-  const broken = await page.evaluate<boolean[]>(
+  // run in the page, as a string: this project's types have no DOM. For each unit between
+  // eight characters and eight more (letters, digits, both ways round), too wide for one
+  // line: whether the line breaks after it, before it, both, or not at all.
+  const measured = await page.evaluate<string[][]>(
     `(() => {
       const box = document.getElementById('box');
-      box.textContent = 'a';
-      const one = box.getBoundingClientRect().height;
-      return ${JSON.stringify(codes)}.map((code) => {
-        box.textContent = 'aaaaaaaa' + String.fromCharCode(code) + 'bbbbbbbb';
-        return box.getBoundingClientRect().height > one * 1.5;
-      });
+      const top = (node, from, to) => {
+        const range = document.createRange();
+        range.setStart(node, from);
+        range.setEnd(node, to);
+        const rect = range.getClientRects()[0];
+        return rect ? Math.round(rect.top) : NaN;
+      };
+      return ${JSON.stringify(units)}.map((unit) =>
+        [['a', 'b'], ['a', '1'], ['1', 'b'], ['1', '2']].map(([left, right]) => {
+          box.textContent = left.repeat(8) + unit + right.repeat(8);
+          const node = box.firstChild;
+          const before = top(node, 7, 8);
+          const after = top(node, 8 + unit.length, 9 + unit.length);
+          const lines = new Set();
+          for (let i = 0; i < 16 + unit.length; i++) lines.add(top(node, i, i + 1));
+          lines.delete(NaN);
+          if (lines.size === 1) return 'none';
+          // the unit's own line, where it is drawn (a space at a line's end may not be)
+          let own = NaN;
+          for (let i = 8; i < 8 + unit.length && Number.isNaN(own); i++) own = top(node, i, i + 1);
+          if (Number.isNaN(own)) return 'after';
+          if (own === before && own !== after) return 'after';
+          if (own === after && own !== before) return 'before';
+          // on neither line: on one of its own (both), or a soft hyphen's added hyphen
+          return lines.size > 2 ? 'both' : 'after';
+        })
+      );
     })()`
   );
   console.log(
-    'Spaces: whether Chromium breaks a line there (DISAGREE: BREAKABLE_SPACE says otherwise)'
+    'Breaks: where Chromium breaks a line beside each, between letters and digits' +
+      ' (DISAGREE: breakBeside says otherwise)'
   );
-  codes.forEach((code, i) => {
-    const chromiumBreaks = broken[i] === true;
-    const ends = BREAKABLE_SPACE.test(String.fromCharCode(code));
-    if (chromiumBreaks !== ends) disagree++;
-    const mark = chromiumBreaks === ends ? '' : '  DISAGREE';
-    console.log(`  ${hex(code)}  ${chromiumBreaks ? 'breaks' : 'joins '}  ${mark}`);
+  units.forEach((unit, i) => {
+    const found = [...new Set(measured[i])];
+    const expected = breakBeside(unit);
+    const agrees = found.length === 1 && found[0] === (expected === 'space' ? 'after' : expected);
+    // a hyphen with a mark is taken to join, as decided (breakBeside): not a disagreement
+    const decided = !agrees && expected === 'none' && Array.from(unit).length > 1;
+    if (!agrees && !decided) disagree++;
+    const name = Array.from(unit, (char) => hex(char.codePointAt(0) ?? 0)).join(' ');
+    // by context (letter-letter, letter-digit, digit-letter, digit-digit) where they differ
+    const what = found.length === 1 ? (found[0] ?? '') : (measured[i] ?? []).join(' ');
+    const mark = agrees ? '' : decided ? ' taken to join, as decided' : ' DISAGREE';
+    console.log(`  ${name.padEnd(13)} ${what.padEnd(7)} ${mark}`);
   });
 
   // 2. tables
@@ -118,6 +161,6 @@ try {
   await browser.close();
 }
 if (disagree > 0) {
-  console.log(`\n${String(disagree)} spaces disagree`);
+  console.log(`\n${String(disagree)} disagree`);
   process.exitCode = 1;
 }

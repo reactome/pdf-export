@@ -28,7 +28,7 @@ describe("text()'s breaks", () => {
     const breaking = [' ', '\t', '\n', '\r', '\r\n', '\u1680', '\u200b', '\u2028', '\u2029'];
     for (let code = 0x2000; code <= 0x200a; code++)
       if (code !== 0x2007) breaking.push(String.fromCharCode(code));
-    breaking.push('\u205f', '\u3000');
+    breaking.push('\u205f', '\u3000', String.fromCharCode(0x85));
     for (const space of breaking)
       assert.equal(text(`${half}${space}${half}`), `${half}${space}${half}`, JSON.stringify(space));
     const joining = [
@@ -52,6 +52,42 @@ describe("text()'s breaks", () => {
     // 46 characters together: before, they were one token, broken mid-word
     const name = 'glycosylphosphatidylinositol\u2009phosphodiesterase isoform';
     assert.equal(text(name), name);
+  });
+
+  test('a run ends after a hyphen: a hyphenated name is kept whole, a long run broken', () => {
+    const name = '1-phosphatidyl-1D-myo-inositol-4,5-bisphosphate';
+    assert.equal(text(name), name);
+    assert.equal(markupBreaks(`<p>${name}</p>`), `<p>${name}</p>`);
+    // the hyphen counted in the run it closes: 45 and a hyphen in three pieces, then 10
+    const long = `${'a'.repeat(45)}-${'b'.repeat(10)}`;
+    assert.deepEqual(pieces(text(long)), [16, 15, 25]);
+    assert.equal(text(long).replaceAll('<wbr>', ''), long);
+  });
+
+  test('a run ends where Chromium breaks beside a character, and nowhere else', () => {
+    // as measured by ci/measure/breaks.ts, between two runs of 30
+    const half = 'a'.repeat(30);
+    const kept = (c: string) => text(`${half}${c}${half}`) === `${half}${c}${half}`;
+    const after = [0x2d, 0x3f, 0xad, 0x58a, 0x2010, 0x2012, 0x2013, 0x2027, 0x2e17, 0x30fb];
+    for (const code of [...after, 0x1806, 0x2014])
+      assert.ok(kept(String.fromCharCode(code)), code.toString(16));
+    // U+2011 (non-breaking hyphen), U+2015, U+2212 (minus), and punctuation that joins
+    for (const code of [0x2011, 0x2015, 0x2212, 0x2f, 0x7c, 0x2c, 0x2e, 0x2b, 0x5f, 0xb7])
+      assert.deepEqual(
+        pieces(text(`${half}${String.fromCharCode(code)}${half}`)),
+        [16, 15, 15, 15]
+      );
+    // a run that starts with U+1806 counts it there: 30, then 1 and 45
+    const before = `${'a'.repeat(30)}${String.fromCharCode(0x1806)}${'b'.repeat(45)}`;
+    assert.deepEqual(pieces(text(before)), [46, 15, 15]);
+  });
+
+  test('a space with a combining mark ends a token; a hyphen with one is taken to join', () => {
+    const half = 'a'.repeat(30);
+    const mark = String.fromCharCode(0x301);
+    for (const space of [' ', String.fromCharCode(0x2009)])
+      assert.equal(text(`${half}${space}${mark}${half}`), `${half}${space}${mark}${half}`);
+    assert.deepEqual(pieces(text(`${half}-${mark}${half}`)), [16, 16, 15, 15]);
   });
 
   test('a character escaped is one unit, never broken into', () => {
