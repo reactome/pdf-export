@@ -247,7 +247,7 @@ describe('the layout', { skip: skipWithoutGraph }, () => {
     const { html } = layoutSingle(built.pathway, options);
     assert.match(
       sectionOf(html, 'R-HSA-90000100'),
-      /<div class="figure(?: landscape)?"><a class="figure-link" href="[^"]*\/PathwayBrowser\/#\/R-HSA-90000100[^"]*"><svg [^>]*width="[\d.]+pt"/
+      /<div class="figure"><a class="figure-link" href="[^"]*\/PathwayBrowser\/#\/R-HSA-90000100[^"]*"><svg [^>]*width="[\d.]+pt"/
     );
     assert.match(sectionOf(html, 'R-HSA-90000100'), /id="s-R-HSA-90000100-clip-1"/);
     const root = fullSection(built.pathway, 'R-HSA-90000100');

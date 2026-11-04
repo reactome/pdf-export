@@ -201,19 +201,22 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test('a figure as tall as the text area prints no page more, and is estimated', async () => {
-    // a section with text after its figure (Reaction one: a summation, references), its
-    // figure drawn as tall as the text area allows: 600 by 1,400, and 1,000 by 1,600, which
-    // is wide too; each page holds text, the figure's own a label
-    const alpha = bookPdf(built, 'Alpha pathway');
-    const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
-    assert.ok(place?.full && place.section.figure);
-    const key = figureKey(place.section.figure);
+    // a section with text after its figure (Reaction one: a summation, references), and one
+    // with nothing after it (Gamma's R-HSA-90000310), each figure drawn as tall as the text
+    // area allows: 600 by 1,400, and 1,000 by 1,600, which is wide too; each page holds
+    // text, the figure's own a label
     const printer = started;
     assert.ok(printer);
-    for (const [width, height] of [
-      [600, 1400],
-      [1000, 1600],
+    for (const [title, stId, width, height] of [
+      ['Alpha pathway', 'R-HSA-90000211', 600, 1400],
+      ['Alpha pathway', 'R-HSA-90000211', 1000, 1600],
+      ['Gamma pathway', 'R-HSA-90000310', 600, 1400],
+      ['Gamma pathway', 'R-HSA-90000310', 1000, 1600],
     ] as const) {
+      const alpha = bookPdf(built, title);
+      const place = alpha.places.find((p) => p.full && p.section.event.stId === stId);
+      assert.ok(place?.full && place.section.figure);
+      const key = figureKey(place.section.figure);
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}"><rect width="${String(width)}" height="${String(height)}" fill="#eee"/><text x="20" y="40" font-size="12">tall figure</text></svg>`;
       const figures = new Map(options.figures).set(key, svg);
       const sizes = figureSizes(figures);
@@ -222,13 +225,10 @@ describe('parts', { skip: skipWithoutGraph }, () => {
         await printer.part(layoutBookPart(alpha, [place], { ...options, figures }).html)
       );
       const blank = pages.flatMap((page, i) => (page.text.trim() === '' ? [i + 1] : []));
-      assert.deepEqual(blank, [], `${String(width)} by ${String(height)}: blank pages`);
+      const label = `${stId}, ${String(width)} by ${String(height)}`;
+      assert.deepEqual(blank, [], `${label}: blank pages`);
       const estimate = estimatePages(place, sizes);
-      assert.equal(
-        Math.ceil(estimate),
-        pages.length,
-        `${String(width)} by ${String(height)}: ${String(estimate)}`
-      );
+      assert.equal(Math.ceil(estimate), pages.length, `${label}: ${String(estimate)}`);
     }
   });
 
@@ -286,14 +286,14 @@ describe('parts', { skip: skipWithoutGraph }, () => {
     }
   });
 
-  test('a portrait figure counts its margins, and a reaction its events before and after', () => {
+  test('a figure counts its margins, and a reaction its events before and after', () => {
     const alpha = bookPdf(built, 'Alpha pathway');
     const place = alpha.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000211');
     assert.ok(place?.full && place.section.event.kind === 'reaction');
     assert.ok(place.section.event.before.length + place.section.event.after.length > 0);
     const none = estimatePages(place, () => null);
-    // a portrait figure 100 pt tall, that fits: its height and its 10 pt margins
-    const figure = estimatePages(place, () => ({ landscape: false, height: 100 }));
+    // a figure 100 pt tall, that fits: its height and its 10 pt margins
+    const figure = estimatePages(place, () => ({ height: 100 }));
     assert.ok(Math.abs((figure - none) * PORTRAIT.height - 120) < 1e-6, String(figure - none));
     // without events before and after, two lines (15 pt each) fewer
     const alone = {
@@ -305,12 +305,14 @@ describe('parts', { skip: skipWithoutGraph }, () => {
   });
 
   test('a part ends at the boundary where it reaches the threshold, not after', () => {
-    // a section with nothing after its figure, the figure with its margins (20 pt,
-    // pages.css) as tall as the text area: its heading's page, and the figure's, exactly
+    // a section with nothing after its figure, the figure drawn as tall as the text area:
+    // its heading's page, and the figure's, exactly (the figure's margins dropped at the
+    // page's foot)
     const gamma = bookPdf(built, 'Gamma pathway');
-    const sizes = () => ({ height: PORTRAIT.height - 20 });
     const two = gamma.places.find((p) => p.full && p.section.event.stId === 'R-HSA-90000310');
-    assert.ok(two);
+    assert.ok(two?.full && two.section.figure);
+    const tall = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1400"><rect width="600" height="1400" fill="#eee"/></svg>`;
+    const sizes = figureSizes(new Map(options.figures).set(figureKey(two.section.figure), tall));
     assert.equal(estimatePages(two, sizes), 2);
     assert.deepEqual(splitParts([two, two], 2, sizes), [[two], [two]]);
   });
