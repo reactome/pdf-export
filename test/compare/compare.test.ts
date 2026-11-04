@@ -11,12 +11,7 @@ import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import {
-  applyRecorded,
-  compareCommand,
-  compareReduced,
-  type Difference,
-} from '../../src/compare/compare.ts';
+import { compareCommand, compareReduced, type Difference } from '../../src/compare/compare.ts';
 import { readLayout } from '../../src/compare/read.ts';
 import { coverNames, hashNames, reduce, type Reduced } from '../../src/compare/reduce.ts';
 import type { Document } from '../../src/model/types.ts';
@@ -51,6 +46,12 @@ function assertNoName(text: string, where: string): void {
   }
 }
 
+/** The reference's first child section moved to the end. */
+function moveFirstChildLast(doc: Document): void {
+  const [root, child, ...rest] = doc.places;
+  if (root && child) doc.places = [root, ...rest, child];
+}
+
 describe('compare (FR-012)', { timeout: 300_000 }, () => {
   let printer: Printer;
   let folder: string;
@@ -58,7 +59,8 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
   let oursReduced: Reduced;
   const analysis = sampleAnalysis();
 
-  const reduced = async (pdf: Uint8Array) => reduce(await readLayout(pdf));
+  // a copy each time: pdf.js may take the buffer it is given
+  const reduced = async (pdf: Uint8Array) => reduce(await readLayout(pdf.slice()));
   /** The reference printed from a document changed by `change`, with these options. */
   const reference = async (
     change: (doc: Document) => void = () => undefined,
@@ -243,13 +245,8 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
         })
       );
       assert.ok(missing.includes(`sections extra ${S.stId}`), missing.join('\n'));
-      const moved = await differences(
-        await reference((doc) => {
-          const [first, ...rest] = doc.places;
-          if (first) doc.places = [first, ...rest.reverse()];
-        })
-      );
-      assert.ok(moved.includes(`sections order ${R1.stId} ${R2.stId}`), 'the order is missed');
+      const moved = await differences(await reference(moveFirstChildLast));
+      assert.ok(moved.includes(`sections order ${R1.stId}`), 'the order is missed');
     });
 
     test('the references and the edit history, compared by their hashes', async () => {
@@ -291,6 +288,15 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       })
     );
     assert.deepEqual(retargeted, [RESOURCE, 'contents target']);
+    // a target not read, on either side, is a difference of its own
+    const unread = await differences(
+      await reference(undefined, {
+        contents: entries.map((e) =>
+          e.target === `s-${R1.stId}` ? { ...e, target: 'nowhere' } : e
+        ),
+      })
+    );
+    assert.deepEqual(unread, [RESOURCE, 'contents missing-target']);
   });
 
   test('the figures: one missing, and one of another kind', async () => {
@@ -333,14 +339,8 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       newFolder = join(folder, 'new');
       mkdirSync(refFolder);
       mkdirSync(newFolder);
-      // names that differ, sections in another order, and a file on each side alone
-      const ref = await reference(
-        (doc) => {
-          const [first, ...rest] = doc.places;
-          if (first) doc.places = [first, ...rest.reverse()];
-        },
-        { names: [...PEOPLE] }
-      );
+      // names that differ, a section moved, and a file on each side alone
+      const ref = await reference(moveFirstChildLast, { names: [...PEOPLE] });
       writeFileSync(join(refFolder, 'Alpha signalling pathway.pdf'), ref);
       writeFileSync(join(newFolder, 'Alpha signalling pathway.pdf'), ours);
       writeFileSync(join(refFolder, 'Only today.pdf'), ref);
@@ -360,7 +360,7 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
           'Only new.pdf: file extra',
           'Alpha signalling pathway.pdf: cover names count',
           'Alpha signalling pathway.pdf: analysis resource missing',
-          `Alpha signalling pathway.pdf: sections order ${R1.stId} ${R2.stId}`,
+          `Alpha signalling pathway.pdf: sections order ${R1.stId}`,
         ]
       );
     });
@@ -372,6 +372,7 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
         { part: 'cover', field: 'names', kind: 'count', reason: 'a sample' },
         { part: 'analysis', field: 'resource', kind: 'missing', reason: 'not printed yet' },
         { part: 'sections', kind: 'order', reason: "today's lists are in the database's order" },
+        { part: 'contents', kind: 'order', reason: 'matches nothing' },
       ];
       writeFileSync(expected, JSON.stringify({ differences: records }));
       const all = await run([refFolder, newFolder, '--expected', expected]);
@@ -379,8 +380,10 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       const report = JSON.parse(all.out) as {
         counts: { differences: number; recorded: number; unrecorded: number };
         differences: Difference[];
+        unmatched: number[];
       };
       assert.deepEqual(report.counts, { differences: 5, recorded: 5, unrecorded: 0 });
+      assert.deepEqual(report.unmatched, [5]);
       assert.ok(report.differences.every((d) => typeof d.recorded === 'string'));
       // the order's record left out: that difference alone fails the run
       writeFileSync(expected, JSON.stringify({ differences: records.slice(0, 4) }));
@@ -389,35 +392,27 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       const unrecorded = (JSON.parse(some.out) as { differences: Difference[] }).differences.filter(
         (d) => d.recorded === undefined
       );
-      assert.deepEqual(unrecorded.map(brief), [`sections order ${R1.stId} ${R2.stId}`]);
+      assert.deepEqual(unrecorded.map(brief), [`sections order ${R1.stId}`]);
     });
 
-    test('a record naming events covers only those', () => {
-      const difference: Difference = {
-        file: 'f.pdf',
-        part: 'section',
-        field: 'summation',
-        kind: 'text',
-        count: 2,
-        events: [R1.stId, R2.stId],
-      };
-      const split = applyRecorded(
-        [difference],
-        [{ part: 'section', kind: 'text', events: [R1.stId], reason: 'rewritten' }]
-      );
+    test('a file that cannot be read is named and is a difference; the others are compared', async () => {
+      const refs = join(folder, 'broken-reference');
+      const news = join(folder, 'broken-new');
+      mkdirSync(refs);
+      mkdirSync(news);
+      writeFileSync(join(refs, 'Broken.pdf'), 'not a PDF: Placeholder, A');
+      writeFileSync(join(news, 'Broken.pdf'), ours);
+      writeFileSync(join(refs, 'Whole.pdf'), ours);
+      writeFileSync(join(news, 'Whole.pdf'), ours);
+      const { code, out, err } = await run([refs, news]);
+      assert.equal(code, 1);
+      assert.match(err, /^Not read: .*Broken\.pdf \(\w+/);
+      assertNoName(out + err, 'the report of an unreadable file');
+      const report = JSON.parse(out) as { differences: Difference[] };
       assert.deepEqual(
-        split.map((d) => [d.events, d.count, d.recorded]),
-        [
-          [[R1.stId], 1, 'rewritten'],
-          [[R2.stId], 1, undefined],
-        ]
+        report.differences.map((d) => `${d.file}: ${brief(d)}`),
+        ['Broken.pdf: file reference unreadable']
       );
-      // a record for another field covers nothing
-      const other = applyRecorded(
-        [difference],
-        [{ part: 'section', field: 'references', kind: 'text', reason: 'x' }]
-      );
-      assert.equal(other[0]?.recorded, undefined);
     });
 
     test('no name is printed, in the report or its errors', async () => {
@@ -444,6 +439,24 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       const unrecorded = await run([refFolder, newFolder, '--expected', expected]);
       assert.equal(unrecorded.code, 2);
       assert.match(unrecorded.err, /needs a part, a kind and a reason/);
+      writeFileSync(
+        expected,
+        JSON.stringify({
+          differences: [{ part: 'cover', kind: 'count', reason: 'x', feild: 'names' }],
+        })
+      );
+      const misspelt = await run([refFolder, newFolder, '--expected', expected]);
+      assert.equal(misspelt.code, 2);
+      assert.match(misspelt.err, /keys not known: feild/);
+      assert.equal((await run([refFolder, newFolder, '--reference-margin', 'wide'])).code, 2);
+    });
+
+    test("--reference-margin: the reference's margin band, in points", async () => {
+      const file = join(newFolder, 'Alpha signalling pathway.pdf');
+      assert.equal((await run([file, file])).code, 0);
+      // a band 300 pt deep leaves the reference little of its text
+      const deep = await run([file, file, '--reference-margin', '300']);
+      assert.equal(deep.code, 1);
     });
 
     test('it is a command of the command line', () => {

@@ -228,23 +228,44 @@ is a PDF, or a folder of today's PDFs, as today's book is one file per top-level
 pathway, and the new side likewise; a folder is compared file by file, by top-level
 pathway, and a file on one side only is reported as a difference.
 
-- **Output:** a JSON report of the differences by part and kind, with counts. Names
-  appear only as counts and hashes (FR-013).
+- **Output:** a JSON report of the differences by part and kind, with counts.
   - Each difference has its `file`, its `part` (`file`, `cover`, `introduction`,
     `analysis`, `sections`, `section`, `figure`, `contents` or `short-entries`), a `field`
     where the part has several (a section's `summation`, the cover's `names`), its `kind`
-    (`value`, `count`, `text`, `order`, `missing` from the new side, `extra` on it, `kind`
-    or `target`), a `count`, and the sections it is in by stable identifier.
-  - Each side's value is given only where it names no one: the cover's title and flags,
-    the introduction's numbers, the analysis's properties, and the cover's names as a
-    count and a hash. A section's text is never printed.
-  - A list in another order is a difference of its own kind, `order`.
+    (`value`, `count`, `text`, `order`, `missing` from the new side, `extra` on it, `kind`,
+    `target`, `missing-target` or `unreadable`), a `count`, and the sections it is in by
+    stable identifier.
+  - **What may be printed:** no text read from a PDF is printed unless it has one of these
+    shapes: a count, yes or no, a release number, one of a fixed list (the analysis's
+    types and resources, the parts, fields and kinds), a stable identifier
+    (`R-[A-Z]{3}-\d+`), an analysis token of the form the analysis service issues, or one
+    of Reactome's species. Anything else is printed as a hash and a length, and the
+    cover's names as a count and a hash (FR-013). The hashes are salted once a run, so
+    they say which values are equal within a report and cannot be checked against a
+    guessed name. The cover's title is never printed: a side's title is said only to be
+    its file's name or not (`same` or `differs`). A section's text is never printed.
+  - A list in another order is a difference of its own kind, `order`. The sections' order
+    is read by their longest common subsequence, so only the sections out of it are
+    reported; a section written twice is compared occurrence by occurrence.
+  - A contents entry whose target is not read on either side is `missing-target`.
+  - A file that cannot be read is named on standard error and reported as `unreadable`;
+    the other files are still compared.
+  - `unmatched`: the records of `--expected` that matched no difference, by their place in
+    its list.
 - **`--expected <file>`:** the recorded differences, as `{ "differences": [...] }`, each
-  with a `part`, a `kind` and a `reason`, and optionally a `field`, a `file` and `events`
-  (a record naming events covers only those). Each difference it covers is reported with
-  its reason. With it, the exit is 1 only for a difference not recorded.
-- **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments, a
-  reference and a new side not both PDFs or both folders, or a file that cannot be read.
+  with a `part`, a `kind` and a `reason`, and optionally a `field`, a `file` and `events`;
+  any other key is refused (exit 2). A record naming events covers only those events, and
+  never a difference that names none. Each difference it covers is reported with its
+  reason. With it, the exit is 1 only for a difference not recorded.
+- **`--reference-margin <pt>`:** the depth of the bands at the top and bottom of the
+  reference's pages read as margins (running headers, page numbers), 50 by default, as
+  pdf-export's own; T040 sets it for `event-pdf`'s files from their real margins.
+- **Exit:** 0 with no difference (or none not recorded), 1 with one, 2 on bad arguments or
+  a reference and a new side not both PDFs or both folders.
+- **What it does not know yet:** the reducer reads parts by their labels, pdf-export's
+  and other words for them; `event-pdf`'s own labels, margins, contents form and names'
+  separator are not known here, and are for T040 to add from its real files. A label not
+  known leaves its part unread, which shows as a difference.
 
 ## `pdf-export serve`
 

@@ -3,20 +3,23 @@
 // Nothing here knows which made the file; src/compare/reduce.ts reads the parts from these.
 //
 // - **Lines:** the pieces of text that share a baseline on a page, left to right, each with
-//   its left edge and its largest size. What is in a page's top or bottom MARGIN_BAND_PT (the
-//   running headers and page numbers, which FR-012 does not compare) and what is inside a
-//   figure (a vector diagram's labels) is left out.
+//   its left edge and its largest size. What is in a page's top or bottom margin band (the
+//   running headers and page numbers, which FR-012 does not compare; MARGIN_BAND_PT unless
+//   set) and what is inside a figure (a vector diagram's labels) is left out.
 // - **Links:** each link's box, its address or where in the PDF it lands.
 // - **Figures:** the boxes of what is drawn: images, and painted paths that are neither thin
 //   (a rule, a table's border) nor the whole page, clustered where they lie within
-//   FIGURE_GAP_PT of each other; a cluster at least FIGURE_MIN_PT each way is a figure. A
-//   raster diagram is one image; a vector one is many paths.
+//   FIGURE_GAP_PT of each other, a thin path joining only the clusters it touches (a
+//   diagram's connector); a cluster at least FIGURE_MIN_PT each way is a figure. A raster
+//   diagram is one image; a vector one is many paths. A table drawn with thick or shaded
+//   cells could be read as one, its text then left out (for T040 to check on `event-pdf`).
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 /**
- * The bands at a page's top and bottom read as margins: within pdf-export's 20 mm (56.7 pt,
- * src/layout/figure.ts), where its running headers and page numbers are, and above the first
- * line of its text area. `event-pdf`'s margins are to be confirmed on its real files (T040).
+ * The bands at a page's top and bottom read as margins, by default: within pdf-export's 20 mm
+ * (56.7 pt, src/layout/figure.ts), where its running headers and page numbers are, and above
+ * the first line of its text area. A setting (`compare --reference-margin`): T040 sets it for
+ * `event-pdf`'s files from their real margins, not known here.
  */
 export const MARGIN_BAND_PT = 50;
 
@@ -150,55 +153,69 @@ function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page:
   return boxes;
 }
 
-/** The figures among a page's shapes: clusters of the shapes that are neither thin nor all. */
-export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
-  const clusters: Box[] = [];
-  const near = (a: Box, b: Box) =>
-    a.x1 - FIGURE_GAP_PT <= b.x2 &&
-    b.x1 - FIGURE_GAP_PT <= a.x2 &&
-    a.y1 - FIGURE_GAP_PT <= b.y2 &&
-    b.y1 - FIGURE_GAP_PT <= a.y2;
+/** Two boxes within `gap` of each other. */
+const near = (a: Box, b: Box, gap: number): boolean =>
+  a.x1 - gap <= b.x2 && b.x1 - gap <= a.x2 && a.y1 - gap <= b.y2 && b.y1 - gap <= a.y2;
+
+const union = (a: Box, b: Box): Box => ({
+  page: a.page,
+  x1: Math.min(a.x1, b.x1),
+  y1: Math.min(a.y1, b.y1),
+  x2: Math.max(a.x2, b.x2),
+  y2: Math.max(a.y2, b.y2),
+});
+
+/** Boxes joined into clusters wherever any two are within `gap`, until none are. */
+function clustered(boxes: readonly Box[], gap: number): Box[] {
+  let clusters: Box[] = [];
   for (const box of boxes) {
-    const w = box.x2 - box.x1;
-    const h = box.y2 - box.y1;
-    if (w < THIN_PT || h < THIN_PT || w * h >= 0.9 * width * height) continue;
     let merged = { ...box };
     // a box may join clusters that were apart until it came
-    for (let i = clusters.length - 1; i >= 0; i--) {
-      const cluster = clusters[i];
-      if (!cluster || !near(cluster, merged)) continue;
-      merged = {
-        page: box.page,
-        x1: Math.min(cluster.x1, merged.x1),
-        y1: Math.min(cluster.y1, merged.y1),
-        x2: Math.max(cluster.x2, merged.x2),
-        y2: Math.max(cluster.y2, merged.y2),
-      };
-      clusters.splice(i, 1);
-    }
+    clusters = clusters.filter((cluster) => {
+      if (!near(cluster, merged, gap)) return true;
+      merged = union(cluster, merged);
+      return false;
+    });
     clusters.push(merged);
   }
   // a merge can bring a cluster near one it was not near before
-  let again = true;
-  while (again) {
+  for (let again = true; again;) {
     again = false;
     for (let i = 0; i < clusters.length && !again; i++) {
       for (let j = i + 1; j < clusters.length && !again; j++) {
-        const a = clusters[i];
-        const b = clusters[j];
-        if (!a || !b || !near(a, b)) continue;
-        clusters[i] = {
-          page: a.page,
-          x1: Math.min(a.x1, b.x1),
-          y1: Math.min(a.y1, b.y1),
-          x2: Math.max(a.x2, b.x2),
-          y2: Math.max(a.y2, b.y2),
-        };
+        const [a, b] = [clusters[i], clusters[j]];
+        if (!a || !b || !near(a, b, gap)) continue;
+        clusters[i] = union(a, b);
         clusters.splice(j, 1);
         again = true;
       }
     }
   }
+  return clusters;
+}
+
+/**
+ * The figures among a page's shapes. The shapes that are neither thin nor all of the page
+ * are clustered within FIGURE_GAP_PT; a thin shape (a diagram's connector, a line drawn as
+ * a path) joins a cluster only where it touches one, so a rule or a table's border near a
+ * figure is not taken in, while a connector bridges the shapes it joins. A cluster at least
+ * FIGURE_MIN_PT each way is a figure.
+ */
+export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
+  const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
+  const thin = (b: Box) => b.x2 - b.x1 < THIN_PT || b.y2 - b.y1 < THIN_PT;
+  let clusters = clustered(
+    kept.filter((b) => !thin(b)),
+    FIGURE_GAP_PT
+  );
+  let lines = kept.filter(thin);
+  for (let joined = true; joined && clusters.length > 0;) {
+    const touching = lines.filter((line) => clusters.some((c) => near(c, line, 1)));
+    joined = touching.length > 0;
+    lines = lines.filter((line) => !touching.includes(line));
+    if (joined) clusters = clustered([...clusters, ...touching], 1);
+  }
+  clusters = clustered(clusters, FIGURE_GAP_PT);
   return clusters.filter((c) => c.x2 - c.x1 >= FIGURE_MIN_PT && c.y2 - c.y1 >= FIGURE_MIN_PT);
 }
 
@@ -269,10 +286,17 @@ function linesOf(pieces: Piece[], page: number): Line[] {
   return lines;
 }
 
-/** A PDF's lines, links and figures, read with pdf.js. */
-export async function readLayout(data: Uint8Array): Promise<Layout> {
-  // a copy: pdf.js takes the buffer it is given
-  const task = getDocument({ data: new Uint8Array(data) });
+/**
+ * A PDF's lines, links and figures, read with pdf.js. The bytes are handed over: pdf.js may
+ * detach their buffer, so a caller keeping them passes a copy. A Node Buffer is refused: give
+ * a plain Uint8Array over its memory.
+ */
+export async function readLayout(
+  data: Uint8Array,
+  { margin = MARGIN_BAND_PT }: { margin?: number } = {}
+): Promise<Layout> {
+  // not copied: pdf.js takes the buffer it is given, which the caller gives up
+  const task = getDocument({ data });
   try {
     const doc = await task.promise;
     const layout: Layout = { pages: [], lines: [], links: [], figures: [] };
@@ -287,7 +311,7 @@ export async function readLayout(data: Uint8Array): Promise<Layout> {
       for (const item of (await page.getTextContent()).items) {
         if (!('str' in item) || item.str === '') continue;
         const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = item.transform as number[];
-        if (y <= MARGIN_BAND_PT || y >= height - MARGIN_BAND_PT) continue;
+        if (y <= margin || y >= height - margin) continue;
         if (figures.some((box) => inside(x, y, box))) continue;
         pieces.push({ x, y, size: Math.max(Math.hypot(a, b), Math.hypot(c, d)), str: item.str });
       }

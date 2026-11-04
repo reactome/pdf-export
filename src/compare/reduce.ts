@@ -8,24 +8,33 @@
 // line broken elsewhere, or the cover's names written with U+2060 between their characters
 // and no-break spaces between their words (`event-pdf`, research R2), read the same.
 //
-// People's names are never held as text: the cover's are a count and a hash, and a
-// section's literature references and edit history, which name their authors, are held as
-// one hash an item (FR-013).
+// What the reduced form holds as text (a section's parts, the contents' titles) is compared,
+// never printed: src/compare/output.ts prints only values of strict shapes. People's names
+// are not held as text at all: the cover's names are a count and a hash, its title (which
+// a misread cover could take from the names) a hash and a length, a section's literature
+// references and edit history one hash an item, and an analysis property not of its shape a
+// hash and a length (FR-013).
 //
-// The parts are found by their labels. Each part has pdf-export's label and the others it
-// is known by; `event-pdf`'s own are to be confirmed on its real files (T040), and a label
-// not known leaves its part unread, which the comparison reports, never passes.
-import { createHash } from 'node:crypto';
-
-import { NEVER_DRAWN } from '../layout/characters.ts';
+// The parts are found by their labels: pdf-export's, and other words for them. `event-pdf`'s
+// own labels are not known here, and are for T040 to add from its real files; a label not
+// known leaves its part unread, which the comparison reports as a difference.
 import { CONTRIBUTORS, INSTITUTIONS } from '../layout/text.ts';
-import type { Box, Layout, Line, Spot } from './read.ts';
+import {
+  ANALYSIS_TYPES,
+  RESOURCES,
+  checked,
+  fold,
+  hash,
+  withhold,
+  type Checked,
+  type Hashed,
+  type Shape,
+  type Withheld,
+} from './output.ts';
+import type { Box, Layout, Line, Link, Spot } from './read.ts';
 
-/** People's names, or a list that holds them: how many, and one hash of them all. */
-export interface Hashed {
-  count: number;
-  hash: string;
-}
+export { fold, hash } from './output.ts';
+export type { Hashed } from './output.ts';
 
 export type FigureKind = 'none' | 'diagram' | 'selection' | 'reaction' | 'figure';
 
@@ -54,25 +63,16 @@ export interface ContentsItem {
 }
 
 export interface Reduced {
-  cover: { title: string; diagram: boolean; excerpt: boolean; names: Hashed };
+  cover: { title: Withheld; diagram: boolean; excerpt: boolean; names: Hashed };
   introduction: { release: number | null; pathways: number | null; reactions: number | null };
-  /** The analysis's properties by name, their values folded, yes or no for either; null without one. */
-  analysis: Record<string, string> | null;
+  /** The analysis's properties by name, each of its shape or withheld; null without one. */
+  analysis: Record<string, Checked> | null;
   sections: ReducedSection[];
   /** Null where the PDF has no contents list. */
   contents: ContentsItem[] | null;
   /** Short entries at an event's later places (FR-004), which today's files do not write. */
   shortEntries: number;
 }
-
-const UNPRINTED = new RegExp(`${NEVER_DRAWN.source}+`, 'gu');
-
-/** Text as compared: compatibility forms folded, white space and joiners left out. */
-export const fold = (text: string): string => text.normalize('NFKC').replace(UNPRINTED, '');
-
-/** A short hash of a text, as names and the parts naming people are held. */
-export const hash = (text: string): string =>
-  createHash('sha256').update(text).digest('hex').slice(0, 16);
 
 /** Distinct names, folded, counted and hashed together; empty names left out. */
 export function hashNames(names: readonly string[]): Hashed {
@@ -112,10 +112,17 @@ export const PART_NAMES = [
 
 export type PartName = (typeof PART_NAMES)[number];
 
+/** A label at a line's start, whole and case aside, then a colon, white space or its end. */
+const labelPattern = (labels: readonly string[]): RegExp[] =>
+  labels.map((label) => {
+    const words = label.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`^\\s*${words.join('\\s*')}\\s*(?::|\\s|$)`, 'i');
+  });
+
 interface PartRule {
   part: PartName;
-  /** The labels it is known by, lower case, longest first where one begins another. */
-  labels: readonly string[];
+  /** The labels it is known by, longest first where one begins another, compiled. */
+  labels: readonly RegExp[];
   /** A fact, beside its label: a line of the section's own left edge after it ends it. */
   fact?: boolean;
   /** Its items, within its text: parted by a pattern, or each on lines of their own. */
@@ -126,61 +133,71 @@ interface PartRule {
 
 /** The labelled parts, in the order a section prints them (FR-005). */
 const RULES: readonly PartRule[] = [
-  { part: 'location', labels: ['location'], fact: true, split: /[›»>]/ },
-  { part: 'stId', labels: ['stable identifier', 'stable id'], fact: true },
-  { part: 'type', labels: ['reaction type', 'type'], fact: true },
-  { part: 'compartments', labels: ['compartments', 'compartment'], fact: true, split: /,/ },
-  { part: 'diseases', labels: ['diseases', 'disease'], fact: true, split: /,/ },
-  { part: 'inferredFrom', labels: ['inferred from'], fact: true, split: /;/ },
+  { part: 'location', labels: labelPattern(['location']), fact: true, split: /[›»>]/ },
+  { part: 'stId', labels: labelPattern(['stable identifier', 'stable id']), fact: true },
+  { part: 'type', labels: labelPattern(['reaction type', 'type']), fact: true },
+  {
+    part: 'compartments',
+    labels: labelPattern(['compartments', 'compartment']),
+    fact: true,
+    split: /,/,
+  },
+  { part: 'diseases', labels: labelPattern(['diseases', 'disease']), fact: true, split: /,/ },
+  { part: 'inferredFrom', labels: labelPattern(['inferred from']), fact: true, split: /;/ },
   { part: 'summation', labels: [] },
   {
     part: 'before',
-    labels: ['preceded by', 'preceding events', 'preceding event'],
+    labels: labelPattern(['preceded by', 'preceding events', 'preceding event']),
     fact: true,
     split: /;/,
   },
   {
     part: 'after',
-    labels: ['followed by', 'following events', 'following event'],
+    labels: labelPattern(['followed by', 'following events', 'following event']),
     fact: true,
     split: /;/,
   },
   {
     part: 'references',
-    labels: ['literature references', 'references'],
+    labels: labelPattern(['literature references', 'references']),
     split: 'numbered',
     names: true,
   },
-  { part: 'edits', labels: ['edit history'], split: 'dated', names: true },
-  { part: 'entities', labels: ['entities found'], split: 'rows' },
-  { part: 'interactors', labels: ['interactors found'], split: 'rows' },
+  { part: 'edits', labels: labelPattern(['edit history']), split: 'dated', names: true },
+  { part: 'entities', labels: labelPattern(['entities found']), split: 'rows' },
+  { part: 'interactors', labels: labelPattern(['interactors found']), split: 'rows' },
 ];
 
 const ruleOf = (part: PartName): PartRule | undefined => RULES.find((r) => r.part === part);
 const orderOf = (part: PartName): number => PART_NAMES.indexOf(part);
+const STABLE_ID_LABELS = ruleOf('stId')?.labels ?? [];
+const LOCATION_LABELS = ruleOf('location')?.labels ?? [];
 
-/** A line's text as read: compatibility forms folded, no-break spaces as spaces. */
+/** A line's text as read: compatibility forms folded, U+2060 left out. */
 const plain = (text: string): string => text.normalize('NFKC').replace(/\u2060/g, '');
 
-/** A label at a line's start, whole and case aside, then a colon, white space or its end. */
-function labelled(text: string, labels: readonly string[]): string | null {
+/** What follows a line's label, or null where it does not begin with one of them. */
+function labelled(text: string, labels: readonly RegExp[]): string | null {
   const read = plain(text);
   for (const label of labels) {
-    const words = label.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const match = new RegExp(`^\\s*${words.join('\\s*')}\\s*(?::|\\s|$)`, 'i').exec(read);
+    const match = label.exec(read);
     if (match) return read.slice(match[0].length);
   }
   return null;
 }
 
-const STABLE_ID = /R-[A-Z]{2,4}-\d+/;
-const STABLE_ID_AT_END = /R-[A-Z]{2,4}-\d+$/;
+const STABLE_ID = /R-[A-Z]{3}-\d+/;
+const STABLE_ID_AT_END = /R-[A-Z]{3}-\d+$/;
 
 /** A heading is set at least this much larger than its body text (as check-book reads it). */
 const HEADING_RATIO = 11.25 / 10.5;
 
-/** How far below where a link lands its target's first line may be. */
-const LANDING_PT = 100;
+/**
+ * How far below where a link lands its target's first line may be: Chromium's own
+ * destinations land up to about 76 pt above a heading's baseline (at the top of its page, or
+ * of the space above it), measured on pdf-export's single-event PDFs.
+ */
+export const LANDING_PT = 100;
 
 /** Whether `a` comes before `b` in reading order: an earlier page, or higher on the same one. */
 const before = (a: Spot, b: Spot): boolean => a.page < b.page || (a.page === b.page && a.y > b.y);
@@ -206,16 +223,31 @@ type FrontName = keyof typeof FRONT_HEADINGS;
 const linkOn = (line: Line, box: Box): boolean =>
   box.page === line.page && line.y >= box.y1 - 2 && line.y <= box.y2 + 2;
 
+/** Items grouped by their page, so each line looks only at its own page's. */
+function byPage<T>(items: readonly T[], page: (item: T) => number): (p: number) => readonly T[] {
+  const pages = new Map<number, T[]>();
+  for (const item of items) {
+    const list = pages.get(page(item));
+    if (list) list.push(item);
+    else pages.set(page(item), [item]);
+  }
+  return (p) => pages.get(p) ?? [];
+}
+
 /** A layout reduced to FR-012's parts. */
 export function reduce(layout: Layout): Reduced {
-  const { lines, links, figures } = layout;
+  const { lines, figures } = layout;
+  const linksOn = byPage(layout.links, (link) => link.box.page);
+  const figuresOn = byPage(figures, (box) => box.page);
   const body = bodySize(lines.filter((line) => line.page > 0));
   const heading = (line: Line) => line.size >= body * HEADING_RATIO;
+  const internalOn = (line: Line): Link | undefined =>
+    linksOn(line.page).find((link) => link.uri === null && linkOn(line, link.box));
 
   // each section, at its stable identifier's label; its name the heading above it, above its
   // location where that comes first
   const anchors = lines.flatMap((line, i) => {
-    const rest = labelled(line.text, ruleOf('stId')?.labels ?? []);
+    const rest = labelled(line.text, STABLE_ID_LABELS);
     const stId = rest === null ? undefined : STABLE_ID.exec(fold(rest))?.[0];
     return stId === undefined ? [] : [{ i, stId }];
   });
@@ -223,7 +255,7 @@ export function reduce(layout: Layout): Reduced {
     const floor = n > 0 ? (anchors[n - 1]?.i ?? 0) + 1 : 0;
     let j = i - 1;
     for (let k = i - 1; k >= Math.max(floor, i - 6); k--) {
-      if (labelled(lines[k]?.text ?? '', ruleOf('location')?.labels ?? []) !== null) {
+      if (labelled(lines[k]?.text ?? '', LOCATION_LABELS) !== null) {
         j = k - 1;
         break;
       }
@@ -232,41 +264,58 @@ export function reduce(layout: Layout): Reduced {
     while (start - 1 >= floor && lines[start - 1] && heading(lines[start - 1] as Line)) start--;
     return start;
   });
+  const startSet = new Set(starts);
   const firstSection = starts[0] ?? lines.length;
+  const lastAnchor = anchors.at(-1)?.i ?? -1;
 
   // the front parts' headings: the introduction's and the analysis's before the sections, the
   // contents list's before them or after them all (today's files put it last)
   const front = new Map<FrontName, number>();
   lines.forEach((line, i) => {
-    if (line.page === 0 || !heading(line) || starts.includes(i)) return;
+    if (line.page === 0 || !heading(line) || startSet.has(i)) return;
     const text = plain(line.text).trim();
     for (const name of Object.keys(FRONT_HEADINGS) as FrontName[]) {
       if (front.has(name) || !FRONT_HEADINGS[name].test(text)) continue;
       if (name !== 'contents' && i >= firstSection) continue;
-      if (name === 'contents' && i >= firstSection && i < (anchors.at(-1)?.i ?? 0)) continue;
+      if (name === 'contents' && i >= firstSection && i < lastAnchor) continue;
       front.set(name, i);
     }
   });
-  const boundaries = [...starts, ...front.values(), lines.length].sort((a, b) => a - b);
-  const regionEnd = (from: number) => boundaries.find((b) => b > from) ?? lines.length;
+  const boundaries = [...new Set([...starts, ...front.values(), lines.length])].sort(
+    (a, b) => a - b
+  );
+  /** The first boundary after a line: the next section or front part, or the end. */
+  const regionEnd = (from: number): number => {
+    let lo = 0;
+    let hi = boundaries.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if ((boundaries[mid] ?? Infinity) <= from) lo = mid + 1;
+      else hi = mid;
+    }
+    return boundaries[lo] ?? lines.length;
+  };
   const spotOf = (i: number): Spot | null => {
     const line = lines[i];
     return line ? { page: line.page, y: line.y + line.size } : null;
   };
 
-  // where an internal link lands: the first section or front part starting at or below it
-  // on its page, within LANDING_PT (Chromium's own destinations land up to about 76 pt
-  // above a heading's baseline, at the top of its page or of the space above it)
-  const targets = [
-    ...anchors.map(({ stId }, n) => ({ at: starts[n] ?? 0, name: stId })),
-    ...[...front].map(([name, at]) => ({ at, name })),
-  ];
+  // where an internal link lands: the first section or front part starting at or below it on
+  // its page, within LANDING_PT
+  const targetsOn = byPage(
+    [
+      ...anchors.map(({ stId }, n) => ({ at: starts[n] ?? 0, name: stId })),
+      ...[...front].map(([name, at]) => ({ at, name })),
+    ].flatMap((t) => {
+      const line = lines[t.at];
+      return line ? [{ ...t, line }] : [];
+    }),
+    (t) => t.line.page
+  );
   const resolve = (landing: Spot | null): string | null => {
     if (!landing) return null;
     let best: { name: string; y: number } | null = null;
-    for (const { at, name } of targets) {
-      const line = lines[at];
-      if (!line || line.page !== landing.page) continue;
+    for (const { line, name } of targetsOn(landing.page)) {
       if (line.y > landing.y + 2 || line.y < landing.y - LANDING_PT) continue;
       if (!best || line.y > best.y) best = { name, y: line.y };
     }
@@ -277,14 +326,18 @@ export function reduce(layout: Layout): Reduced {
   const sections = anchors.map(({ i, stId }, n): ReducedSection => {
     const start = starts[n] ?? i;
     const end = regionEnd(i);
-    const label = lines[i];
-    const left = label?.x ?? 0;
+    const left = lines[i]?.x ?? 0;
     const from = spotOf(start);
     const to = spotOf(end);
-    const own = figures.filter((box) => {
-      const top = { page: box.page, y: box.y2 };
-      return from !== null && !before(top, from) && (to === null || before(top, to));
-    });
+    const own: Box[] = [];
+    if (from) {
+      for (let page = from.page; page <= (to?.page ?? from.page); page++) {
+        for (const box of figuresOn(page)) {
+          const top = { page: box.page, y: box.y2 };
+          if (!before(top, from) && (to === null || before(top, to))) own.push(box);
+        }
+      }
+    }
     const parts: { part: PartName; texts: string[] }[] = [];
     const headingLines: Line[] = [];
     for (let k = start; k < i && lines[k] && heading(lines[k] as Line); k++) {
@@ -311,8 +364,7 @@ export function reduce(layout: Layout): Reduced {
         continue;
       }
       // a short entry: an event's name and stable identifier, linked to its section
-      const internal = links.some((link) => link.uri === null && linkOn(line, link.box));
-      if (internal && STABLE_ID_AT_END.test(fold(line.text))) {
+      if (STABLE_ID_AT_END.test(fold(line.text)) && internalOn(line)) {
         shortEntries++;
         continue;
       }
@@ -344,8 +396,8 @@ export function reduce(layout: Layout): Reduced {
   function figureKind(own: readonly Box[], reaction: boolean): FigureKind {
     const [box] = own;
     if (!box) return 'none';
-    for (const link of links) {
-      if (link.box.page !== box.page || link.uri === null) continue;
+    for (const link of linksOn(box.page)) {
+      if (link.uri === null) continue;
       const overlaps =
         link.box.x1 < box.x2 &&
         box.x1 < link.box.x2 &&
@@ -359,34 +411,25 @@ export function reduce(layout: Layout): Reduced {
     return reaction ? 'reaction' : 'figure';
   }
 
+  /** A front part's lines: after its heading, to the next section or front part. */
+  const region = (name: FrontName): Line[] | null => {
+    const at = front.get(name);
+    return at === undefined ? null : lines.slice(at + 1, regionEnd(at));
+  };
+  const analysisLines = region('analysis');
+  const contentsLines = region('contents');
   return {
     cover: cover(
       lines.filter((line) => line.page === 0),
-      figures
+      figuresOn(0)
     ),
     introduction: introduction(
-      front.has('introduction')
-        ? lines.slice(
-            (front.get('introduction') ?? 0) + 1,
-            regionEnd(front.get('introduction') ?? 0)
-          )
-        : lines.slice(0, firstSection).filter((line) => line.page > 0)
+      region('introduction') ?? lines.slice(0, firstSection).filter((line) => line.page > 0)
     ),
-    analysis: front.has('analysis')
-      ? analysis(
-          lines.slice((front.get('analysis') ?? 0) + 1, regionEnd(front.get('analysis') ?? 0))
-        )
-      : null,
+    analysis: analysisLines ? analysis(analysisLines, heading) : null,
     sections,
-    contents: front.has('contents')
-      ? contents(
-          lines.slice((front.get('contents') ?? 0) + 1, regionEnd(front.get('contents') ?? 0)),
-          (line) =>
-            resolve(
-              links.find((link) => link.uri === null && link.landing && linkOn(line, link.box))
-                ?.landing ?? null
-            )
-        )
+    contents: contentsLines
+      ? contents(contentsLines, (line) => resolve(internalOn(line)?.landing ?? null))
       : null,
     shortEntries,
   };
@@ -432,16 +475,17 @@ const AFTER_NAMES = new RegExp(
 /** The cover's label before its names: pdf-export's, or a word that says what they are. */
 const NAMES_LABEL = /^\s*(?:authored|authors?|contributors?|edited|editors?|curated|curators?)\b/i;
 
+/**
+ * The cover. Its title is its largest text, held as a hash and a length: where a figure took
+ * in the real title, the largest text left could be the names.
+ */
 function cover(page: readonly Line[], figures: readonly Box[]): Reduced['cover'] {
   const largest = Math.max(0, ...page.map((line) => line.size));
   const first = page.findIndex((line) => Math.abs(line.size - largest) < 0.5);
   let last = first;
   while (page[last + 1] && Math.abs((page[last + 1]?.size ?? 0) - largest) < 0.5) last++;
   const titleLines = first < 0 ? [] : page.slice(first, last + 1);
-  const title = titleLines
-    .map((line) => plain(line.text).replace(/\s+/g, ' ').trim())
-    .join(' ')
-    .trim();
+  const title = fold(titleLines.map((line) => line.text).join(''));
   const below = titleLines.at(-1);
   const diagram = figures.some((box) => box.page === 0 && below !== undefined && box.y2 < below.y);
   const excerpt = page.some((line) => /excerpt/i.test(plain(line.text)));
@@ -461,7 +505,7 @@ function cover(page: readonly Line[], figures: readonly Box[]): Reduced['cover']
     region = page.filter((line) => line.text.includes('\u2060'));
   }
   return {
-    title,
+    title: withhold(title),
     diagram,
     excerpt,
     names: hashNames(coverNames(region.map((line) => line.text).join('\n'))),
@@ -481,36 +525,57 @@ function introduction(region: readonly Line[]): Reduced['introduction'] {
   };
 }
 
-/** The analysis's properties and the labels each is known by, longest first. */
-const PROPERTIES: readonly (readonly [string, readonly string[]])[] = [
-  ['token', ['token']],
-  ['type', ['analysis type', 'type']],
-  ['species', ['species']],
-  ['projection', ['projected to human', 'projection']],
-  ['interactors', ['interactors included', 'include interactors', 'interactors']],
-  ['identifiers', ['identifiers found']],
-  ['pathways', ['pathways hit', 'pathways found']],
-  ['resource', ['resource']],
+/** The analysis's properties, the labels each is known by (longest first), and their shapes. */
+const PROPERTIES: readonly { name: string; labels: readonly RegExp[]; shape: Shape }[] = [
+  { name: 'token', labels: labelPattern(['token']), shape: 'token' },
+  {
+    name: 'type',
+    labels: labelPattern(['analysis type', 'type']),
+    shape: { oneOf: ANALYSIS_TYPES },
+  },
+  { name: 'species', labels: labelPattern(['species']), shape: 'species' },
+  {
+    name: 'projection',
+    labels: labelPattern(['projected to human', 'projection']),
+    shape: 'yesno',
+  },
+  {
+    name: 'interactors',
+    labels: labelPattern(['interactors included', 'include interactors', 'interactors']),
+    shape: 'yesno',
+  },
+  { name: 'identifiers', labels: labelPattern(['identifiers found']), shape: 'count' },
+  { name: 'pathways', labels: labelPattern(['pathways hit', 'pathways found']), shape: 'count' },
+  { name: 'resource', labels: labelPattern(['resource']), shape: { oneOf: RESOURCES } },
 ];
 
-function analysis(region: readonly Line[]): Record<string, string> {
-  const properties: Record<string, string> = {};
+/**
+ * The analysis's properties, from its region up to the first stable identifier or the next
+ * heading (a section's, where its stable identifier was not read), each kept only where it
+ * has its shape (src/compare/output.ts), else withheld.
+ */
+function analysis(
+  region: readonly Line[],
+  heading: (line: Line) => boolean
+): Record<string, Checked> {
+  const properties: Record<string, Checked> = {};
   for (const line of region) {
-    for (const [name, labels] of PROPERTIES) {
+    if (heading(line) || STABLE_ID.test(fold(line.text))) break;
+    for (const { name, labels, shape } of PROPERTIES) {
       if (name in properties || (name === 'identifiers' && 'identifiersFound' in properties)) {
         continue;
       }
       const rest = labelled(line.text, labels);
       if (rest === null) continue;
       const value = fold(rest);
-      const yes = /^(?:yes|true)$/i.test(value);
-      const no = /^(?:no|false)$/i.test(value);
       if (name === 'identifiers') {
-        const [found, total] = value.split(/of/i);
-        properties['identifiersFound'] = found ?? '';
-        if (total !== undefined) properties['identifiersTotal'] = total;
+        const [found = '', total, more] = value.split(/of/i);
+        properties['identifiersFound'] = checked(found, 'count');
+        if (total !== undefined) properties['identifiersTotal'] = checked(total, 'count');
+        // a value of another form than `x of y`, withheld whole
+        if (more !== undefined) properties['identifiersFound'] = checked(value, 'count');
       } else {
-        properties[name] = yes ? 'yes' : no ? 'no' : value;
+        properties[name] = checked(value, shape);
       }
       break;
     }
