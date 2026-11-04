@@ -35,7 +35,7 @@ import {
 
 import { bookCommand } from '../../src/book/command.ts';
 import { CHECKS, checkBook, checkBookCommand } from '../../src/check/book.ts';
-import { graphSettings, openGraph } from '../../src/graph/connection.ts';
+import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PLACEHOLDER } from '../../src/layout/html.ts';
 import { buildBook } from '../../src/model/build.ts';
@@ -255,12 +255,15 @@ describe('pdf-export check-book', { skip }, () => {
   /** The fixture's book, as `book` wrote it, and the documents it was made from. */
   let book: string;
   let docs: Document[];
+  let figures: string;
+  let summary: NonNullable<ReturnType<typeof readSummary>>;
   const env = { NEO4J_URI: process.env['NEO4J_URI'] };
 
   before(async () => {
     const graph = openGraph(graphSettings(process.env));
-    const summary = readSummary(FILES);
-    if (!summary) throw new Error('the fixture has no EHLD summary');
+    const read = readSummary(FILES);
+    if (!read) throw new Error('the fixture has no EHLD summary');
+    summary = read;
     let print;
     try {
       const release = await releaseInfo(graph);
@@ -276,7 +279,7 @@ describe('pdf-export check-book', { skip }, () => {
       await graph.close();
     }
     // a figures' folder as `figures` would leave it, as the book's tests write one
-    const figures = scratch();
+    figures = scratch();
     const lines = [manifestLine({ type: 'fingerprint', ...print })];
     for (const record of expectedFigures(docs).values()) {
       const file = `${record.source}${record.kind === 'reaction' ? '.reaction' : ''}.svg`;
@@ -389,6 +392,14 @@ describe('pdf-export check-book', { skip }, () => {
       })
     );
     assert.deepEqual(retitled, [line('not-in-outline', EIGHT)]);
+    // titled its name, but landing 10 pt below its heading, past what a landing may be off
+    const moved = await planted(
+      inBeta((pdf) => {
+        const dest = entryOf(pdf, 'Reaction eight').dict.lookup(PDFName.of('Dest'), PDFArray);
+        dest.set(3, PDFNumber.of(dest.lookup(3, PDFNumber).asNumber() - 10));
+      })
+    );
+    assert.deepEqual(moved, [line('not-in-outline', EIGHT)]);
   });
 
   test("a section's name not printed: no-name", async () => {
@@ -459,6 +470,87 @@ describe('pdf-export check-book', { skip }, () => {
       );
     });
     assert.deepEqual(await planted(placeholder), [line('broken-link', EIGHT)]);
+    // an address to an event's page that cannot be decoded: broken, not a stop
+    const undecodable = breaking((pdf, link) => {
+      link.dict.delete(PDFName.of('Dest'));
+      const uri = PDFString.of('https://site.example/content/detail/%E0%A4%A');
+      link.dict.set(PDFName.of('A'), pdf.context.obj({ S: 'URI', URI: uri }));
+    });
+    assert.deepEqual(await planted(undecodable), [line('broken-link', EIGHT)]);
+  });
+
+  test('a section whose heading lost its link and its contents entry is found by the outline', async () => {
+    // its first link to its page is then its figure's: the section is not placed there
+    const faults = await planted(
+      inBeta((pdf) => {
+        const target = landingOf(pdf, 'Reaction eight');
+        const heading = annotations(pdf, target.index)
+          .filter((a) => a.uri?.endsWith(`/content/detail/${EIGHT}`))
+          .sort((a, b) => b.top - a.top)[0];
+        if (!heading) throw new Error('no heading link');
+        removeAnnotation(pdf, target.index, heading.ref);
+        const contents = landingOf(pdf, 'Contents').index;
+        for (const link of annotations(pdf, contents)) {
+          if (
+            link.dest?.get(0) === target.page &&
+            link.dest.lookup(3, PDFNumber).asNumber() === target.y
+          ) {
+            removeAnnotation(pdf, contents, link.ref);
+          }
+        }
+      })
+    );
+    assert.deepEqual(faults, [line('not-in-contents', EIGHT)]);
+  });
+
+  test('two sections of one name, and an earlier link to the second: each found at its own', async () => {
+    // Reaction eight printed as `Shared reaction`, the name of another section of beta's
+    // (R-HSA-90000220), and a link on the cover to its page, before both
+    const renamed = (graph: Graph): Graph => ({
+      read: async <T>(query: string, params?: Record<string, unknown>) => {
+        const rows = await graph.read<unknown>(query, params);
+        return JSON.parse(
+          JSON.stringify(rows).split('"Reaction eight"').join('"Shared reaction"')
+        ) as T[];
+      },
+      close: () => graph.close(),
+    });
+    const graph = renamed(openGraph(graphSettings(process.env)));
+    let twice: Document[];
+    try {
+      twice = await buildBook(graph, { illustrated: summary.illustrated });
+    } finally {
+      await graph.close();
+    }
+    const folder = join(scratch(), 'TheReactomeBook');
+    const temporary = scratch();
+    const was = process.env['TMPDIR'];
+    process.env['TMPDIR'] = temporary;
+    let code: number;
+    try {
+      code = await bookCommand(
+        ['--files', FILES, '--figures', figures, '--site', 'https://site.example', '--out', folder],
+        env,
+        {
+          out: () => undefined,
+          err: () => undefined,
+          open: (settings, options) => renamed(openGraph(settings, options)),
+        }
+      );
+    } finally {
+      if (was === undefined) delete process.env['TMPDIR'];
+      else process.env['TMPDIR'] = was;
+    }
+    assert.equal(code, 0);
+    const before = await checkBook(folder, twice, FILES);
+    assert.deepEqual(before.faults, []);
+    await editPdf(join(folder, BETA), (pdf) => {
+      const [link] = annotations(pdf, 0).filter((a) => a.uri !== null);
+      if (!link) throw new Error('no link on the cover');
+      const uri = PDFString.of(`https://site.example/content/detail/${EIGHT}`);
+      link.dict.set(PDFName.of('A'), pdf.context.obj({ S: 'URI', URI: uri }));
+    });
+    assert.deepEqual((await checkBook(folder, twice, FILES)).faults, []);
   });
 
   test('pdf-export check-book: its lines and exit codes', async () => {

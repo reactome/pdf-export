@@ -939,13 +939,24 @@ embedded.
 **Decision.**
 
 - **FR-011's check** (`check-book`) reads the book with pdfjs. The book is untagged
-  (R4), so it finds the sections by the outline pdf-export wrote and the text at each
-  outline entry's destination, not by a structure tree. It checks every top-level
+  (R4), so it finds each section, not by a structure tree, but at its heading's link to
+  the event's page on the website where an outline or contents entry with its name lands
+  too (or else where such an entry lands, T030, contracts/cli.md), and reads the text
+  there: its heading, the leading text set larger than its page's body text, and its
+  stable identifier. It checks every top-level
   pathway present, every event in the contents and the bookmarks, every section named
   and every section with its stable identifier (two faults), every figure present where
   its source exists, and every link landing on a page. Each fault is seen to fail once
   (SC-007). The release's files are checked before printing, by `book`'s preflight
   (contracts/cli.md).
+  - **Measured 4 Nov on a private copy of release 98's graph** (T030, from #160's review):
+    28 human events have a `<table>` in their summation, so a table wider than the text
+    column, which Chromium printed by scaling its whole part down below the theme's sizes,
+    would have reached the real book: the layout now never overflows (pages.css), and the
+    check reads headings against their page's body text. No human summation holds a
+    `<pre>` block, and no human event's name holds a soft hyphen, a zero-width or
+    variation-selector character or a control: the check's leaving those out of the names
+    it compares is defensive.
 - **SC-008's figure comparison** draws both by the same means, as SC-008 asks: the
   render service's SVG is printed alone by the same Chromium to a one-page PDF at the
   figure's size on the page, on a page with the same `@font-face` rules as the book's

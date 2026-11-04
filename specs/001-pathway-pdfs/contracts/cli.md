@@ -181,24 +181,35 @@ FR-011's check, alone. Also run by `book`.
   the graph as `book` makes them, and any other file or folder in the folder is an
   `extra-file`. The PDFs are untagged, so they are read with pdf.js for their outline, links
   and text (research R8), each event's printed texts after FR-017's substitutions:
+  - names are compared as read back: compatibility forms folded (NFKC), white space and the
+    characters never drawn (FR-017's controls and default-ignorables: a soft hyphen, a
+    joiner, a variation selector) left out;
   - a **section** is found at its heading's link to the event's page on the website (the
     first link there; a reaction's figure links there too, below it), where an outline or
-    contents entry with its name lands too, or else where the first such entry lands, and
-    runs to the next section found;
-  - `not-in-contents`: no contents entry (a link before the first section, its lines read
-    together) lands on the section and reads its name; `not-in-outline`: no outline entry,
-    at any depth, does both; an event whose section is not found at all is all three of
-    these and `no-name`;
-  - `no-name`: the section's heading (its leading text set larger than the body's 10.5 pt)
-    does not read its name; `no-stable-id`: its text holds no `Stable identifier` followed
-    by its stable identifier;
+    contents entry with its name lands too; or else where such an entry lands whose section
+    gives the event's stable identifier first (two events of one name), or the first such
+    entry; or else at that link. It runs to the next section found;
+  - the **contents list's entries** are the links before the first section (where the first
+    outline entry with an event's name lands), each one annotation, its rectangle around
+    every line of an entry that wraps;
+  - `not-in-contents`: no contents entry lands on the section and reads its name;
+    `not-in-outline`: no outline entry, at any depth, does both; an event whose section is
+    not found at all is these two faults and `no-name`;
+  - `no-name`: the section's heading does not read its name. The heading is its leading
+    text set larger than its page's body text (the size most of the page's characters are
+    set at) by at least 15:14, the ratio of 11.25 pt to the body's 10.5 (the smallest
+    heading is 12 pt): measured against the page, not in points, so a page Chromium printed
+    scaled down (which the layout should never make, as nothing in it is wider than the text
+    column) still reads its names, its own scale not a fault; `no-stable-id`: its text
+    holds no `Stable identifier` followed by its stable identifier;
   - `missing-figure`: a pathway's or reaction's section with a figure by the Figure rules,
     whose source is in `--files` (its diagram's two files, its EHLD; a reaction's is the
     graph), has no link to that figure's interactive form below its heading. The figure is
     known by its link: a drawing lost with its link kept is not seen;
-  - `broken-link`: a link that lands on no page of its PDF, or is still a placeholder or
-    probe address (T026), named by the section it is in, or by the PDF's pathway for one in
-    its front parts, one line a section.
+  - `broken-link`: a link that lands on no page of its PDF, is still a placeholder or probe
+    address (T026), or whose address to an event's page cannot be decoded, named by the
+    section it is in, or by the PDF's pathway for one in its front parts, one line a
+    section.
 
 ## `pdf-export compare <reference> <new>`
 

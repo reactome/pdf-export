@@ -9,15 +9,18 @@
 //
 // A section is found by its heading's link to the event's page on the website, the first
 // link there in reading order, where an outline or contents entry with its name lands too;
-// failing that, where the first such entry lands (a heading that lost its link, whose first
-// link is then a reaction's figure's); failing both, at that first link. It runs to the next
-// section found. Its name is the text of its heading, the leading text there set larger
-// than the body's; its stable identifier the text after `Stable identifier` in it; its
-// figure the link to the figure's interactive form below its heading. An entry of the
-// outline or the contents list is the event's when it lands on its section's heading and
-// reads its name; the contents list's entries are the links before the first section. A
-// link is broken when it lands on no page of its PDF, or is still a placeholder or a probe
-// (src/layout/html.ts), named by the section it is in, or by the PDF's pathway in the front.
+// failing that, where such an entry lands whose section gives its stable identifier first
+// (two events of one name), or the first such entry (a heading that lost its link, whose
+// first link is then a reaction's figure's); failing both, at that first link. It runs to
+// the next section found. Its name is the text of its heading, the leading text there set
+// larger than its page's body text (so a page printed scaled down still reads it); its
+// stable identifier the text after `Stable identifier` in it; its figure the link to the
+// figure's interactive form below its heading. An entry of the outline or the contents list
+// is the event's when it lands on its section's heading and reads its name, compared
+// without white space or the characters never drawn; the contents list's entries are the
+// links before the first section. A link is broken when it lands on no page of its PDF, is
+// still a placeholder or a probe (src/layout/html.ts), or its address to an event's page
+// cannot be decoded, named by the section it is in, or by the PDF's pathway in the front.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -71,10 +74,12 @@ export interface BookCheck {
 }
 
 /**
- * Above the body's 10.5 pt and below the smallest heading's 12 pt (src/layout/pages.css:
- * body-medium, and title-medium for h3 to h6): text set larger is a heading's.
+ * A heading is set at least this much larger than its page's body text: between the body's
+ * 10.5 pt and the smallest heading's 12 pt (src/layout/pages.css: body-medium, and
+ * title-medium for h3 to h6), as a ratio, so a page Chromium printed scaled down (anything
+ * wider than the text column, which the layout should never print) still reads its headings.
  */
-const HEADING_PT = 11.25;
+const HEADING_RATIO = 11.25 / 10.5;
 
 /**
  * How far a landing may be from a heading's link and still be on it: a destination is the
@@ -119,14 +124,24 @@ interface OutlineItem {
 interface Read {
   /** Every page's pieces of text, in reading order. */
   pieces: Piece[];
+  /** Each page's body size: the size most of its text's characters are set at. */
+  body: number[];
   /** Every link, in reading order. */
   links: Link[];
   /** Every outline entry, at any depth. */
   outline: OutlineItem[];
 }
 
-/** Text compared as read back: compatibility forms folded, white space ignored. */
-const folded = (text: string): string => text.normalize('NFKC').replace(/\s+/gu, '');
+/**
+ * Text compared as read back: compatibility forms folded, white space ignored, and the
+ * characters never drawn (FR-017's NEVER_DRAWN: controls and default-ignorables, a soft
+ * hyphen, a joiner, a variation selector) left out, as the printed text has none of them.
+ */
+const folded = (text: string): string =>
+  text.normalize('NFKC').replace(/[\s\p{Cc}\p{Default_Ignorable_Code_Point}]+/gu, '');
+
+/** The label a section's stable identifier follows, as read. */
+const LABEL = folded('Stable identifier');
 
 const byReading = (a: Spot & { x?: number }, b: Spot & { x?: number }): number =>
   a.page - b.page || b.y - a.y || (a.x ?? 0) - (b.x ?? 0);
@@ -169,22 +184,22 @@ async function readPdf(path: string): Promise<Read> {
     const doc = await task.promise;
     const pieces: Piece[] = [];
     const links: Link[] = [];
+    const body: number[] = [];
     for (let i = 0; i < doc.numPages; i++) {
       const page = await doc.getPage(i + 1);
       const [, , , height = 0] = page.view;
+      const bySize = new Map<number, number>();
       for (const item of (await page.getTextContent()).items) {
         if (!('str' in item) || item.str.trim() === '') continue;
         const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = item.transform as number[];
         // the stamped headers and numbers are in the margins
         if (y <= PAGE.margin || y >= height - PAGE.margin) continue;
-        pieces.push({
-          page: i,
-          x,
-          y,
-          size: Math.max(Math.hypot(a, b), Math.hypot(c, d)),
-          str: item.str,
-        });
+        const size = Math.max(Math.hypot(a, b), Math.hypot(c, d));
+        pieces.push({ page: i, x, y, size, str: item.str });
+        const rounded = Math.round(size * 100) / 100;
+        bySize.set(rounded, (bySize.get(rounded) ?? 0) + item.str.length);
       }
+      body.push([...bySize].sort(([, m], [, n]) => n - m)[0]?.[0] ?? 0);
       for (const annot of (await page.getAnnotations()) as unknown[]) {
         if (!isRecord(annot) || annot['subtype'] !== 'Link') continue;
         const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = (annot['rect'] as number[] | undefined) ?? [];
@@ -219,7 +234,7 @@ async function readPdf(path: string): Promise<Read> {
     // null, not an empty list, for a PDF with no outline, whatever its type says
     const top = (await doc.getOutline()) as Parameters<typeof walk>[0] | null;
     await walk(top ?? []);
-    return { pieces: pieces.sort(byReading), links: links.sort(byReading), outline };
+    return { pieces: pieces.sort(byReading), body, links: links.sort(byReading), outline };
   } finally {
     await task.destroy();
   }
@@ -241,7 +256,7 @@ interface Expected {
   figure: Figure | null;
 }
 
-/** The items of a list in reading order from `start` (a point above it) to `next`. */
+/** The items of a list in reading order from `start` (at or below it) to `next` (above it). */
 function between<T extends Spot>(sorted: readonly T[], start: Spot, next: Spot | undefined): T[] {
   const first = (before: (item: T) => boolean) => {
     let lo = 0;
@@ -255,7 +270,7 @@ function between<T extends Spot>(sorted: readonly T[], start: Spot, next: Spot |
     return lo;
   };
   const from = first(
-    (item) => item.page < start.page || (item.page === start.page && item.y > start.y + 1)
+    (item) => item.page < start.page || (item.page === start.page && item.y > start.y)
   );
   const to = next
     ? first((item) => item.page < next.page || (item.page === next.page && item.y > next.y))
@@ -263,72 +278,88 @@ function between<T extends Spot>(sorted: readonly T[], start: Spot, next: Spot |
   return sorted.slice(from, Math.max(from, to));
 }
 
-/** Whether a run of an entry's lines, one after another, reads `name`. */
-function reads(lines: readonly string[], name: string): boolean {
-  for (let i = 0; i < lines.length; i++) {
-    let text = '';
-    for (let j = i; j < lines.length; j++) {
-      text += lines[j] ?? '';
-      if (folded(text) === name) return true;
-    }
-  }
-  return false;
-}
-
 /** One PDF's faults, in its events' order, then its broken links. */
 function checkPdf(
   file: string,
   pathway: string,
   events: readonly Expected[],
-  { pieces, links, outline }: Read,
+  { pieces, body, links, outline }: Read,
   sourced: (stId: string, figure: Figure) => boolean
 ): string[] {
   const site = new Links(true, '', new Set());
   const fault = (kind: CheckKind, stId: string) => `${kind} ${JSON.stringify(file)} ${stId}`;
 
-  // each event's first link to its page on the website: its heading's, unless that is lost
+  // each event's first link to its page on the website: its heading's, unless that is lost;
+  // a link whose address cannot be decoded is broken, never a stop
   const pagePath = site.event('');
   const firstLinks = new Map<string, Link>();
+  const undecodable = new Set<Link>();
   for (const link of links) {
     const at = link.uri?.lastIndexOf(pagePath) ?? -1;
     if (link.uri === null || at < 0) continue;
-    const stId = decodeURIComponent(link.uri.slice(at + pagePath.length));
+    let stId: string;
+    try {
+      stId = decodeURIComponent(link.uri.slice(at + pagePath.length));
+    } catch {
+      undecodable.add(link);
+      continue;
+    }
     if (!firstLinks.has(stId)) firstLinks.set(stId, link);
   }
-  // the contents list's entries: the links before the first section; an entry's lines, one
-  // link each, land at the same place one after another, so each such run is kept together
-  const first = events
-    .flatMap((event) => {
-      const link = firstLinks.get(event.stId);
-      return link ? [link] : [];
-    })
-    .sort(byReading)[0];
-  const entries: { landing: Spot; lines: string[] }[] = [];
+  // the contents list's entries: the links before the first section, which is where the
+  // first outline entry with an event's name lands, or else at the first event's first link
+  // to its page (a link to an event's page on the cover would otherwise end the list before
+  // it begins). Chromium writes one annotation for a link, its rectangle around every line of
+  // an entry that wraps, so an entry's text is all that rectangle holds
+  const names = new Set(events.map((event) => folded(event.name)));
+  const first =
+    outline
+      .flatMap((item) => (item.landing && names.has(folded(item.title)) ? [item.landing] : []))
+      .sort(byReading)[0] ??
+    events
+      .flatMap((event) => {
+        const link = firstLinks.get(event.stId);
+        return link ? [link] : [];
+      })
+      .sort(byReading)[0];
+  const entries: { landing: Spot; text: string }[] = [];
   for (const link of links) {
     if (first && !later(first, link)) break;
-    if (!link.landing) continue;
-    const last = entries.at(-1);
-    const text = linkText(link, pieces);
-    if (last?.landing.page === link.landing.page && last.landing.y === link.landing.y) {
-      last.lines.push(text);
-    } else {
-      entries.push({ landing: link.landing, lines: [text] });
-    }
+    if (link.landing) entries.push({ landing: link.landing, text: folded(linkText(link, pieces)) });
   }
+  // where the outline's entries and the contents' land, by the name each reads, once
+  const byName = new Map<string, { outline: Spot[]; contents: Spot[] }>();
+  const named = (name: string) => {
+    let spots = byName.get(name);
+    if (!spots) {
+      spots = { outline: [], contents: [] };
+      byName.set(name, spots);
+    }
+    return spots;
+  };
+  for (const item of outline)
+    if (item.landing) named(folded(item.title)).outline.push(item.landing);
+  for (const entry of entries) named(entry.text).contents.push(entry.landing);
+  /** Whether the section starting at `spot` gives `stId` as its stable identifier: its first. */
+  const identifies = (spot: Spot, stId: string): boolean => {
+    const after = between(pieces, spot, undefined);
+    const at = after.findIndex((piece) => folded(piece.str).startsWith(LABEL));
+    const read = folded(after[at]?.str ?? '');
+    return read === LABEL + stId || (read === LABEL && folded(after[at + 1]?.str ?? '') === stId);
+  };
   // each section: at its first link to its page where an outline or contents entry with its
-  // name lands there too, or else where the first of those lands (a section whose heading
-  // lost its link, whose first link is then a reaction's figure's), or else at that link
+  // name lands there too; or else where such an entry lands whose section gives its stable
+  // identifier (two events of one name), or the first; or else at that link
   const located = new Map<string, Spot>();
   for (const event of events) {
-    const name = folded(event.name);
-    const named = [
-      ...outline.flatMap((item) =>
-        item.landing && folded(item.title) === name ? [item.landing] : []
-      ),
-      ...entries.flatMap((entry) => (reads(entry.lines, name) ? [entry.landing] : [])),
-    ];
+    const spots = byName.get(folded(event.name));
+    const candidates = spots ? [...spots.outline, ...spots.contents] : [];
     const link = firstLinks.get(event.stId);
-    const found = link && named.some((spot) => near(spot, link)) ? link : (named[0] ?? link);
+    const stId = folded(event.stId);
+    const found =
+      link && candidates.some((spot) => near(spot, link))
+        ? link
+        : (candidates.find((spot) => identifies(spot, stId)) ?? candidates[0] ?? link);
     if (found) located.set(event.stId, found);
   }
   // each section runs from its start to the next section's
@@ -349,28 +380,27 @@ function checkPdf(
       continue;
     }
     const { start, next } = section;
-    if (!entries.some((entry) => near(entry.landing, start) && reads(entry.lines, name))) {
+    const spots = byName.get(name);
+    if (!spots?.contents.some((spot) => near(spot, start))) {
       faults.push(fault('not-in-contents', event.stId));
     }
-    const lands = (item: OutlineItem) => item.landing !== null && near(item.landing, start);
-    if (!outline.some((item) => lands(item) && folded(item.title) === name)) {
+    if (!spots?.outline.some((spot) => near(spot, start))) {
       faults.push(fault('not-in-outline', event.stId));
     }
     const text = between(pieces, start, next);
     const heading: Piece[] = [];
     for (const piece of text) {
-      if (piece.size <= HEADING_PT) break;
+      if (piece.size < (body[piece.page] ?? 0) * HEADING_RATIO) break;
       heading.push(piece);
     }
     if (folded(heading.map((p) => p.str).join('')) !== name) {
       faults.push(fault('no-name', event.stId));
     }
     // its own piece after the label's, or in one piece with it
-    const label = folded('Stable identifier');
     const stId = folded(event.stId);
     const identified = text.some((piece, i) => {
       const read = folded(piece.str);
-      return read === label + stId || (read === label && folded(text[i + 1]?.str ?? '') === stId);
+      return read === LABEL + stId || (read === LABEL && folded(text[i + 1]?.str ?? '') === stId);
     });
     if (!identified) {
       faults.push(fault('no-stable-id', event.stId));
@@ -385,12 +415,13 @@ function checkPdf(
       if (!drawn) faults.push(fault('missing-figure', event.stId));
     }
   }
-  // a link not rewritten, or one landing on no page of the PDF, named by the section it is
-  // in, or by the PDF's pathway for one in the front parts
+  // a link not rewritten, one landing on no page of the PDF, or one whose address cannot be
+  // decoded, named by the section it is in, or by the PDF's pathway in the front parts
   const broken = new Set<string>();
   for (const link of links) {
     const placeholder = link.uri?.startsWith(PLACEHOLDER) || link.uri?.startsWith(PROBE);
-    if (!placeholder && !(link.internal && link.landing === null)) continue;
+    const nowhere = link.internal && link.landing === null;
+    if (!placeholder && !nowhere && !undecodable.has(link)) continue;
     let holder = pathway;
     for (const [stId, { start, next }] of sections) {
       if (between([link], start, next).length > 0) holder = stId;

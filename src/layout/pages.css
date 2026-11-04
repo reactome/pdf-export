@@ -29,6 +29,13 @@ body {
   font-size: var(--mat-sys-body-medium-size);
   line-height: var(--mat-sys-body-medium-line-height);
   font-weight: var(--mat-sys-body-medium-weight);
+  /*
+   * Nothing may be wider than the text column: Chromium prints a page holding anything wider
+   * scaled down whole, its text below the theme's sizes (T030's review). A word too long for
+   * its line (a token of 140 characters, a table of long words) is broken anywhere, and
+   * `anywhere`, unlike `break-word`, lets tables and grids size their columns below it.
+   */
+  overflow-wrap: anywhere;
 }
 a {
   color: var(--mat-sys-primary);
@@ -202,6 +209,11 @@ table.edits,
 table.found {
   border-collapse: collapse;
   margin: 4pt 0 8pt;
+  /*
+   * never wider than the column, its cells wrapping: the body's `overflow-wrap: anywhere`
+   * already lets them, and this says so where a table is set
+   */
+  max-width: 100%;
 }
 th {
   text-align: left;

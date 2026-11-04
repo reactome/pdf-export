@@ -18,7 +18,10 @@ import { join } from 'node:path';
 export interface PrivateTemporary {
   /** The folder, which TMPDIR names until `remove`. */
   root: string;
-  /** The folder removed, TMPDIR as it was, and the exit handler let go; done once. */
+  /**
+   * The folder removed, TMPDIR as it was, and the exit handler let go; done once. A removal
+   * that fails throws, the handler set again to try once more as the process exits.
+   */
   remove(): void;
 }
 
@@ -67,8 +70,20 @@ export function privateTemporary(purpose: string): PrivateTemporary {
       process.off('exit', onExit);
       if (was === undefined) delete process.env['TMPDIR'];
       else process.env['TMPDIR'] = was;
-      // last, so a removal that fails leaves the process as it was before
-      onExit();
+      // last, so a removal that fails leaves the process as it was before, but for the
+      // folder's exit handler, set again: the folder is still there, and is tried again on exit
+      try {
+        onExit();
+      } catch (error) {
+        process.on('exit', () => {
+          try {
+            onExit();
+          } catch {
+            // the folder could not be removed now either: nothing more can be done
+          }
+        });
+        throw error;
+      }
     },
   };
 }

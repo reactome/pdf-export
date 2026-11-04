@@ -991,4 +991,88 @@ describe('pdf-export book', { skip }, () => {
     assert.deepEqual(readdirSync(temporary), [], 'left in its temporary folder');
     assert.equal(process.listenerCount('SIGTERM'), before, 'its handlers left set');
   });
+  test('nothing overflows the text column: a wide table and a long unbroken token print every part at full size', async () => {
+    // release 98 has 28 human summations holding a table; a table of several columns of long
+    // words, and a token of 140 characters unbroken, in a summation and in a name, are wider
+    // than the text column, and Chromium shrank the whole part to fit them (#160's review)
+    const word = (n: number) => `Longwordcolumn${String(n)}withoutspaces`;
+    const row = (cells: string[]) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+    const table = `<table>${row([1, 2, 3, 4, 5, 6].map(word))}${row([7, 8, 9, 10, 11, 12].map(word))}</table>`;
+    const token = 'X'.repeat(140);
+    const plants: [string, string][] = [
+      ['A third placeholder summation, first by order.', `<p>${token}</p>${table}`],
+      ['Reaction eight', `Reaction eight ${token}`],
+    ];
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '1'], { open: planting(plants), threshold: 1 });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    // every section's body text at 10.5 pt, and its headings at 12, 16.5 and 18
+    const sizes = { label: new Set<number>(), headings: new Set<number>() };
+    const headings = new Set(['Reaction one', 'Shared reaction', 'beta sub sub', 'Alpha pathway']);
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if (!('str' in item)) continue;
+            const t = item.transform as number[];
+            const size = Math.round(Math.hypot(t[2] ?? 0, t[3] ?? 0) * 100) / 100;
+            if (item.str === 'Stable identifier') sizes.label.add(size);
+            // a heading: at the text column's left edge, past the cover, set above the body
+            // (not the same name in a contents entry, a location or a figure's label)
+            const left = Math.abs((t[4] ?? 0) - PAGE.margin) < 2;
+            if (i > 1 && left && headings.has(item.str) && size > 10.5) sizes.headings.add(size);
+          }
+        }
+      });
+    }
+    assert.deepEqual([...sizes.label], [10.5]);
+    assert.deepEqual([...sizes.headings].sort(), [12, 16.5, 18]);
+  });
+  test("a part Chromium printed scaled down still reads its sections' names", async () => {
+    // a block wider than the text column planted in every part printed, as the layout's
+    // overflow once did: Chromium prints each part scaled down whole, its text below the
+    // theme's sizes, and the check reads each heading against its page's body text
+    const { out, args } = place();
+    const run = await book([...args, '--parallel', '2'], {
+      startPrinter: async () => {
+        const printer = await counting([])();
+        return {
+          part: (html) =>
+            printer.part(
+              html.replace('</body>', '<div style="width: 800px; height: 1px"></div></body>')
+            ),
+          close: () => printer.close(),
+        };
+      },
+    });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+    // and it was scaled down: the label every section prints is below the body's 10.5 pt
+    const labels = new Set<number>();
+    for (const file of readdirSync(out)) {
+      await reading(join(out, file), async (doc) => {
+        for (let i = 1; i <= doc.numPages; i++) {
+          for (const item of (await (await doc.getPage(i)).getTextContent()).items) {
+            if (!('str' in item) || item.str !== 'Stable identifier') continue;
+            const t = item.transform as number[];
+            labels.add(Math.round(Math.hypot(t[2] ?? 0, t[3] ?? 0) * 100) / 100);
+          }
+        }
+      });
+    }
+    assert.ok(labels.size > 0 && [...labels].every((size) => size < 10), [...labels].join(' '));
+  });
+
+  test('a name holding characters never drawn reads as printed', async () => {
+    // a soft hyphen, a joiner, a variation selector and a control: the preflight lets them
+    // through (FR-017's NEVER_DRAWN), the book prints none of them, and the check reads the
+    // name without them
+    const plants: [string, string][] = [
+      ['Reaction eight', 'Reac\u00ADtion\u200D eight\uFE0F\u0007'],
+    ];
+    const run = await book([...place().args, '--parallel', '2'], { open: planting(plants) });
+    assert.deepEqual(run.left, [], 'left in its temporary folder');
+    assert.equal(run.code, 0, run.err + run.out);
+  });
 });
