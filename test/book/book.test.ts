@@ -218,9 +218,10 @@ describe('pdf-export book', { skip }, () => {
     };
 
   /**
-   * `book` run as a child process, sent its signals once `ready` holds: polled every 10 ms
-   * until the printer's pages' folder appears, then without pause, as a launch's moments
-   * last only milliseconds. How it exited, and its folders, which should be empty. The run
+   * `book` run as a child process, sent its signals once `ready` holds: polled every 10 ms,
+   * and without pause once `near` holds (for the launch's moments, the printer's pages'
+   * folder), as those moments last only milliseconds. How it exited, and its folders, which
+   * should be empty. The run
    * is given 90 s to reach its moment: the last, a part printed, came at 18 s on a busy host
    * and at 36 s with the test's processes held to 30% of a CPU (when the poll spun without
    * pause, taking that CPU, it never came within the 60 s once given). A run that ends
