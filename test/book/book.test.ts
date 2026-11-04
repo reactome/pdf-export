@@ -620,8 +620,14 @@ describe('pdf-export book', { skip }, () => {
     assert.ok(!existsSync(join(parent, 'TheReactomeBook')));
   });
   test('a run stopped by a signal, as the browser launches and after a part has printed: exit 128 and its number, its report written, nothing left', async () => {
-    const begun = (dir: string, prefix: string) =>
-      readdirSync(dir).some((name) => name.startsWith(prefix));
+    // in the folder, or in a folder of its (the run's private temporary folder)
+    const begun = (dir: string, prefix: string): boolean =>
+      readdirSync(dir, { withFileTypes: true }).some(
+        (entry) =>
+          entry.name.startsWith(prefix) ||
+          (entry.isDirectory() &&
+            readdirSync(join(dir, entry.name)).some((name) => name.startsWith(prefix)))
+      );
     /** Whether the run's browser has been spawned: a child of its process (Linux's /proc). */
     const spawned = ({ pid }: { pid: number }) => {
       let children: string[];
@@ -670,6 +676,11 @@ describe('pdf-export book', { skip }, () => {
         `as the browser is spawned (${String(n)})`,
         spawned,
         ['SIGINT'],
+      ]),
+      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+        `twice as the launcher's artifacts' folder appears (${String(n)})`,
+        moments['as the browser launches'] ?? (() => false),
+        ['SIGINT', 'SIGINT'],
       ]),
       ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
         `twice as the browser is spawned (${String(n)})`,

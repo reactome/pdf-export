@@ -118,8 +118,12 @@ the figures already drawn by `figures`.
   128 and the signal's number. It exits rather than raising the signal again, as the
   exit handlers that end the browser and remove its folders run only on an exit. A
   signal while the browser is starting is acted on once it has started, and a second
-  signal then stops the run at once. The browser launcher's own signal handling is off,
-  in `book` and `serve` alike, so the command's handlers decide.
+  signal then stops the run at once.
+- **A private temporary folder:** the run makes one in TMPDIR at its start and points
+  everything it starts at it (the printer's pages, the browser launcher's folders and the
+  browser itself, by TMPDIR), and removes it, whole, as the process exits, after the
+  launcher has ended the browser; so a signal at any moment leaves nothing in TMPDIR. The
+  browser launcher's own signal handling is off, as in `serve`.
 
 ## `pdf-export preflight`
 
@@ -192,3 +196,9 @@ The single-event service (contracts/service.md).
 | `--render`                     | `RENDER_SERVICE`   | as for `figures`: draws the figures of a PDF with an analysis, and any the folder lacks                                                                           |
 | `--analysis`                   | `ANALYSIS_SERVICE` | the analysis service's base URL                                                                                                                                   |
 | `--concurrency`                |                    | PDFs made at once; default 2                                                                                                                                      |
+
+- **Signals:** the handlers are set before the service starts. The first SIGINT, SIGTERM or
+  SIGHUP once it serves closes it and exits 0; one before it serves, or another while it
+  closes, exits at once with 128 and the signal's number. Like `book`, it makes a private
+  temporary folder at its start for the printer and the browsers it starts, removed as
+  the process exits, so it leaves nothing in TMPDIR however it is stopped.

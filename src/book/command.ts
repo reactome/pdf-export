@@ -35,6 +35,7 @@ import { closing, message, SettingsError } from '../preflight/command.ts';
 import { expectedFigures } from '../preflight/folder.ts';
 import { preflight } from '../preflight/preflight.ts';
 import { PARTS, type PartPrinter } from '../print/parts.ts';
+import { privateTemporary } from '../print/temporary.ts';
 import { BookFaults, OBJECT_STREAMS, writeBook, type PdfWritten, type Written } from './book.ts';
 
 export interface BookSettings {
@@ -268,6 +269,9 @@ export async function bookCommand(
     err(`${error.message}\n`);
     return 2;
   }
+  // the run's private temporary folder, first, its removal on exit registered with it: the
+  // printer and the browser it starts write theirs in it (src/print/temporary.ts)
+  const temporary = privateTemporary('book');
   const started = performance.now();
   const report = emptyReport(settings);
   const writeReport = (): boolean => {
@@ -283,6 +287,7 @@ export async function bookCommand(
   };
   const end = (code: number, error: unknown = null): number => {
     for (const signal of SIGNALS) process.off(signal, onSignal);
+    temporary.remove();
     for (const fault of report.faults) out(`fault ${fault}\n`);
     if (error !== null) {
       report.error = message(error);
@@ -305,6 +310,8 @@ export async function bookCommand(
     signalled: null,
   };
   const stop = (signal: NodeJS.Signals): void => {
+    // the run's private temporary folder is removed by its exit handler, after the browser
+    // launcher's has ended the browser (src/print/temporary.ts)
     if (folder !== null) rmSync(folder, { recursive: true, force: true });
     report.outcome = 'error';
     report.error = `stopped by ${signal}`;
@@ -330,6 +337,7 @@ export async function bookCommand(
     settings.report === null ? null : reportProblem(settings.report, settings.out);
   if (unreportable) {
     for (const signal of SIGNALS) process.off(signal, onSignal);
+    temporary.remove();
     err(`${unreportable}\n`);
     return 2;
   }
