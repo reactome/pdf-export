@@ -29,23 +29,27 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   They never carry a path, a host or a name.
 - **Where a figure comes from:** without a token, from the release's figures' folder
   (`--figures`, contracts/figures.md), if it passes `book`'s folder checks against the
-  graph's current release: the full checks when the service starts and whenever the
-  folder's fingerprint or the graph's release and checksum change, which are read again
-  at most once a minute; a folder of another
-  release, or incomplete, is not used, and every figure is drawn on request until one
-  that passes is in place. A figure the folder lacks (another species' event) is drawn
-  on request and logged. With a token, every figure is drawn on request, with the
+  graph's current release (the book's species, Homo sapiens, and the EHLD summary in
+  `--files`, read once at the start): the full checks when the service starts and whenever
+  the folder's manifest (its fingerprint among its lines) or the graph's release and checksum
+  change, which are read again once a minute; a folder of another release, or incomplete,
+  is not used, and every figure is drawn on request until one that passes is in place, as
+  it is while the checks run. A figure the folder lacks (another species' event), or whose
+  file cannot be read, is drawn on request and logged (`not-in-folder <figure>`). A folder
+  changed on disk is noticed at the next read, so for up to a minute a PDF can read a
+  folder put in place since the last checks. With a token, every figure is drawn on request, with the
   analysis's overlay (SC-005). A PDF can so mix figures from the folder with figures
   drawn on request by another render build; contracts/figures.md lists what the
   fingerprint cannot see.
 - **The limit and the deadline:** a request beyond the concurrency limit is answered
   503 at once, not queued. It is counted before its first read of the graph, so the
   depth and an identifier of no known form are answered whatever the load, and a lookup
-  at the limit is 503: the reads in flight never outnumber the places. A PDF holds its
-  place until its work has ended and every graph read it began has ended, each given the
-  time left before the deadline as its transaction timeout, so the database ends it
-  there, or until its deadline and a grace of 5 s have passed, whichever is first (a read
-  on a connection gone silent never ends); not only until it is answered. Each request has a deadline across everything
+  at the limit is 503. A PDF holds its place until its work has ended and every graph read
+  it began has ended, each given the time left before the deadline as its transaction
+  timeout, so the database ends it there, or until its deadline and a grace of 5 s have
+  passed, whichever is first (a read on a connection gone silent never ends); not only
+  until it is answered. So the reads in flight never outnumber the places, but for reads
+  still unsettled past their deadline and grace, which `/health` counts as `stuck`. Each request has a deadline across everything
   it waits for, the analysis service's calls together among them (each of which also
   has its own timeout); past it, or once the client has gone, the request's reads and
   calls are given up on, its print under way is stopped, nothing more is printed, and
@@ -61,11 +65,18 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
 
 ## `GET /health`
 
-200 with the package's version, the graph's release, whether the render and analysis
-services answer, whether its browser is up, how many PDFs are being made, and the figures'
-folder: `ready` (its release and checksum), `stale`, `incomplete` or `none`. Used by the
-container's health check. 503 with the same body once three starts of the browser in a row
-have failed (the service cannot print, and is to be replaced; a browser gone within 30 s
+200 with the package's version (`version`), the graph's release (`release`), whether the
+render and analysis services answer (`render`, `analysis`), whether its browser is up
+(`printer`), how many PDFs are being made (`making`), how many PDFs' graph reads are
+unsettled past their deadline and grace (`stuck`), and the figures' folder (`figures`):
+`{ "state": "ready", "release": 98, "checksum": "…" }` (the release and checksum it was
+checked against, the checksum as its decimal digits), or `{ "state": … }` with `checking`
+(its checks under way, or failed and to be tried again), `stale` (another release's,
+summary's or Figure rules', or a graph with no checksum), `incomplete` (its manifest not
+whole, or a figure's file missing) or `none` (no `--figures`, no folder or no manifest).
+Used by the container's health check; a folder not in use does not make it 503.
+
+503 with the same body once three starts of the browser in a row have failed (the service cannot print, and is to be replaced; a browser gone within 30 s
 of its start, having printed nothing, counts as a start that failed), or while a graph read
 is unsettled past its request's deadline and grace (its connection gone silent), or when the
 graph does not answer its release within the health check's own timeout (then the body is

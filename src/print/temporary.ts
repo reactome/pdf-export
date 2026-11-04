@@ -10,7 +10,9 @@
 // as one still running could write into its profile again after the folder had gone. One
 // is live in a process at a time: TMPDIR is the process's, and a second would leave it
 // naming a folder the first had removed, and the two exit handlers each moving itself last
-// on the other's every move.
+// on the other's every move. Writes on libuv's thread pool begun before the exit (a launch's
+// `mkdtemp` of the browser's profile, say) go on while the exit handlers run, and can land in
+// the folder as it is removed: a removal that meets one is tried again.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,8 +42,10 @@ export function privateTemporary(purpose: string): PrivateTemporary {
   const root = mkdtempSync(join(tmpdir(), `pdf-export.${purpose}-`));
   live = root;
   const was = process.env['TMPDIR'];
+  // a directory found not empty as it is removed, a write in flight landing in it, is tried
+  // again, each time after a longer pause, by when the writes in flight have ended
   const onExit = () => {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 5 });
   };
   let removed = false;
   let moving = false;

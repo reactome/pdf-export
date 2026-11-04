@@ -3,10 +3,12 @@
 // drawn on request with the token as the render service is to receive it, a figure that
 // cannot be drawn left out and logged, the concurrency limit and the deadline (and nothing
 // done past it, a hanging graph, figure or print among them), a browser that dies, the
-// health answer, and FR-017's characters in the texts and the labels, logged once per PDF.
+// health answer, and FR-017's characters in the texts and the labels, logged once per PDF;
+// and the figures' folder (T047): read for a PDF without a token while it passes the folder's
+// checks, which run again only when the manifest or the graph's release changes.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
@@ -16,6 +18,16 @@ import { after, afterEach, before, describe, test } from 'node:test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { graphSettings, openGraph, type Graph, type ReadOptions } from '../src/graph/connection.ts';
+import { releaseInfo } from '../src/graph/queries.ts';
+import { buildBook } from '../src/model/build.ts';
+import { readSummary } from '../src/preflight/files.ts';
+import {
+  expectedFigures,
+  manifestLine,
+  MANIFEST,
+  type FigureRecord,
+  type Fingerprint,
+} from '../src/preflight/folder.ts';
 import { Printer } from '../src/print/print.ts';
 import {
   SettingsError,
@@ -30,7 +42,9 @@ import { startRenderStub, type RenderStub } from './stubs/render.ts';
 import { skipWithoutGraph } from './layout/fixture.ts';
 
 const FILES = fileURLToPath(new URL('../ci/fixture/files/', import.meta.url));
+const FIGURES = fileURLToPath(new URL('../ci/fixture/figures/', import.meta.url));
 const BETA = 'R-HSA-90000100';
+const MOUSE = 'R-MMU-90000900';
 const REACTION = 'R-HSA-90000211';
 const COMPLEX = 'R-HSA-90000400';
 const REASONS = new Set([
@@ -89,10 +103,12 @@ async function closedPort(): Promise<number> {
  * The fixture graph, with texts planted on request (each key replaced by its value in every
  * row), failing on request, as a graph that cannot answer does, and never answering a query
  * that matches `hanging`, as a stalled read does, until its transaction timeout, nor one
- * matching `blackhole` at all (a silent connection) until `unblock`. With
+ * matching `blackhole` at all (a silent connection) until `unblock`, and ending one matching
+ * `late` `lateByMs` after its transaction timeout, as an answer slow to come back. With
  * `holdMs`, every read is held that long before it is read, or ended at its transaction
  * timeout as the database would end it; the reads held at once are counted (`inFlight`, its
- * most `maxInFlight`), and each read's timeout is kept (`timeouts`).
+ * most `maxInFlight`), each read's timeout is kept (`timeouts`), and every query asked
+ * (`queries`).
  */
 function plantingGraph(): Graph & {
   planted: Map<string, string>;
@@ -100,6 +116,9 @@ function plantingGraph(): Graph & {
   hanging: RegExp | null;
   blackhole: RegExp | null;
   unblock: () => void;
+  late: RegExp | null;
+  lateByMs: number;
+  queries: string[];
   holdMs: number;
   inFlight: number;
   maxInFlight: number;
@@ -116,6 +135,9 @@ function plantingGraph(): Graph & {
     unblock: () => {
       for (const end of blocked.splice(0)) end();
     },
+    late: null as RegExp | null,
+    lateByMs: 0,
+    queries: [] as string[],
     holdMs: 0,
     inFlight: 0,
     maxInFlight: 0,
@@ -125,8 +147,18 @@ function plantingGraph(): Graph & {
       params?: Record<string, unknown>,
       options?: ReadOptions
     ): Promise<T[]> {
+      graph.queries.push(query);
       if (graph.failing) {
         throw new Error('Could not reach bolt://graph.invalid:7687 for /data/graph.db');
+      }
+      // a read whose end comes back after its transaction timeout
+      if (graph.late?.test(query)) {
+        const end = (options?.timeoutMs ?? 0) + graph.lateByMs;
+        return new Promise<T[]>((_resolve, reject) => {
+          setTimeout(() => {
+            reject(new Error('the transaction timed out'));
+          }, end);
+        });
       }
       // a read on a silent connection: it never settles, whatever its timeout
       if (graph.blackhole?.test(query)) {
@@ -172,7 +204,8 @@ function plantingGraph(): Graph & {
 
 /**
  * T019's printer, its prints and starts counted: each print held while `hang` is set (until
- * its signal ends it, counted in `stopped`); every printer seen as gone while `down` is;
+ * its signal ends it, counted in `stopped`), or its PDF handed back `printDelayMs` after it is
+ * printed (`printed` counting those printed); every printer seen as gone while `down` is;
  * `goes()` telling the service its printer went; every start after the first failing while
  * `failing` is set, and held from the twentieth until `endStarts`, so a service starting in
  * a loop stops there; each start after the first taking `slowStartMs` longer; and each
@@ -189,6 +222,8 @@ function countingPrinter(): {
     failing: boolean;
     slowStartMs: number;
     dieAfterMs: number;
+    printDelayMs: number;
+    printed: number;
   };
   goes: () => void;
   endStarts: () => void;
@@ -202,6 +237,8 @@ function countingPrinter(): {
     failing: false,
     slowStartMs: 0,
     dieAfterMs: 0,
+    printDelayMs: 0,
+    printed: 0,
   };
   let latest: { gone: boolean; listeners: (() => void)[] } | null = null;
   /** The starts held from the twentieth, ended by `endStarts` so a service can close. */
@@ -240,9 +277,16 @@ function countingPrinter(): {
         }, prints.dieAfterMs);
       }
       return {
-        single: (html: string, signal?: AbortSignal) => {
+        single: async (html: string, signal?: AbortSignal) => {
           prints.count += 1;
-          if (!prints.hang) return printer.single(html, signal);
+          if (!prints.hang) {
+            const pdf = await printer.single(html, signal);
+            prints.printed += 1;
+            if (prints.printDelayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, prints.printDelayMs));
+            }
+            return pdf;
+          }
           return new Promise<Uint8Array>((_resolve, reject) => {
             signal?.addEventListener('abort', () => {
               prints.stopped += 1;
@@ -269,6 +313,17 @@ async function idle(url: string, withinMs = 5_000): Promise<number> {
   for (;;) {
     const { making } = (await (await fetch(`${url}/health`)).json()) as { making: number };
     if (making === 0 || Date.now() > until) return making;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** The health answer's status, once it is `status`, or the last seen after 10 s. */
+async function healthOnceIt(url: string, status: number): Promise<number> {
+  const until = Date.now() + 10_000;
+  for (;;) {
+    const response = await fetch(`${url}/health`);
+    await response.arrayBuffer();
+    if (response.status === status || Date.now() > until) return response.status;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
@@ -668,7 +723,7 @@ describe('the service', { skip: skipWithoutGraph }, () => {
       printer: true,
       making: 0,
       stuck: 0,
-      figures: 'none',
+      figures: { state: 'none' },
     });
     analysis.refuse();
     const refused = JSON.parse(new TextDecoder().decode((await get('/health')).body)) as {
@@ -780,9 +835,328 @@ describe('the service', { skip: skipWithoutGraph }, () => {
       const response = await fetch(`${short.url}/health`, { signal: AbortSignal.timeout(10_000) });
       assert.equal(response.status, 503);
       await response.arrayBuffer();
+      graph.hanging = null;
+      // on a connection gone silent: 503 too, and its own read, left unsettled, is no PDF's,
+      // so never counted as stuck
+      graph.blackhole = /DBInfo/;
+      for (let i = 0; i < 2; i++) {
+        const silent = await fetch(`${short.url}/health`, { signal: AbortSignal.timeout(10_000) });
+        assert.equal(silent.status, 503);
+        assert.equal(await silent.text(), '{"reason":"unavailable"}');
+      }
+      graph.blackhole = null;
+      const after = await fetch(`${short.url}/health`);
+      assert.equal(after.status, 200);
+      assert.equal(((await after.json()) as { stuck: number }).stuck, 0);
     } finally {
       graph.hanging = null;
+      graph.blackhole = null;
+      graph.unblock();
       await short.close();
+    }
+  });
+});
+
+describe("the figures' folder", { skip: skipWithoutGraph }, () => {
+  let render: RenderStub;
+  let analysis: AnalysisStub;
+  let graph: ReturnType<typeof plantingGraph>;
+  let expected: Map<string, FigureRecord>;
+  let print: Fingerprint;
+  let root: string;
+  const lines: string[] = [];
+  /** The full checks: each builds the book, which reads the top-level pathways first. */
+  const fullChecks = () =>
+    graph.queries.filter((q) => q.includes('MATCH (p:TopLevelPathway')).length;
+  /** The folder's polls: each reads the release and its checksum. */
+  const polls = () => graph.queries.filter((q) => q.includes('toString(d.checksum)')).length;
+
+  /**
+   * A figures' folder as `figures` would leave it for the fixture's book, each file the
+   * recorded SVG of what it draws with `Folder` at the start of its first label, so a PDF
+   * shows where its figure came from; `fingerprint` changes its fingerprint, `lines` its
+   * manifest's lines.
+   */
+  const folder = (
+    fingerprint: Partial<Fingerprint> = {},
+    lines: (lines: string[]) => string[] = (all) => all
+  ): string => {
+    const dir = mkdtempSync(join(root, 'figures-'));
+    const print2 = { ...print, ...fingerprint };
+    const manifest = [manifestLine({ type: 'fingerprint', ...print2 })];
+    for (const record of expected.values()) {
+      const file = join(
+        FIGURES,
+        `${record.source}${record.kind === 'reaction' ? '.reaction' : ''}.svg`
+      );
+      const svg = readFileSync(file, 'utf8').replace(/<text\b[^>]*>/, (tag) => `${tag}Folder`);
+      writeFileSync(join(dir, `${record.stId}.svg`), svg);
+      manifest.push(manifestLine({ type: 'figure', ...record }));
+    }
+    manifest.push(manifestLine({ type: 'complete', ...print2 }));
+    writeFileSync(join(dir, MANIFEST), lines(manifest).join(''));
+    return dir;
+  };
+
+  const start = (figures: string | null) =>
+    startService(
+      {
+        bind: '127.0.0.1',
+        port: 0,
+        graph: graphSettings(process.env),
+        files: FILES,
+        figures,
+        render: render.url,
+        analysis: analysis.url,
+        site: 'https://site.invalid',
+        concurrency: 2,
+      },
+      { graph, log: (line) => lines.push(line), limits: { folderPollMs: 100 } }
+    );
+
+  /** The health answer's `figures`, once it is `state`, or the last seen after 10 s. */
+  async function figuresOnceIt(url: string, state: string): Promise<Record<string, unknown>> {
+    const until = Date.now() + 10_000;
+    for (;;) {
+      const response = await fetch(`${url}/health`);
+      const { figures = {} } = (await response.json()) as { figures?: Record<string, unknown> };
+      if (figures['state'] === state || Date.now() > until) return figures;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  const drawn = () => render.requests.filter((path) => path.startsWith('/render/'));
+
+  before(async () => {
+    render = await startRenderStub();
+    analysis = await startAnalysisStub();
+    graph = plantingGraph();
+    root = mkdtempSync(join(tmpdir(), 'pdfx-serve-figures-'));
+    const release = await releaseInfo(graph);
+    const summary = readSummary(FILES);
+    if (!summary) throw new Error('the fixture has no EHLD summary');
+    expected = expectedFigures(await buildBook(graph, { illustrated: summary.illustrated }));
+    print = {
+      release: release.release,
+      checksum: release.checksum ?? '',
+      summary: summary.hash,
+      content: release.release,
+      build: 'test-build',
+    };
+  });
+  afterEach(() => {
+    render.reset();
+    analysis.reset();
+    graph.planted.clear();
+    graph.queries.length = 0;
+    lines.length = 0;
+  });
+  after(async () => {
+    await graph.close();
+    await render.close();
+    await analysis.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test('ready: a PDF without a token asks the render service nothing, its figures read from the folder', async () => {
+    const service = await start(folder());
+    try {
+      assert.deepEqual(await figuresOnceIt(service.url, 'ready'), {
+        state: 'ready',
+        release: print.release,
+        checksum: print.checksum,
+      });
+      for (const id of [BETA, REACTION]) {
+        const response = await fetch(`${service.url}/event/${id}.pdf`);
+        assert.equal(response.status, 200, id);
+        const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+        assert.ok(text.includes('Folder'), `${id}: its figures are the folder's`);
+      }
+      assert.deepEqual(drawn(), [], 'nothing drawn on request');
+      assert.ok(!lines.some((line) => line.startsWith('not-in-folder')), lines.join('\n'));
+    } finally {
+      await service.close();
+    }
+  });
+
+  test("a folder's file is printed as a drawn figure is: FR-017 on its labels, logged", async () => {
+    const dir = folder();
+    const file = join(dir, `${REACTION}.svg`);
+    writeFileSync(file, readFileSync(file, 'utf8').replace('Folder', 'Folder'));
+    const service = await start(dir);
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      const response = await fetch(`${service.url}/event/${REACTION}.pdf`);
+      const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+      assert.ok(text.includes('Folder�'), 'replaced');
+      assert.deepEqual(
+        lines.filter((line) => line.startsWith('uncovered-character')),
+        [`uncovered-character U+E001 ${REACTION}`]
+      );
+      assert.deepEqual(drawn(), []);
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('with a token: every figure drawn on request, with the token', async () => {
+    const service = await start(folder());
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      const response = await fetch(`${service.url}/event/${BETA}.pdf?token=${TOKENS.stored}`);
+      assert.equal(response.status, 200);
+      const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+      assert.ok(!text.includes('Folder'), 'no figure from the folder');
+      assert.equal(drawn().length, 4);
+      for (const path of drawn()) assert.match(path, new RegExp(`[?&]token=${TOKENS.stored}`));
+    } finally {
+      await service.close();
+    }
+  });
+
+  test("a figure the folder lacks (another species' event) is drawn on request and logged", async () => {
+    const service = await start(folder());
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      const response = await fetch(`${service.url}/event/${MOUSE}.pdf?depth=0`);
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+      assert.deepEqual(drawn(), [`/render/${MOUSE}.svg`]);
+      assert.deepEqual(
+        lines.filter((line) => line.startsWith('not-in-folder')),
+        [`not-in-folder diagram/${MOUSE}: drawn on request`]
+      );
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('a file gone from a ready folder: that figure drawn on request, and logged', async () => {
+    const dir = folder();
+    const service = await start(dir);
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      rmSync(join(dir, `${REACTION}.svg`));
+      const response = await fetch(`${service.url}/event/${REACTION}.pdf`);
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+      assert.deepEqual(drawn(), [`/render/${REACTION}.svg?layout=reaction`]);
+      assert.ok(
+        lines.includes(
+          `not-in-folder reaction/${REACTION}: its file not read (ENOENT); drawn on request`
+        ),
+        lines.join('\n')
+      );
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('not used, and /health says why: stale, incomplete or none', async () => {
+    const otherChecksum = `${print.checksum}0`;
+    const cases: [string, string | null, string][] = [
+      ['no --figures', null, 'none'],
+      ['no folder', join(root, 'absent'), 'none'],
+      ['no manifest', mkdtempSync(join(root, 'empty-')), 'none'],
+      ['another release', folder({ release: print.release - 1 }), 'stale'],
+      ['another checksum', folder({ checksum: otherChecksum }), 'stale'],
+      ['another summary', folder({ summary: 'sha256:0' }), 'stale'],
+      // a figure's line for another selection: drawn under other Figure rules
+      [
+        'a stale figure',
+        folder({}, (all) =>
+          all.map((line) =>
+            line.includes(`"stId":"${REACTION}"`) ? line.replace('"reaction"', '"diagram"') : line
+          )
+        ),
+        'stale',
+      ],
+      ['no complete line', folder({}, (all) => all.slice(0, -1)), 'incomplete'],
+      [
+        'a torn last line',
+        folder({}, (all) => [...all.slice(0, -1), all.at(-1)?.trim() ?? '']),
+        'incomplete',
+      ],
+    ];
+    const missing = folder();
+    rmSync(join(missing, `${BETA}.svg`));
+    cases.push(['a file missing', missing, 'incomplete']);
+    for (const [name, dir, state] of cases) {
+      const service = await start(dir);
+      try {
+        assert.deepEqual(await figuresOnceIt(service.url, state), { state }, name);
+        render.reset();
+        const response = await fetch(`${service.url}/event/${REACTION}.pdf`);
+        assert.equal(response.status, 200, name);
+        const text = await textOf(new Uint8Array(await response.arrayBuffer()));
+        assert.ok(!text.includes('Folder'), `${name}: not read`);
+        assert.deepEqual(drawn(), [`/render/${REACTION}.svg?layout=reaction`], name);
+        assert.ok(!lines.some((line) => line.startsWith('not-in-folder')), name);
+      } finally {
+        await service.close();
+      }
+    }
+  });
+
+  test('the full checks run once at the start, and again only when the manifest or the release changes', async () => {
+    const dir = folder();
+    const service = await start(dir);
+    /** Waits for `n` more polls than now, so what they found is settled. */
+    const polled = async (n: number) => {
+      const target = polls() + n;
+      const until = Date.now() + 10_000;
+      while (polls() < target) {
+        assert.ok(Date.now() < until, 'polled');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    };
+    try {
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      assert.equal(fullChecks(), 1, 'at the start');
+      await polled(5);
+      assert.equal(fullChecks(), 1, 'nothing changed: not checked again');
+      // the graph's checksum changes: the folder is another release's
+      const checksum = `"${print.checksum}"`;
+      const next = `"${print.checksum}1"`;
+      graph.planted.set(checksum, next);
+      assert.equal((await figuresOnceIt(service.url, 'stale'))['state'], 'stale');
+      // a folder drawn for it put in place: checked in full, and used
+      const redrawn = folder({ checksum: `${print.checksum}1` });
+      writeFileSync(join(dir, MANIFEST), readFileSync(join(redrawn, MANIFEST)));
+      assert.deepEqual(await figuresOnceIt(service.url, 'ready'), {
+        state: 'ready',
+        release: print.release,
+        checksum: `${print.checksum}1`,
+      });
+      assert.equal(fullChecks(), 2, 'the manifest changed');
+      await polled(5);
+      assert.equal(fullChecks(), 2, 'nothing changed since');
+      // the graph's release goes back, with the folder in place: checked again, stale
+      graph.planted.clear();
+      assert.equal((await figuresOnceIt(service.url, 'stale'))['state'], 'stale');
+      // and the folder of that release put back: checked in full again
+      writeFileSync(join(dir, MANIFEST), readFileSync(join(folder(), MANIFEST)));
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+      assert.equal(fullChecks(), 3);
+    } finally {
+      await service.close();
+    }
+  });
+
+  test('a poll the graph fails: logged, and tried again at the next', async () => {
+    graph.failing = true;
+    const service = await start(folder());
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      graph.failing = false;
+      assert.ok(
+        lines.some((line) => line.startsWith('figures-folder: not read')),
+        lines.join('\n')
+      );
+      assert.equal((await figuresOnceIt(service.url, 'ready'))['state'], 'ready');
+    } finally {
+      graph.failing = false;
+      await service.close();
     }
   });
 });
@@ -836,6 +1210,7 @@ describe(
       graph.hanging = null;
       graph.blackhole = null;
       graph.unblock();
+      graph.late = null;
       graph.holdMs = 0;
       graph.maxInFlight = 0;
       graph.timeouts.length = 0;
@@ -927,6 +1302,20 @@ describe(
       graph.unblock();
       await new Promise((resolve) => setTimeout(resolve, 50));
       assert.equal((await fetch(`${service.url}/health`)).status, 200);
+    });
+
+    test('a read that ends within the grace: the slot held until it ends, nothing stuck', async () => {
+      // the events' facts, their end coming back 600 ms past the deadline, within its grace
+      graph.late = /WHERE e:Event\s+RETURN e\.dbId AS dbId/;
+      graph.lateByMs = 600;
+      assert.deepEqual(await ask(`/event/${REACTION}.pdf`), unavailable);
+      const health = (await (await fetch(`${service.url}/health`)).json()) as { making: number };
+      assert.equal(health.making, 1, 'the slot held past the deadline, through the grace');
+      assert.equal(await idle(service.url, 2_000), 0, 'freed once the read ended');
+      const later = await fetch(`${service.url}/health`);
+      assert.equal(later.status, 200);
+      assert.equal(((await later.json()) as { stuck: number }).stuck, 0);
+      assert.ok(!lines.some((line) => line.startsWith('stuck')), lines.join('\n'));
     });
 
     test('clients that go: the reads in flight never outnumber the slots', async () => {
@@ -1081,6 +1470,127 @@ describe('a browser that cannot be started again', { skip: skipWithoutGraph }, (
       assert.equal((await fetch(`${service.url}/health`)).status, 200);
     } finally {
       // closing first, then any start held ended, so the service's loop ends with it
+      const closed = service.close();
+      printer.endStarts();
+      await closed;
+      await render.close();
+      await analysis.close();
+    }
+  });
+
+  test('each start must prove itself again: one after a browser that printed, dying at once, counts', async () => {
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const printer = countingPrinter();
+    const service = await startService(settings(render, analysis), {
+      log: () => undefined,
+      startPrinter: printer.start,
+      limits: { relaunchPauseMs: 300 },
+    });
+    try {
+      // the first browser prints a PDF: proven
+      const response = await fetch(`${service.url}/event/${REACTION}.pdf?depth=0`);
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+      // then it goes, and each browser after it dies at once, having printed nothing
+      printer.prints.dieAfterMs = 50;
+      printer.goes();
+      assert.equal(await healthOnceIt(service.url, 503), 503, 'three starts that died');
+    } finally {
+      const closed = service.close();
+      printer.endStarts();
+      await closed;
+      await render.close();
+      await analysis.close();
+    }
+  });
+
+  test('a browser that lives provenAfterMs, printing nothing, ends the failed starts', async () => {
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const printer = countingPrinter();
+    const service = await startService(settings(render, analysis), {
+      log: () => undefined,
+      startPrinter: printer.start,
+      limits: { relaunchPauseMs: 200, provenAfterMs: 500 },
+    });
+    try {
+      printer.prints.failing = true;
+      printer.goes();
+      assert.equal(await healthOnceIt(service.url, 503), 503, 'three starts failed');
+      // one starts and lives, printing nothing
+      printer.prints.failing = false;
+      assert.equal(await healthOnceIt(service.url, 200), 200, 'proven by living');
+      assert.equal(printer.prints.count, 0, 'nothing printed');
+    } finally {
+      const closed = service.close();
+      printer.endStarts();
+      await closed;
+      await render.close();
+      await analysis.close();
+    }
+  });
+
+  test('a browser gone after provenAfterMs, though never proven, is no failed start', async () => {
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const printer = countingPrinter();
+    const service = await startService(settings(render, analysis), {
+      log: () => undefined,
+      startPrinter: printer.start,
+      limits: { relaunchPauseMs: 200, provenAfterMs: 300 },
+    });
+    try {
+      // every browser seen as down, so living proves none, and each goes 600 ms after its start
+      printer.prints.down = true;
+      printer.prints.dieAfterMs = 600;
+      printer.goes();
+      const until = Date.now() + 30_000;
+      while (printer.prints.starts < 5) {
+        assert.ok(Date.now() < until, String(printer.prints.starts));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const health = await fetch(`${service.url}/health`);
+      assert.equal(health.status, 200, 'old enough when they went: no start failed');
+      await health.arrayBuffer();
+    } finally {
+      printer.prints.down = false;
+      const closed = service.close();
+      printer.endStarts();
+      await closed;
+      await render.close();
+      await analysis.close();
+    }
+  });
+
+  test('a PDF printed by a browser since gone proves not the one after it', async () => {
+    const render = await startRenderStub();
+    const analysis = await startAnalysisStub();
+    const printer = countingPrinter();
+    const service = await startService(settings(render, analysis), {
+      log: () => undefined,
+      startPrinter: printer.start,
+      limits: { relaunchPauseMs: 100 },
+    });
+    try {
+      // printed, then handed back 3 s later; meanwhile its browser goes and none can start
+      printer.prints.printDelayMs = 3_000;
+      const asked = fetch(`${service.url}/event/${REACTION}.pdf?depth=0`);
+      const until = Date.now() + 30_000;
+      while (printer.prints.printed < 1) {
+        assert.ok(Date.now() < until, 'printed');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      printer.prints.failing = true;
+      printer.goes();
+      assert.equal(await healthOnceIt(service.url, 503), 503, 'three starts failed');
+      const response = await asked;
+      assert.equal(response.status, 200, 'its PDF made');
+      await response.arrayBuffer();
+      const health = await fetch(`${service.url}/health`);
+      assert.equal(health.status, 503, 'the gone browser proves nothing now');
+      await health.arrayBuffer();
+    } finally {
       const closed = service.close();
       printer.endStarts();
       await closed;
@@ -1248,17 +1758,32 @@ test(
             assert.ok(Date.now() < deadline, `${name}: never ready to be signalled`);
             await new Promise((resolve) => setImmediate(resolve));
           }
-          // a second signal 20 ms after the first, while the service closes (its browser's
-          // close takes longer), as two sent at once can arrive as one
+          // a second signal once the first is acted on, while the service closes (its
+          // browser's close takes longer): two sent before the child has run can arrive as
+          // one, as a loaded host showed with a fixed 20 ms between them
           for (const [i, signal] of signals.entries()) {
-            if (i > 0) await new Promise((resolve) => setTimeout(resolve, 20));
+            if (i > 0) {
+              while (!stderr.includes('stopping on')) {
+                assert.equal(child.exitCode, null, `${name}: ended before the second signal`);
+                assert.ok(Date.now() < deadline, `${name}: the first signal never acted on`);
+                await new Promise((resolve) => setImmediate(resolve));
+              }
+            }
             child.kill(signal);
           }
           await ended;
         } finally {
           clearTimeout(kill);
         }
-        assert.deepEqual([child.exitCode, child.signalCode], [code, null], `${name}: ${stderr}`);
+        // a moment during the launch (a launcher's folder there, a browser spawned) holds for
+        // the browser's life, so on a loaded host it can first be seen once the service
+        // serves: then one signal closes it, as the child says, and exits 0
+        const closed = signals.length === 1 && stderr.includes(`stopping on ${signals[0] ?? ''}`);
+        assert.deepEqual(
+          [child.exitCode, child.signalCode],
+          [closed ? 0 : code, null],
+          `${name}: ${stderr}`
+        );
         assert.deepEqual(readdirSync(temporary), [], name);
       }
     } finally {

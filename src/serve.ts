@@ -3,7 +3,9 @@
 // The checks go in this order: the depth and an identifier of no known form, whatever the
 // load; then the concurrency limit (and a browser being up); then the identifier's lookup in
 // the graph; then the token's form; only then is anything made. Every figure is drawn on
-// request, with the token where there is one; one that cannot be drawn leaves its section
+// request when there is a token; without one, from the figures' folder (`--figures`) while it
+// passes `book`'s folder checks against the graph's current release (src/figures/served.ts),
+// a figure it lacks drawn on request and logged. One that cannot be drawn leaves its section
 // without it, logged. Characters no font draws print as U+FFFD (FR-017), logged once per PDF.
 // Each request has a deadline across everything it waits for, the graph's reads and the
 // analysis service's calls among them; past it, or once the client has gone, the work stops
@@ -11,6 +13,7 @@
 // `unavailable`. The browser that prints is started again if it goes. A reason never carries
 // a path, a host or a name: the content service writes WebsiteAngular's envelope from it.
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -20,6 +23,7 @@ import { AnalysisError, readAnalysis, type AnalysedEvent } from './analysis/clie
 import { canonicalToken } from './analysis/token.ts';
 import { fetchFigure, type FigureRequest } from './figures/client.ts';
 import { labelsOnRequest } from './figures/labels.ts';
+import { ServedFolder } from './figures/served.ts';
 import { graphSettings, openGraph, type Graph, type GraphSettings } from './graph/connection.ts';
 import {
   eventByIdentifier,
@@ -33,6 +37,7 @@ import { layoutSingle, pageStyles } from './layout/document.ts';
 import { figureKey } from './layout/figure.ts';
 import { buildSingle } from './model/build.ts';
 import type { Document, Figure, Section } from './model/types.ts';
+import { readSummary, SUMMARY, type Summary } from './preflight/files.ts';
 import { Printer } from './print/print.ts';
 
 /** Why a PDF is not made (contracts/service.md). */
@@ -54,7 +59,7 @@ export interface ServeSettings {
   graph: GraphSettings;
   /** The release's folder: its EHLD summary says which pathways are illustrated. */
   files: string;
-  /** The release's figures' folder: read from T047; until then every figure is drawn. */
+  /** The release's figures' folder, for a PDF without a token while it passes the checks. */
   figures: string | null;
   render: string;
   analysis: string;
@@ -82,6 +87,17 @@ export interface ServeLimits {
    * on a connection that went silent never does, and its slot is freed then all the same.
    */
   graceMs: number;
+  /**
+   * A browser gone sooner than this after its start, having printed no PDF, counts as a start
+   * that failed: one that starts and dies at once is as unable to print as one that never
+   * starts. Once it has printed, or lived this long, the failed starts are forgotten.
+   */
+  provenAfterMs: number;
+  /**
+   * How often the figures' folder's manifest and the graph's release and checksum are read
+   * again, the folder's checks run in full when either has changed.
+   */
+  folderPollMs: number;
 }
 
 export const LIMITS: ServeLimits = {
@@ -92,14 +108,9 @@ export const LIMITS: ServeLimits = {
   healthTimeoutMs: 5_000,
   relaunchPauseMs: 5_000,
   graceMs: 5_000,
+  provenAfterMs: 30_000,
+  folderPollMs: 60_000,
 };
-
-/**
- * A browser gone sooner than this after its start, having printed no PDF, counts as a start
- * that failed: one that starts and dies at once is as unable to print as one that never
- * starts. Once it has printed, or lived this long, the failed starts are forgotten.
- */
-const PROVEN_AFTER_MS = 30_000;
 
 /** Figures asked of the render service at once: its own default concurrency. */
 const FIGURES_AT_ONCE = 2;
@@ -209,14 +220,11 @@ const VERSION = (
   }
 ).version;
 
-/** The pathways the EHLD summary names: their figure is their illustration. */
-function readIllustrated(files: string): Set<string> {
-  return new Set(
-    readFileSync(join(files, 'ehld', 'svgsummary.txt'), 'utf8')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith('R-'))
-  );
+/** The EHLD summary: the pathways it names are drawn as their illustration. */
+function summaryOf(files: string): Summary {
+  const summary = readSummary(files);
+  if (!summary) throw new Error(`No EHLD summary: ${join(files, SUMMARY)}`);
+  return summary;
 }
 
 /** A refusal with its reason, answered as JSON. */
@@ -254,7 +262,8 @@ export async function startService(
 ): Promise<Service> {
   const limits: ServeLimits = { ...LIMITS, ...options.limits };
   const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));
-  const illustrated = readIllustrated(settings.files);
+  const summary = summaryOf(settings.files);
+  const { illustrated } = summary;
   // a read the database runs longer than a request may wait is ended there too
   const graph =
     options.graph ??
@@ -279,7 +288,7 @@ export async function startService(
   let lastLaunch = -Infinity;
   /** Starts failed since a browser was last up: past DEAD_AFTER, the service is unhealthy. */
   let failedStarts = 0;
-  /** Whether the browser up has printed a PDF, or lived PROVEN_AFTER_MS. */
+  /** Whether the browser up has printed a PDF, or lived `provenAfterMs`. */
   let proven = false;
   const prove = (): void => {
     proven = true;
@@ -299,14 +308,14 @@ export async function startService(
           proven = false;
           const lived = setTimeout(() => {
             if (printer === started && started.connected) prove();
-          }, PROVEN_AFTER_MS);
+          }, limits.provenAfterMs);
           lived.unref();
           started.onDisconnected(() => {
             clearTimeout(lived);
             if (printer !== started) return;
             printer = null;
             // gone soon after its start, having printed nothing: a start that failed
-            if (!proven && Date.now() - startedAt < PROVEN_AFTER_MS) failedStarts += 1;
+            if (!proven && Date.now() - startedAt < limits.provenAfterMs) failedStarts += 1;
             void started.close().catch(() => undefined);
             if (closing()) return;
             log('printer: the browser went; starting another');
@@ -344,6 +353,28 @@ export async function startService(
         signal.removeEventListener('abort', stop);
       });
     });
+
+  /**
+   * The figures' folder, with `--figures`. Its checks read the graph as a request does: each
+   * read ended by the database at the deadline, and given up on a grace later, as a read on a
+   * silent connection never settles, so a check is never left waiting for ever.
+   */
+  const folder =
+    settings.figures === null
+      ? null
+      : new ServedFolder({
+          folder: settings.figures,
+          graph: {
+            read: <T>(query: string, params?: Record<string, unknown>) =>
+              within(
+                graph.read<T>(query, params, { timeoutMs: limits.deadlineMs }),
+                AbortSignal.timeout(limits.deadlineMs + limits.graceMs)
+              ),
+            close: () => Promise.resolve(),
+          },
+          summary,
+          log,
+        });
 
   /**
    * The graph as one request reads it: each read given up when the request ends, and given
@@ -415,10 +446,12 @@ export async function startService(
       token === null ? root.stId : `${root.stId} token=${token}`,
       log
     );
-    // the token as the render service is to receive it once decoded: its padding as `=`
+    // the token as the render service is to receive it once decoded: its padding as `=`;
+    // without one, the folder's files where it is ready and holds them
     const figures = await drawFigures(doc, token === null ? undefined : decodeURIComponent(token), {
       characters,
       deadline,
+      files: token === null ? (folder?.files() ?? null) : null,
     });
     going();
     const laid = layoutSingle(onRequestStrings(doc, characters), {
@@ -436,11 +469,22 @@ export async function startService(
     return pdf;
   }
 
-  /** Each figure the document draws, once, at most FIGURES_AT_ONCE at a time. */
+  /**
+   * Each figure the document draws, once: read from the folder's file where `files` gives
+   * one, else drawn on request, at most FIGURES_AT_ONCE at a time.
+   */
   async function drawFigures(
     doc: Document,
     token: string | undefined,
-    { characters, deadline }: { characters: CharacterLog; deadline: AbortSignal }
+    {
+      characters,
+      deadline,
+      files,
+    }: {
+      characters: CharacterLog;
+      deadline: AbortSignal;
+      files: ((figure: Figure) => string | null) | null;
+    }
   ): Promise<Map<string, string>> {
     const wanted = new Map<string, Figure>();
     for (const place of doc.places) {
@@ -453,6 +497,13 @@ export async function startService(
     const worker = async () => {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const [key, figure] = next;
+        if (files) {
+          const svg = await fromFolder(key, files(figure), deadline);
+          if (svg !== null) {
+            drawn.set(key, labelsOnRequest(svg, characters));
+            continue;
+          }
+        }
         const answer = await fetchFigure(settings.render, figureRequest(figure, token), {
           timeoutMs: limits.figureTimeoutMs,
           retryPauseMs: limits.retryPauseMs,
@@ -471,6 +522,27 @@ export async function startService(
     };
     await Promise.all(Array.from({ length: FIGURES_AT_ONCE }, worker));
     return drawn;
+  }
+
+  /** A figure's file from the folder; null, logged, where it lacks it or cannot be read. */
+  async function fromFolder(
+    key: string,
+    file: string | null,
+    deadline: AbortSignal
+  ): Promise<string | null> {
+    // another species' event, say: the folder holds the book's figures only
+    if (file === null) {
+      log(`not-in-folder ${key}: drawn on request`);
+      return null;
+    }
+    try {
+      return await readFile(file, { encoding: 'utf8', signal: deadline });
+    } catch (error) {
+      if (deadline.aborted) throw stopReason(deadline);
+      const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+      log(`not-in-folder ${key}: its file not read (${code}); drawn on request`);
+      return null;
+    }
   }
 
   async function answerPdf(req: IncomingMessage, res: ServerResponse, rawId: string) {
@@ -637,7 +709,7 @@ export async function startService(
       printer: printer?.connected === true,
       making: active,
       stuck,
-      figures: 'none',
+      figures: folder?.state ?? { state: 'none' },
     });
   }
 
@@ -669,11 +741,20 @@ export async function startService(
   });
   const { address, port } = server.address() as AddressInfo;
   const host = address.includes(':') ? `[${address}]` : address;
+  // the folder's checks in full at the start, then whenever what they read has changed
+  let polls: NodeJS.Timeout | null = null;
+  if (folder) {
+    void folder.poll();
+    polls = setInterval(() => void folder.poll(), limits.folderPollMs);
+    polls.unref();
+  }
 
   return {
     url: `http://${host}:${String(port)}`,
     async close() {
       state.closing = true;
+      if (polls) clearInterval(polls);
+      folder?.stop();
       server.closeAllConnections();
       await new Promise<void>((resolve) =>
         server.close(() => {

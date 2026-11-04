@@ -289,9 +289,10 @@ The single-event service (contracts/service.md).
 | `--concurrency`                |                    | PDFs made at once; default 2                                                                                                                                      |
 
 - **Signals:** the handlers are set before the service starts. The first SIGINT, SIGTERM or
-  SIGHUP once it serves closes it and exits 0; one before it serves, or another while it
-  closes, exits at once with 128 and the signal's number. Like `book`, it makes a private
-  temporary folder at its start for the printer and the browsers it starts, removed as
-  the process exits, so it leaves nothing in TMPDIR when it is stopped by SIGINT, SIGTERM
-  or SIGHUP. A process killed outright (SIGKILL, the memory cap's kill) or by a signal it
+  SIGHUP once it serves closes it (writing `stopping on <signal>` on stderr) and exits 0;
+  one before it serves, or another while it closes, exits at once with 128 and the
+  signal's number. Like `book`, it makes a private temporary folder at its start for the
+  printer and the browsers it starts, removed as the process exits (tried again while
+  writes begun before, such as a browser's launch under way, still land in it), so it leaves nothing in
+  TMPDIR when it is stopped by SIGINT, SIGTERM or SIGHUP. A process killed outright (SIGKILL, the memory cap's kill) or by a signal it
   does not handle leaves the folder, as no exit handler runs.
