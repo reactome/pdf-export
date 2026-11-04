@@ -55,7 +55,6 @@ export interface Landed {
   pageCount: number;
 }
 
-/** Where each target landed in a PDF, from its named destinations. */
 /** A contents entry the printed PDF has no destination for, named by its anchor. */
 class MissingDestination extends Error {
   constructor(target: string) {
@@ -63,6 +62,7 @@ class MissingDestination extends Error {
   }
 }
 
+/** Where each target landed in a PDF, from its named destinations. */
 export async function landed(pdf: Uint8Array, targets: Iterable<string>): Promise<Landed> {
   // pdf.js may take the buffer over, so it is given a copy
   // pdf.js's warnings off: they quote the file's content, which holds names

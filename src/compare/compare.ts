@@ -484,23 +484,42 @@ export function compareSettings(args: readonly string[]): CompareSettings {
 
 export { errorKind };
 
+/** The console's methods that write: those held while a comparison runs. */
+const WRITING = [
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'dir',
+  'dirxml',
+  'table',
+  'group',
+  'groupCollapsed',
+  'groupEnd',
+  'count',
+  'countReset',
+  'time',
+  'timeEnd',
+  'timeLog',
+  'assert',
+] as const;
+
 /**
- * `run`, with the console held for its length: every method of the global console (`log`,
- * `warn`, `error`, `dir`, `table`, `trace`, `assert` and the rest: each own property that is
- * a function, as the console is when `run` begins) is replaced by one that counts the call
- * and keeps the kinds of the errors it was passed, and is put back after, whether `run`
- * succeeds or fails. A library writing to the console (pdf.js's warnings quote a file's
- * content) is not printed: the calls are said once, in one line on standard error, with
- * those kinds, never their words. Standard error itself is not held: what `compare` writes
- * there is its own.
+ * `run`, with the console held for its length: each of its methods that writes (WRITING) is
+ * replaced by one that counts the call and keeps the kinds of the errors it was passed, and
+ * is put back after, whether `run` succeeds or fails; its other members (`Console`,
+ * `context`, `createTask` and the profiler's) are left alone. A library writing to the
+ * console (pdf.js's warnings quote a file's content) is not printed: the calls are said
+ * once, in one line on standard error, with those kinds, never their words. Standard error
+ * itself is not held: what `compare` writes there is its own.
  */
 export async function withConsoleHeld<T>(
   run: () => Promise<T>,
   err: (text: string) => void
 ): Promise<T> {
-  const names = Object.keys(console).filter(
-    (name) => typeof Reflect.get(console, name) === 'function'
-  );
+  const names = WRITING.filter((name) => typeof Reflect.get(console, name) === 'function');
   // the methods as they are, put back as they were
   const saved = names.map((name) => [name, Reflect.get(console, name) as unknown] as const);
   let count = 0;

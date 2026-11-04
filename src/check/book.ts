@@ -45,7 +45,7 @@ import { checkFiles, neededFiles, readSummary, SUMMARY } from '../preflight/file
 import { figureRecord } from '../preflight/folder.ts';
 import { fileName } from '../preflight/names.ts';
 import { bookPathways } from '../preflight/preflight.ts';
-import { errorKind, UnreadPdf } from '../print/unread.ts';
+import { UnreadPdf } from '../print/unread.ts';
 
 /** FR-011's checks, in the order their faults are listed (contracts/cli.md). */
 export const CHECKS = [
@@ -235,7 +235,7 @@ async function readPdf(path: string): Promise<Read> {
     return { pieces: pieces.sort(byReading), links: links.sort(byReading), outline };
   } catch (error) {
     // pdf.js's errors by their kind alone: their messages quote the file
-    throw new UnreadPdf(error);
+    throw new UnreadPdf(error, path);
   } finally {
     await task.destroy();
   }
@@ -647,8 +647,10 @@ export async function checkBookCommand(
     graph = undefined;
     checked = await checkBook(settings.folder, docs, settings.files);
   } catch (error) {
-    // the error's kind and code alone: it may come from reading a PDF, which holds names
-    err(`The check stopped: ${errorKind(error)}\n`);
+    // a PDF not read, by its path and pdf.js's error's kind alone (UnreadPdf's message):
+    // pdf.js's own quotes the file, which holds names. A file system's error names its
+    // path, and the graph's holds no text of a PDF: both say their message
+    err(`The check stopped: ${message(error)}\n`);
     return 2;
   } finally {
     await closing(graph, err);

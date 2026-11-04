@@ -575,6 +575,20 @@ describe('what a library writes to the console', () => {
     assert.equal(err, '8 message(s) from a library withheld (TypeError)\n');
   });
 
+  test("the console's members that do not write are left alone", async () => {
+    const members = ['Console', 'context', 'createTask', 'profile', 'timeStamp'];
+    const before = members.map((name) => Reflect.get(console, name) as unknown);
+    let during: unknown[] = [];
+    await withConsoleHeld(
+      () => {
+        during = members.map((name) => Reflect.get(console, name) as unknown);
+        return Promise.resolve();
+      },
+      () => undefined
+    );
+    assert.deepEqual(during, before);
+  });
+
   test('the console is put back when the comparison fails, and what was held still said', async () => {
     let err = '';
     let before: unknown;
@@ -744,7 +758,7 @@ describe('the analysis and the cover, by their meaning', () => {
 
 describe("a section's bounds", () => {
   const layout = (figurePage: number): Layout => ({
-    pages: [0, 1, 2].map(() => ({ width: 595, height: 842 })),
+    pages: [0, 1, 2, 3].map(() => ({ width: 595, height: 842 })),
     lines: [
       { page: 0, y: 700, x: 100, size: 28, text: 'Alpha signalling pathway' },
       { page: 1, y: 780, x: 57, size: 14, text: 'Beta binds gamma' },
@@ -761,8 +775,9 @@ describe("a section's bounds", () => {
     assert.deepEqual(section?.parts[0], { part: 'name', items: ['Betabindsgamma'] });
   });
 
-  test("the last section's figure is found on a later page", () => {
+  test("the last section's figure is found on a later page, however far", () => {
     assert.equal(reduce(layout(1)).sections[0]?.figure, 'figure');
     assert.equal(reduce(layout(2)).sections[0]?.figure, 'figure');
+    assert.equal(reduce(layout(3)).sections[0]?.figure, 'figure');
   });
 });
