@@ -22,12 +22,16 @@ export const LONG_TOKEN = 40;
 export const BREAK_EVERY = 20;
 
 /**
- * The spaces a token ends at: those Chromium breaks a line at. A no-break space, U+202F or
- * U+FEFF joins its neighbours, so a token runs through it; a space it could break at but
- * that is not listed (an en space, say) only adds a `<wbr>` where a break already was.
- * A carriage return and line feed are one grapheme.
+ * The spaces a token ends at: those Chromium breaks a line at, measured
+ * (`ci/measure/breaks.ts`): tab, line feed, carriage return (a carriage return and line
+ * feed are one grapheme), space, U+1680, U+2000 to U+2006, U+2008 to U+200A (the en, em,
+ * thin and hair spaces among them), U+200B (zero width), U+2028, U+2029, U+205F and U+3000.
+ * The others `\s` holds join their neighbours, and a token runs through them: U+000B,
+ * U+000C, U+00A0 (no-break), U+2007 (figure), U+202F and U+FEFF. A space left out of this
+ * list would join two words into one token, and a long one would break mid-word.
  */
-const BREAKABLE_SPACE = /^[ \t\n\r]+$/;
+export const BREAKABLE_SPACE =
+  /^[\t\n\r \u1680\u2000-\u2006\u2008-\u200b\u2028\u2029\u205f\u3000]+$/u;
 
 /**
  * A unit of text: a character as a reader sees it, a character reference, or a tag, which
@@ -36,6 +40,8 @@ const BREAKABLE_SPACE = /^[ \t\n\r]+$/;
 interface Unit {
   readonly text: string;
   readonly tag?: 'joins' | 'ends';
+  /** A character reference to a space a line breaks at. */
+  readonly space?: boolean;
 }
 
 /**
@@ -72,7 +78,7 @@ function breakTokens(units: readonly Unit[], escape: (unit: string) => string): 
     } else if (unit.tag === 'ends') {
       flush();
       out += unit.text;
-    } else if (BREAKABLE_SPACE.test(unit.text)) {
+    } else if (unit.space === true || BREAKABLE_SPACE.test(unit.text)) {
       flush();
       out += escape(unit.text);
     } else {
@@ -100,14 +106,32 @@ export function text(value: string): string {
  */
 const INLINE_TAGS = new Set(['a', 'b', 'em', 'i', 'span', 'strong', 'sub', 'sup', 'u']);
 
-/** A tag (its attributes' quoted values may hold `>`), or a comment; a `<` before neither is text. */
+/**
+ * A tag (its attributes' quoted values may hold `>`), or a comment; a `<` before neither is
+ * text. Enough for the sanitiser's output, which holds no CDATA, doctype, processing
+ * instruction or script or style element: raw markup is not read rightly.
+ */
 const TAG = /(<!--[\s\S]*?(?:-->|$)|<\/?([a-z][a-z0-9]*)(?:[^>"']|"[^"]*"|'[^']*')*>?)/giu;
 const REFERENCE = /(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu;
 
 /**
- * A summation's sanitised markup, a long token in its text given places to break as `text`
- * gives plain text: each character reference one unit, a tag never broken into and never
- * counted, and a word counted whole through inline tags.
+ * The character a numeric reference stands for; a named one is left as it is, as the
+ * sanitiser writes every character but `&`, `<`, `>` and `"` as itself.
+ */
+function referenced(reference: string): string {
+  const hex = /^&#x([0-9a-f]+);$/iu.exec(reference)?.[1];
+  const decimal = /^&#([0-9]+);$/u.exec(reference)?.[1];
+  const code =
+    hex !== undefined ? parseInt(hex, 16) : decimal !== undefined ? Number(decimal) : NaN;
+  return code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+}
+
+/**
+ * A summation's markup, sanitised by `sanitiseSummation` (src/model/rules.ts), which the
+ * model applies to every summation it builds, a long token in its text given places to
+ * break as `text` gives plain text: each character reference one unit, a tag never broken
+ * into and never counted, and a word counted whole through inline tags. It relies on the
+ * sanitiser: on raw markup (CDATA, a doctype, a script) it may break where it should not.
  */
 export function markupBreaks(markup: string): string {
   const units: Unit[] = [];
@@ -116,7 +140,7 @@ export function markupBreaks(markup: string): string {
   for (let i = 0; i < parts.length; i += 3) {
     const between = parts[i] ?? '';
     between.split(REFERENCE).forEach((part, j) => {
-      if (j % 2 === 1) units.push({ text: part });
+      if (j % 2 === 1) units.push({ text: part, space: BREAKABLE_SPACE.test(referenced(part)) });
       else units.push(...graphemes(part));
     });
     const tag = parts[i + 1];

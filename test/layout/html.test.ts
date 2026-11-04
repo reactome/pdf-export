@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import { BREAK_EVERY, LONG_TOKEN, markupBreaks, text } from '../../src/layout/html.ts';
+import { sanitiseSummation } from '../../src/model/rules.ts';
 
 /** Each piece's length in characters, a character reference counted as one. */
 const pieces = (out: string): number[] =>
@@ -22,14 +23,35 @@ describe("text()'s breaks", () => {
   });
 
   test('a token ends at a space Chromium breaks at, and runs through one it does not', () => {
+    // as measured by ci/measure/breaks.ts
     const half = 'a'.repeat(30);
-    for (const space of [' ', '\t', '\n', '\r', '\r\n'])
+    const breaking = [' ', '\t', '\n', '\r', '\r\n', '\u1680', '\u200b', '\u2028', '\u2029'];
+    for (let code = 0x2000; code <= 0x200a; code++)
+      if (code !== 0x2007) breaking.push(String.fromCharCode(code));
+    breaking.push('\u205f', '\u3000');
+    for (const space of breaking)
       assert.equal(text(`${half}${space}${half}`), `${half}${space}${half}`, JSON.stringify(space));
-    for (const joiner of ['\u00a0', '\u202f', '\ufeff']) {
+    const joining = [
+      '\u000b',
+      '\u000c',
+      '\u00a0',
+      '\u2007',
+      '\u202f',
+      '\ufeff',
+      '\u180e',
+      '\u2060',
+    ];
+    for (const joiner of joining) {
       const out = text(`${half}${joiner}${half}`);
       assert.deepEqual(pieces(out), [16, 15, 15, 15], JSON.stringify(joiner));
       assert.equal(out.replaceAll('<wbr>', ''), `${half}${joiner}${half}`);
     }
+  });
+
+  test('two words beside a thin space are two tokens, each kept whole', () => {
+    // 46 characters together: before, they were one token, broken mid-word
+    const name = 'glycosylphosphatidylinositol\u2009phosphodiesterase isoform';
+    assert.equal(text(name), name);
   });
 
   test('a character escaped is one unit, never broken into', () => {
@@ -83,5 +105,40 @@ describe("markupBreaks()'s breaks", () => {
       markupBreaks(`<p>${'a'.repeat(30)}\u00a0${'a'.repeat(30)}</p>`).split('<wbr>').length,
       4
     );
+  });
+  test('a space written as a numeric reference ends a token as the space does', () => {
+    const x = 'x'.repeat(30);
+    for (const space of ['&#x2009;', '&#8201;', '&#x20;'])
+      assert.equal(markupBreaks(`${x}${space}${x}`), `${x}${space}${x}`, space);
+    assert.equal(markupBreaks(`${x}&#xa0;${x}`).split('<wbr>').length, 4);
+    assert.equal(markupBreaks(`${x}&nbsp;${x}`).split('<wbr>').length, 4);
+  });
+
+  test("a tag's quoted `>`, a comment, upper case: read as the tags they are", () => {
+    const x = 'x'.repeat(25);
+    const y = 'y'.repeat(25);
+    // a quoted `>` does not end the tag, so nothing in it is counted or broken
+    const link = `<a href="https://site.example/?q=a>${'b'.repeat(40)}">`;
+    assert.equal(markupBreaks(`<p>${link}w</a></p>`), `<p>${link}w</a></p>`);
+    // a word runs through a comment, `a`, `b` and an inline tag in capitals
+    for (const [open, close] of [
+      ['<!-- note -->', ''],
+      ['<a href="https://site.example/">', '</a>'],
+      ['<b>', '</b>'],
+      ['<I>', '</I>'],
+    ] as const) {
+      const out = markupBreaks(`${x}${open}${y}${close}`);
+      assert.equal(out.split('<wbr>').length, 3, open);
+      assert.equal(out.replaceAll('<wbr>', ''), `${x}${open}${y}${close}`, open);
+    }
+  });
+
+  test("it is given the sanitiser's markup, and breaks nothing inside a tag of it", () => {
+    const raw =
+      `<!DOCTYPE html><?pi ${'p'.repeat(50)}?><![CDATA[${'c'.repeat(50)}]]>` +
+      `<script>${'s'.repeat(50)}</script><p title="${'t'.repeat(50)}">${'w'.repeat(50)}</p>`;
+    const out = markupBreaks(sanitiseSummation(raw));
+    assert.doesNotMatch(out, /<[^>]*<wbr>/);
+    assert.match(out, /^<p>w+<wbr>w+<wbr>w+<\/p>$/);
   });
 });

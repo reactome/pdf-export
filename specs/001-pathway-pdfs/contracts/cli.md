@@ -204,9 +204,12 @@ FR-011's check, alone. Also run by `book`.
     part Chromium printed scaled down still reads its names, its scale not a fault: the
     layout keeps realistic content inside the text column (long tokens may break, a table's
     columns narrow to their longest words), but a table whose longest words, side by side,
-    are wider than the column can still be wider: a token of up to 40 characters does not
-    break, so three columns of 40-character words are wider, four of 30 and five of 21 (a
-    longer token breaks into pieces of 14 to 20, and takes six columns or more);
+    are wider than the column can still be wider. A token of up to 40 characters does not
+    break, and a longer one breaks into pieces of 13 to 20; how many columns are too many
+    depends on the letters. Measured (`ci/measure/breaks.ts`, lowercase text cut from
+    biochemical words), roughly: five columns of 20- to 25-character words, four of 30,
+    three of 35 to 40, and five to seven of longer tokens; of wider letters (`m` alone),
+    two to four;
     `no-stable-id`: its text holds no `Stable identifier` followed by its stable identifier;
   - `missing-figure`: a pathway's or reaction's section with a figure by the Figure rules,
     whose source is in `--files` (its diagram's two files, its EHLD; a reaction's is the
