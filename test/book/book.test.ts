@@ -218,12 +218,17 @@ describe('pdf-export book', { skip }, () => {
     };
 
   /**
-   * `book` run as a child process, sent SIGTERM once `ready` holds (polled without pause, so it is sent within a moment):
-   * how it exited, and its folders, which should be empty.
+   * `book` run as a child process, sent SIGTERM once `ready` holds (polled every 10 ms, so it
+   * is sent within a moment): how it exited, and its folders, which should be empty. The run
+   * is given 90 s to reach its moment: the last, a part printed, came at 18 s on a busy host
+   * and at 36 s with the test's processes held to 30% of a CPU (when the poll spun without
+   * pause, taking that CPU, it never came within the 60 s once given). A run that ends
+   * before its moment fails at once.
    */
   const signalled = async (
     ready: (run: { parent: string; temporary: string; pid: number }) => boolean,
-    signals: readonly NodeJS.Signals[] = ['SIGTERM']
+    signals: readonly NodeJS.Signals[] = ['SIGTERM'],
+    near?: (run: { parent: string; temporary: string; pid: number }) => boolean
   ) => {
     const { parent, report, args } = place();
     const temporary = scratch();
@@ -237,11 +242,27 @@ describe('pdf-export book', { skip }, () => {
       })
     );
     try {
-      const deadline = Date.now() + 60_000;
-      while (!ready({ parent, temporary, pid: child.pid ?? 0 })) {
+      const deadline = Date.now() + 90_000;
+      const run = { parent, temporary, pid: child.pid ?? 0 };
+      // a folder read as the run ends and removes it is not yet the moment: the next look
+      // finds the run ended
+      const holds = (moment: typeof ready): boolean => {
+        try {
+          return moment(run);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+          throw error;
+        }
+      };
+      while (!holds(ready)) {
         assert.ok(child.exitCode === null, 'the run ended before it was signalled');
         assert.ok(Date.now() < deadline, 'never ready to be signalled');
-        await new Promise((resolve) => setImmediate(resolve));
+        // a short sleep until the run is near its moment, and then a spin: a poll that spins
+        // all the while takes the CPU the run needs on a loaded host, and one that sleeps
+        // throughout signals after a moment that does not last (the launcher's folders made,
+        // not yet registered for removal: a few milliseconds)
+        if (near && holds(near)) await new Promise((resolve) => setImmediate(resolve));
+        else await new Promise((resolve) => setTimeout(resolve, 10));
       }
       for (const signal of signals) child.kill(signal);
       const kill = setTimeout(() => child.kill('SIGKILL'), 30_000);
@@ -626,86 +647,110 @@ describe('pdf-export book', { skip }, () => {
     assert.equal(readReport(report).outcome, 'error');
     assert.ok(!existsSync(join(parent, 'TheReactomeBook')));
   });
-  test('a run stopped by a signal, as the browser launches and after a part has printed: exit 128 and its number, its report written, nothing left', async () => {
-    // in the folder, or in a folder of its (the run's private temporary folder)
-    const begun = (dir: string, prefix: string): boolean =>
-      readdirSync(dir, { withFileTypes: true }).some(
-        (entry) =>
-          entry.name.startsWith(prefix) ||
-          (entry.isDirectory() &&
-            readdirSync(join(dir, entry.name)).some((name) => name.startsWith(prefix)))
-      );
-    /** Whether the run's browser has been spawned: a child of its process (Linux's /proc). */
-    const spawned = ({ pid }: { pid: number }) => {
-      let children: string[];
+  // a run stopped by a signal, as the browser launches and after a part has printed: one
+  // test each, so each has the suite's time for a test, and a failure names its moment
+
+  // in the folder, or in a folder of its (the run's private temporary folder)
+  const begun = (dir: string, prefix: string): boolean =>
+    readdirSync(dir, { withFileTypes: true }).some(
+      (entry) =>
+        entry.name.startsWith(prefix) ||
+        (entry.isDirectory() &&
+          readdirSync(join(dir, entry.name)).some((name) => name.startsWith(prefix)))
+    );
+  /**
+   * Whether a process's children can be read (CONFIG_PROC_CHILDREN): without it, `spawned` is
+   * never true, and its tests fail at once rather than at their deadline.
+   */
+  const childrenReadable = existsSync(
+    `/proc/${String(process.pid)}/task/${String(process.pid)}/children`
+  );
+  /** Whether the run's browser has been spawned: a child of its process (Linux's /proc). */
+  const spawned = ({ pid }: { pid: number }) => {
+    let children: string[];
+    try {
+      children = readFileSync(`/proc/${String(pid)}/task/${String(pid)}/children`, 'utf8')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    } catch {
+      return false;
+    }
+    return children.some((child) => {
       try {
-        children = readFileSync(`/proc/${String(pid)}/task/${String(pid)}/children`, 'utf8')
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean);
+        return /chrom|headless/i.test(readFileSync(`/proc/${child}/comm`, 'utf8'));
       } catch {
         return false;
       }
-      return children.some((child) => {
-        try {
-          return /chrom|headless/i.test(readFileSync(`/proc/${child}/comm`, 'utf8'));
-        } catch {
-          return false;
-        }
-      });
-    };
-    type Moment = (run: { parent: string; temporary: string; pid: number }) => boolean;
-    const moments: Record<string, Moment> = {
-      // the printer's pages' folder, made just before the browser is launched
-      'as the launch begins': ({ temporary }) => begun(temporary, 'pdf-export-'),
-      // the launcher's folders, made before it has registered them for removal
-      'as the browser launches': ({ temporary }) => begun(temporary, 'playwright-artifacts-'),
-      'as its profile is made': ({ temporary }) =>
-        begun(temporary, 'playwright_chromiumdev_profile-'),
-      // a PDF written into the book's folder, its parts printed
-      'after a part has printed': ({ parent }) =>
-        readdirSync(parent).some(
-          (name) =>
-            name.startsWith('.TheReactomeBook-') &&
-            readdirSync(join(parent, name)).some((file) => file.endsWith('.pdf'))
-        ),
-    };
-    const cases: [string, Moment, NodeJS.Signals[]][] = [
-      ...Object.entries(moments).map(([moment, ready]): [string, Moment, NodeJS.Signals[]] => [
-        moment,
+    });
+  };
+  type Moment = (run: { parent: string; temporary: string; pid: number }) => boolean;
+  /** Near the launch's moments: the printer's pages' folder, made just before the launch. */
+  const launching: Moment = ({ temporary }) => begun(temporary, 'pdf-export-');
+  const moments: Record<string, Moment> = {
+    // the printer's pages' folder, made just before the browser is launched
+    'as the launch begins': ({ temporary }) => begun(temporary, 'pdf-export-'),
+    // the launcher's folders, made before it has registered them for removal
+    'as the browser launches': ({ temporary }) => begun(temporary, 'playwright-artifacts-'),
+    'as its profile is made': ({ temporary }) =>
+      begun(temporary, 'playwright_chromiumdev_profile-'),
+    // a PDF written into the book's folder, its parts printed
+    'after a part has printed': ({ parent }) =>
+      readdirSync(parent).some(
+        (name) =>
+          name.startsWith('.TheReactomeBook-') &&
+          readdirSync(join(parent, name)).some((file) => file.endsWith('.pdf'))
+      ),
+  };
+  const cases: [string, Moment, NodeJS.Signals[]][] = [
+    ...Object.entries(moments).map(([moment, ready]): [string, Moment, NodeJS.Signals[]] => [
+      moment,
+      ready,
+      ['SIGTERM'],
+    ]),
+    // SIGINT once the browser is spawned, which the browser launcher's own handler would
+    // take, closing the browser and exiting itself (130) before the run's handler, and
+    // two at once, the second stopping the run while the launch is held
+    ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+      `as the browser is spawned (${String(n)})`,
+      spawned,
+      ['SIGINT'],
+    ]),
+    ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+      `as the launcher's artifacts' folder appears (${String(n)})`,
+      moments['as the browser launches'] ?? (() => false),
+      ['SIGINT', 'SIGINT'],
+    ]),
+    ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
+      `as the browser is spawned (${String(n)})`,
+      spawned,
+      ['SIGINT', 'SIGINT'],
+    ]),
+  ];
+  /** The signals sent, as said: `SIGTERM`, or `two SIGINTs`. */
+  const said = (sent: NodeJS.Signals[]): string =>
+    sent.length === 1 ? sent.join('') : `two ${sent[0] ?? ''}s`;
+  for (const [moment, ready, sent] of cases) {
+    test(`a run stopped by ${said(sent)} ${moment}: exit 128 and its number, its report written, nothing left`, async () => {
+      assert.ok(
+        ready !== spawned || childrenReadable,
+        "a process's children cannot be read (/proc/<pid>/task/<pid>/children)"
+      );
+      // every moment but the last is the launch's
+      const run = await signalled(
         ready,
-        ['SIGTERM'],
-      ]),
-      // SIGINT once the browser is spawned, which the browser launcher's own handler would
-      // take, closing the browser and exiting itself (130) before the run's handler, and
-      // two at once, the second stopping the run while the launch is held
-      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
-        `as the browser is spawned (${String(n)})`,
-        spawned,
-        ['SIGINT'],
-      ]),
-      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
-        `twice as the launcher's artifacts' folder appears (${String(n)})`,
-        moments['as the browser launches'] ?? (() => false),
-        ['SIGINT', 'SIGINT'],
-      ]),
-      ...[1, 2, 3].map((n): [string, Moment, NodeJS.Signals[]] => [
-        `twice as the browser is spawned (${String(n)})`,
-        spawned,
-        ['SIGINT', 'SIGINT'],
-      ]),
-    ];
-    for (const [moment, ready, sent] of cases) {
-      const run = await signalled(ready, sent);
+        sent,
+        ready === moments['after a part has printed'] ? undefined : launching
+      );
       const [first = 'SIGTERM'] = sent;
       const code = 128 + osConstants.signals[first];
-      assert.deepEqual([run.code, run.signal], [code, null], moment);
-      assert.deepEqual(run.parent, [], moment);
-      assert.deepEqual(run.temporary, [], moment);
-      assert.equal(run.report?.outcome, 'error', moment);
-      assert.equal(run.report.error, `stopped by ${first}`, moment);
-    }
-  });
+      assert.deepEqual([run.code, run.signal], [code, null]);
+      assert.deepEqual(run.parent, []);
+      assert.deepEqual(run.temporary, []);
+      assert.equal(run.report?.outcome, 'error');
+      assert.equal(run.report.error, `stopped by ${first}`);
+    });
+  }
 
   test('a second signal stops a run whose browser never finishes launching', async () => {
     // a child that runs `book` with a printer whose launch never ends, as a hung browser's
