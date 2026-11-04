@@ -184,11 +184,16 @@ describe("a figure's size", () => {
         },
       ],
     ];
+    // timed by the process's CPU time, not the wall's: a reader that backtracks spends its
+    // seconds computing, which a busy host does not hide, while a process kept waiting for
+    // a CPU (a busy host's, or a 10% quota's: 0.9 s of wall time for 0.1 s of work) is not
+    // slow reading
     for (const [name, run] of inputs) {
-      const start = performance.now();
+      const start = process.cpuUsage();
       run();
-      const took = performance.now() - start;
-      assert.ok(took < 250, `${name}: ${String(took)} ms`);
+      const { user, system } = process.cpuUsage(start);
+      const took = (user + system) / 1000;
+      assert.ok(took < 250, `${name}: ${String(took)} ms of CPU time`);
     }
   });
 

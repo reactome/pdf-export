@@ -7,11 +7,15 @@
 // that lets the exit handlers run (the commands' handlers exit, never die by the signal)
 // leaves nothing, whichever of those folders had been made by then. Its exit handler is kept
 // the last: the launcher's own, added when a browser is spawned, kills the browser first,
-// as one still running could write into its profile again after the folder had gone. One
+// as one still running could write into its profile again after the folder had gone. A
+// browser sent SIGKILL is not gone at once, and one that had just been spawned may still be
+// making its profile's folders (the folder's own among them) on a loaded host, so the folder
+// is removed only once no process that names it as its TMPDIR is left, waited for up to 5 s
+// (Linux's /proc; elsewhere none is known, and it is removed at once). One
 // is live in a process at a time: TMPDIR is the process's, and a second would leave it
 // naming a folder the first had removed, and the two exit handlers each moving itself last
 // on the other's every move.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,6 +27,32 @@ export interface PrivateTemporary {
    * that fails throws, the handler set again to try once more as the process exits.
    */
   remove(): void;
+}
+
+/** How long a removal waits for the processes writing into the folder to be gone. */
+const WRITERS_GONE_MS = 5000;
+
+/**
+ * Whether another process, started by this one, may still write into `root`: one whose
+ * environment, as it began, names `root` as its TMPDIR (the browser and its helpers, which
+ * inherit it). A process gone but not yet reaped has no environment to read, and is not one.
+ */
+function written(root: string): boolean {
+  let pids: string[];
+  try {
+    pids = readdirSync('/proc').filter((name) => /^\d+$/.test(name));
+  } catch {
+    return false;
+  }
+  const named = `\0TMPDIR=${root}\0`;
+  return pids.some((pid) => {
+    if (Number(pid) === process.pid) return false;
+    try {
+      return `\0${readFileSync(`/proc/${pid}/environ`, 'latin1')}`.includes(named);
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** The live folder's path, or null. */
@@ -41,6 +71,10 @@ export function privateTemporary(purpose: string): PrivateTemporary {
   live = root;
   const was = process.env['TMPDIR'];
   const onExit = () => {
+    // synchronous, as an exit handler is: a short sleep between looks
+    const pause = new Int32Array(new SharedArrayBuffer(4));
+    const deadline = Date.now() + WRITERS_GONE_MS;
+    while (written(root) && Date.now() < deadline) Atomics.wait(pause, 0, 0, 20);
     rmSync(root, { recursive: true, force: true });
   };
   let removed = false;
