@@ -6,7 +6,6 @@ import type { Reference } from '../graph/queries.ts';
 import type { Found, FoundRow, Place, Section } from '../model/types.ts';
 import { figureHtml, figureKey, type FigureSvgs, type Placement } from './figure.ts';
 import { anchorOf } from '../model/build.ts';
-import { markupText } from './characters.ts';
 import { Links, attribute, markupBreaks, text } from './html.ts';
 
 /** What laying out sections reports, for the run report and the service's log. */
@@ -95,7 +94,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
   if (section.summations.length > 0) {
     // sanitised by the model (rules.ts) to the tags the website's pages allow
     // a long token in its text given places to break, as every other text is (html.ts)
-    const broken = section.summations.map((summation) => markupText(summation, markupBreaks));
+    const broken = section.summations.map(markupBreaks);
     parts.push(`<div class="summation">${broken.join('\n')}</div>`);
   }
 
