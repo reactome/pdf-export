@@ -12,34 +12,75 @@ export function plainText(value: string): string {
 }
 
 /**
- * A token longer than this, with no space in it, may break every BREAK_EVERY characters:
- * the pages break words only where they may (`overflow-wrap: break-word`, pages.css), so
- * that a table's short columns keep their words whole, and a token longer than the text
- * column (a run of letters, a long address) would otherwise overflow it, and Chromium then
- * prints its whole part scaled down.
+ * A token longer than this, with no space in it, is given places to break, in equal pieces
+ * of at most BREAK_EVERY characters: the pages break words only where they may
+ * (`overflow-wrap: break-word`, pages.css), so that a table's short columns keep their
+ * words whole, and a token longer than the text column (a run of letters, a long address)
+ * would otherwise overflow it, and Chromium then prints its whole part scaled down.
  */
 export const LONG_TOKEN = 40;
 export const BREAK_EVERY = 20;
 
 /**
- * Units of text (characters as a reader sees them, and a markup run's character references)
- * with `<wbr>` between every BREAK_EVERY of a token longer than LONG_TOKEN: a break
+ * The spaces a token ends at: those Chromium breaks a line at, measured
+ * (`ci/measure/breaks.ts`): tab, line feed, carriage return (a carriage return and line
+ * feed are one grapheme), space, U+1680, U+2000 to U+2006, U+2008 to U+200A (the en, em,
+ * thin and hair spaces among them), U+200B (zero width), U+2028, U+2029, U+205F and U+3000.
+ * The others `\s` holds join their neighbours, and a token runs through them: U+000B,
+ * U+000C, U+00A0 (no-break), U+2007 (figure), U+202F and U+FEFF. A space left out of this
+ * list would join two words into one token, and a long one would break mid-word.
+ */
+export const BREAKABLE_SPACE =
+  /^[\t\n\r \u1680\u2000-\u2006\u2008-\u200b\u2028\u2029\u205f\u3000]+$/u;
+
+/**
+ * A unit of text: a character as a reader sees it, a character reference, or a tag, which
+ * is no character, and which ends the token it is in unless it is inline (`joins`).
+ */
+interface Unit {
+  readonly text: string;
+  readonly tag?: 'joins' | 'ends';
+  /** A character reference to a space a line breaks at. */
+  readonly space?: boolean;
+}
+
+/**
+ * Units with `<wbr>` between the pieces of a token longer than LONG_TOKEN, each piece of
+ * at most BREAK_EVERY units and none more than one shorter than another: a break
  * opportunity, which adds no character to the printed text.
  */
-function breakTokens(units: readonly string[], escape: (unit: string) => string): string {
+function breakTokens(units: readonly Unit[], escape: (unit: string) => string): string {
   let out = '';
-  let token: string[] = [];
+  let token: Unit[] = [];
   const flush = () => {
-    for (let i = 0; i < token.length; i++) {
-      if (token.length > LONG_TOKEN && i > 0 && i % BREAK_EVERY === 0) out += '<wbr>';
-      out += escape(token[i] ?? '');
+    const length = token.filter((unit) => unit.tag === undefined).length;
+    const pieces = length > LONG_TOKEN ? Math.ceil(length / BREAK_EVERY) : 1;
+    // the k-th piece ends at ceil(k * length / pieces) units, so the pieces differ by one at most
+    let next = 1;
+    let counted = 0;
+    for (const unit of token) {
+      if (unit.tag !== undefined) {
+        out += unit.text;
+        continue;
+      }
+      if (next < pieces && counted === Math.ceil((next * length) / pieces)) {
+        out += '<wbr>';
+        next++;
+      }
+      out += escape(unit.text);
+      counted++;
     }
     token = [];
   };
   for (const unit of units) {
-    if (/^\s$/u.test(unit)) {
+    if (unit.tag === 'joins') {
+      token.push(unit);
+    } else if (unit.tag === 'ends') {
       flush();
-      out += escape(unit);
+      out += unit.text;
+    } else if (unit.space === true || BREAKABLE_SPACE.test(unit.text)) {
+      flush();
+      out += escape(unit.text);
     } else {
       token.push(unit);
     }
@@ -50,8 +91,8 @@ function breakTokens(units: readonly string[], escape: (unit: string) => string)
 
 /** Characters as a reader sees them: a break never parts a mark from its letter. */
 const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
-const graphemes = (value: string): string[] =>
-  Array.from(GRAPHEMES.segment(value), (part) => part.segment);
+const graphemes = (value: string): Unit[] =>
+  Array.from(GRAPHEMES.segment(value), (part) => ({ text: part.segment }));
 
 /** Text for an element's content, escaped, a long token given places to break. */
 export function text(value: string): string {
@@ -59,14 +100,55 @@ export function text(value: string): string {
 }
 
 /**
- * A run of markup's text (raw: its character references as they are) given places to break
- * in a long token, as `text` gives plain text: for `markupText`'s runs of a summation.
+ * The inline tags of a summation (the sanitiser's, rules.ts): a word may run through them,
+ * as `Na<sub>2</sub>` or a word half in italics, and is counted whole. Any other tag, a
+ * paragraph's or a cell's, ends the word.
  */
-export function markupBreaks(run: string): string {
-  // each character reference one unit, every other text by its characters
-  const units = run
-    .split(/(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu)
-    .flatMap((part, i) => (i % 2 === 1 ? [part] : graphemes(part)));
+const INLINE_TAGS = new Set(['a', 'b', 'em', 'i', 'span', 'strong', 'sub', 'sup', 'u']);
+
+/**
+ * A tag (its attributes' quoted values may hold `>`), or a comment; a `<` before neither is
+ * text. Enough for the sanitiser's output, which holds no CDATA, doctype, processing
+ * instruction or script or style element: raw markup is not read rightly.
+ */
+const TAG = /(<!--[\s\S]*?(?:-->|$)|<\/?([a-z][a-z0-9]*)(?:[^>"']|"[^"]*"|'[^']*')*>?)/giu;
+const REFERENCE = /(&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/giu;
+
+/**
+ * The character a numeric reference stands for; a named one is left as it is, as the
+ * sanitiser writes every character but `&`, `<`, `>` and `"` as itself.
+ */
+function referenced(reference: string): string {
+  const hex = /^&#x([0-9a-f]+);$/iu.exec(reference)?.[1];
+  const decimal = /^&#([0-9]+);$/u.exec(reference)?.[1];
+  const code =
+    hex !== undefined ? parseInt(hex, 16) : decimal !== undefined ? Number(decimal) : NaN;
+  return code <= 0x10ffff ? String.fromCodePoint(code) : reference;
+}
+
+/**
+ * A summation's markup, sanitised by `sanitiseSummation` (src/model/rules.ts), which the
+ * model applies to every summation it builds, a long token in its text given places to
+ * break as `text` gives plain text: each character reference one unit, a tag never broken
+ * into and never counted, and a word counted whole through inline tags. It relies on the
+ * sanitiser: on raw markup (CDATA, a doctype, a script) it may break where it should not.
+ */
+export function markupBreaks(markup: string): string {
+  const units: Unit[] = [];
+  const parts = markup.split(TAG);
+  // split gives text, then each tag with its name (or undefined), then text again
+  for (let i = 0; i < parts.length; i += 3) {
+    const between = parts[i] ?? '';
+    between.split(REFERENCE).forEach((part, j) => {
+      if (j % 2 === 1) units.push({ text: part, space: BREAKABLE_SPACE.test(referenced(part)) });
+      else units.push(...graphemes(part));
+    });
+    const tag = parts[i + 1];
+    if (tag === undefined) continue;
+    const name = parts[i + 2]?.toLowerCase();
+    const joins = tag.startsWith('<!--') || (name !== undefined && INLINE_TAGS.has(name));
+    units.push({ text: tag, tag: joins ? 'joins' : 'ends' });
+  }
   return breakTokens(units, (unit) => unit);
 }
 

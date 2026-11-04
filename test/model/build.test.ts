@@ -6,6 +6,7 @@ import { after, before, describe, test } from 'node:test';
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
 import { eventByIdentifier } from '../../src/graph/queries.ts';
 import { buildBook, buildSingle } from '../../src/model/build.ts';
+import { sanitiseSummation } from '../../src/model/rules.ts';
 import type { Document, Place } from '../../src/model/types.ts';
 
 const skip = process.env['NEO4J_URI'] ? false : 'no fixture graph: set NEO4J_URI';
@@ -205,6 +206,12 @@ describe('the model', { skip }, () => {
     ]);
     const alpha = fullOf(pdfs, 'R-HSA-90000200');
     assert.doesNotMatch(alpha.summations.join(''), /script|onerror|javascript/);
+    // every summation sanitised, as the layout's breaks (markupBreaks) rely on it
+    for (const doc of pdfs)
+      for (const p of doc.places)
+        if (p.full)
+          for (const summation of p.section.summations)
+            assert.equal(sanitiseSummation(summation), summation, p.section.event.stId);
     assert.deepEqual(
       fullOf(pdfs, 'R-HSA-90000120').inferredFrom.map((s) => s.speciesName),
       ['Mus musculus', 'Rattus norvegicus']

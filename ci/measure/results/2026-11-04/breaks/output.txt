@@ -1,0 +1,53 @@
+Spaces: whether Chromium breaks a line there (DISAGREE: BREAKABLE_SPACE says otherwise)
+  U+0009  breaks  
+  U+000A  breaks  
+  U+000B  joins   
+  U+000C  joins   
+  U+000D  breaks  
+  U+0020  breaks  
+  U+00A0  joins   
+  U+1680  breaks  
+  U+2000  breaks  
+  U+2001  breaks  
+  U+2002  breaks  
+  U+2003  breaks  
+  U+2004  breaks  
+  U+2005  breaks  
+  U+2006  breaks  
+  U+2007  joins   
+  U+2008  breaks  
+  U+2009  breaks  
+  U+200A  breaks  
+  U+2028  breaks  
+  U+2029  breaks  
+  U+202F  joins   
+  U+205F  breaks  
+  U+3000  breaks  
+  U+FEFF  joins   
+  U+180E  joins   
+  U+200B  breaks  
+  U+2060  joins   
+
+Tables: the fewest columns wider than the text column, by token length
+  m alone
+     20 characters: 3 (685 px > 643 px)
+     21 characters: 3 (718 px > 643 px)
+     25 characters: 3 (849 px > 643 px)
+     30 characters: 2 (675 px > 643 px)
+     35 characters: 2 (784 px > 643 px)
+     40 characters: 2 (893 px > 643 px)
+     41 characters: 4 (653 px > 643 px)
+     50 characters: 4 (783 px > 643 px)
+     60 characters: 3 (685 px > 643 px)
+    100 characters: 3 (685 px > 643 px)
+  biochemical words
+     20 characters: 5 (647 px > 643 px)
+     21 characters: 5 (677 px > 643 px)
+     25 characters: 5 (795 px > 643 px)
+     30 characters: 4 (748 px > 643 px)
+     35 characters: 3 (663 px > 643 px)
+     40 characters: 3 (754 px > 643 px)
+     41 characters: 7 (674 px > 643 px)
+     50 characters: 6 (691 px > 643 px)
+     60 characters: 5 (675 px > 643 px)
+    100 characters: 5 (685 px > 643 px)

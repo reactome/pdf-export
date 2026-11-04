@@ -954,7 +954,15 @@ embedded.
     28 human events have a `<table>` in their summation, so a table wider than the text
     column, which Chromium printed by scaling its whole part down below the theme's sizes,
     would have reached the real book: the layout now keeps realistic content inside the
-    column (pages.css; a table of very many columns can still be wider), and the check
+    column (pages.css; a table whose longest words, side by side, are wider than the
+    column can still be wider: a token of up to 40 characters does not break, a longer one
+    breaks into pieces of 13 to 20. Measured by `ci/measure/breaks.ts`, a table of two
+    rows laid out by Chromium with the book's stylesheets and print media in a
+    `.summation` 170 mm wide, the text column; its output in
+    `ci/measure/results/2026-11-04/breaks/`. With lowercase text cut from biochemical
+    words, roughly five columns of 20- to 25-character words are wider, four of 30,
+    three of 35 to 40, and five to seven of longer tokens; with `m` alone, two to four.
+    The figures depend on the letters, so they are approximate), and the check
     reads headings against the section's own body text, so a part printed scaled down is
     not a fault. No human summation holds a
     `<pre>` block, and no human event's name holds a soft hyphen, a zero-width or
