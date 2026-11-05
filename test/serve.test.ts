@@ -713,9 +713,11 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     assert.match(text, /Homo sapiens \uFFFD/);
     assert.ok(!text.includes('\uE000'), 'the texts and the analysis alike');
     assert.deepEqual(uncovered(), [
-      `uncovered-character U+E000 ${REACTION} token=${TOKENS.stored}`,
-      `uncovered-character U+E002 ${REACTION} token=${TOKENS.stored}`,
+      `uncovered-character U+E000 ${REACTION} with-token`,
+      `uncovered-character U+E002 ${REACTION} with-token`,
     ]);
+    // never the token itself: whoever holds it can read the results
+    assert.ok(lines.every((line) => !line.includes(TOKENS.stored)));
     // never the text
     assert.ok(lines.every((line) => !line.includes('Reaction ')));
   });

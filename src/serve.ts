@@ -442,8 +442,11 @@ export async function startService(
             { timeoutMs: limits.analysisTimeoutMs, signal: deadline }
           );
     going();
+    // The token names whose results these are, and anyone holding it can read
+    // them. It is a timestamp and a counter, so even a hash of it can be
+    // guessed back: the log says only that the PDF had one.
     const characters = new CharacterLog(
-      token === null ? root.stId : `${root.stId} token=${token}`,
+      token === null ? root.stId : `${root.stId} with-token`,
       log
     );
     // the token as the render service is to receive it once decoded: its padding as `=`;

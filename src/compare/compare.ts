@@ -424,7 +424,14 @@ export async function comparePaths(
     if (!a) failed.push({ file, part: 'file', field: 'reference', kind: 'unreadable', count: 1 });
     if (!b) failed.push({ file, part: 'file', field: 'new', kind: 'unreadable', count: 1 });
     if (!a || !b) return failed;
-    return compareReduced(file, a, b, { reference: refPath, new: newPath });
+    // A side with no section the reader recognised was not read, whatever else
+    // it holds: two such sides are not "the same".
+    const unread: Difference[] = [];
+    if (a.sections.length === 0)
+      unread.push({ file, part: 'sections', field: 'reference', kind: 'unreadable', count: 1 });
+    if (b.sections.length === 0)
+      unread.push({ file, part: 'sections', field: 'new', kind: 'unreadable', count: 1 });
+    return [...unread, ...compareReduced(file, a, b, { reference: refPath, new: newPath })];
   };
   if (!refFolder) return pair(basename(neu), reference, neu);
   const pdfs = (path: string) =>
@@ -432,6 +439,12 @@ export async function comparePaths(
       .filter((name) => name.toLowerCase().endsWith('.pdf'))
       .sort();
   const [refFiles, newFiles] = [pdfs(reference), pdfs(neu)];
+  // A folder with no PDF compares nothing: not a pass.
+  for (const [path, files] of [
+    [reference, refFiles],
+    [neu, newFiles],
+  ] as const)
+    if (files.length === 0) throw new SettingsError(`${path} holds no PDF`);
   const out: Difference[] = [];
   for (const file of refFiles) {
     if (!newFiles.includes(file)) out.push({ file, part: 'file', kind: 'missing', count: 1 });

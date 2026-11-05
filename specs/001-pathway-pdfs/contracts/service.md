@@ -62,7 +62,8 @@ and its error envelope are WebsiteAngular's (FR-014). This is the interface behi
   it and the absence is logged (spec, Edge Cases).
 - **A character no font draws** does not fail the PDF (FR-017): after the fixed list's
   substitutions, it prints as U+FFFD, and each such code point is logged once per PDF
-  with the stable identifier or token, never the text.
+  with the stable identifier, and `with-token` when a token was given: never the text, and
+  never the token, which is a timestamp and a counter, so even its hash can be guessed back.
 - **The species** of the overlay is the event's (FR-006). The analysis options the
   website does not send are ignored (spec, Assumptions).
 
