@@ -12,7 +12,6 @@
 // between stages, its calls are stopped, nothing more is printed, and the answer is 503
 // `unavailable`. The browser that prints is started again if it goes. A reason never carries
 // a path, a host or a name: the content service writes WebsiteAngular's envelope from it.
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
@@ -444,9 +443,10 @@ export async function startService(
           );
     going();
     // The token names whose results these are, and anyone holding it can read
-    // them: the log has a short hash of it, enough to match lines, not the token.
+    // them. It is a timestamp and a counter, so even a hash of it can be
+    // guessed back: the log says only that the PDF had one.
     const characters = new CharacterLog(
-      token === null ? root.stId : `${root.stId} token-sha256=${tokenTag(token)}`,
+      token === null ? root.stId : `${root.stId} with-token`,
       log
     );
     // the token as the render service is to receive it once decoded: its padding as `=`;
@@ -847,9 +847,4 @@ function describe(error: unknown): string {
   const cause = error.cause as { code?: unknown } | undefined;
   const code = typeof cause?.code === 'string' ? ` (${cause.code})` : '';
   return `${error.name}: ${error.message}${code}`;
-}
-
-/** The first 12 hex digits of a token's SHA-256: what the log names a token by. */
-export function tokenTag(token: string): string {
-  return createHash('sha256').update(token).digest('hex').slice(0, 12);
 }

@@ -49,7 +49,7 @@ export class CharacterLog {
   readonly #write: (line: string) => void;
 
   /**
-   * @param subject what the line names: the stable identifier, and a short hash of the token if there is one
+   * @param subject what the line names: the stable identifier, and `with-token` if there is one (never the token)
    * @param write where each line goes
    */
   constructor(subject: string, write: (line: string) => void) {

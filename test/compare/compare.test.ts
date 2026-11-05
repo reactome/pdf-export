@@ -509,5 +509,9 @@ describe('nothing read is never a pass', () => {
     mkdirSync(ref);
     mkdirSync(neu);
     await assert.rejects(comparePaths(ref, neu), /holds no PDF/);
+    // Either side alone, a PDF on the other.
+    writeFileSync(join(ref, 'a.pdf'), await plain('Some text'));
+    await assert.rejects(comparePaths(ref, neu), /holds no PDF/);
+    await assert.rejects(comparePaths(neu, ref), /holds no PDF/);
   });
 });
