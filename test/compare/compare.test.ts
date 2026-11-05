@@ -11,7 +11,14 @@ import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { compareCommand, compareReduced, type Difference } from '../../src/compare/compare.ts';
+import { PDFDocument } from '@cantoo/pdf-lib';
+
+import {
+  compareCommand,
+  comparePaths,
+  compareReduced,
+  type Difference,
+} from '../../src/compare/compare.ts';
 import { readLayout } from '../../src/compare/read.ts';
 import { coverNames, hashNames, reduce, type Reduced } from '../../src/compare/reduce.ts';
 import type { Document } from '../../src/model/types.ts';
@@ -469,5 +476,38 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       assert.equal(result.status, 2);
       assert.match(result.stderr, /Two paths are needed/);
     });
+  });
+});
+
+describe('nothing read is never a pass', () => {
+  let folder: string;
+  before(() => {
+    folder = mkdtempSync(join(tmpdir(), 'pdf-export-compare-empty-'));
+  });
+  after(() => {
+    rmSync(folder, { recursive: true, force: true });
+  });
+
+  /** A PDF of plain text the reader finds no section in. */
+  const plain = async (text: string) => {
+    const doc = await PDFDocument.create();
+    doc.addPage().drawText(text);
+    return doc.save();
+  };
+
+  test('two PDFs with no section the reader knows are each unreadable, not the same', async () => {
+    const [a, b] = [join(folder, 'a.pdf'), join(folder, 'b.pdf')];
+    writeFileSync(a, await plain('Some text'));
+    writeFileSync(b, await plain('Other text entirely'));
+    const found = (await comparePaths(a, b)).map(brief);
+    assert.ok(found.includes('sections reference unreadable'), found.join('; '));
+    assert.ok(found.includes('sections new unreadable'), found.join('; '));
+  });
+
+  test('a folder with no PDF is refused, not compared as empty', async () => {
+    const [ref, neu] = [join(folder, 'ref'), join(folder, 'new')];
+    mkdirSync(ref);
+    mkdirSync(neu);
+    await assert.rejects(comparePaths(ref, neu), /holds no PDF/);
   });
 });

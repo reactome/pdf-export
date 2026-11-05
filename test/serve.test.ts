@@ -37,6 +37,7 @@ import {
   type ServeSettings,
   type Service,
   type ServicePrinter,
+  tokenTag,
 } from '../src/serve.ts';
 import { startAnalysisStub, TOKENS, type AnalysisStub } from './stubs/analysis.ts';
 import { startRenderStub, type RenderStub } from './stubs/render.ts';
@@ -713,9 +714,11 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     assert.match(text, /Homo sapiens \uFFFD/);
     assert.ok(!text.includes('\uE000'), 'the texts and the analysis alike');
     assert.deepEqual(uncovered(), [
-      `uncovered-character U+E000 ${REACTION} token=${TOKENS.stored}`,
-      `uncovered-character U+E002 ${REACTION} token=${TOKENS.stored}`,
+      `uncovered-character U+E000 ${REACTION} token-sha256=${tokenTag(TOKENS.stored)}`,
+      `uncovered-character U+E002 ${REACTION} token-sha256=${tokenTag(TOKENS.stored)}`,
     ]);
+    // never the token itself: whoever holds it can read the results
+    assert.ok(lines.every((line) => !line.includes(TOKENS.stored)));
     // never the text
     assert.ok(lines.every((line) => !line.includes('Reaction ')));
   });

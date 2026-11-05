@@ -249,6 +249,8 @@ pathway, and a file on one side only is reported as a difference.
     is read by their longest common subsequence, so only the sections out of it are
     reported; a section written twice is compared occurrence by occurrence.
   - A contents entry whose target is not read on either side is `missing-target`.
+  - A side with no section the reader recognises is reported as `unreadable` in `sections`,
+    and a folder holding no PDF is refused (exit 2), so nothing read is never a pass.
   - A file that cannot be read is named on standard error and reported as `unreadable`;
     the other files are still compared.
   - `unmatched`: the records of `--expected` that matched no difference, by their place in
