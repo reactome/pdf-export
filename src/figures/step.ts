@@ -56,6 +56,7 @@ import {
 } from '../preflight/folder.ts';
 import { fetchFigure, type FigureRequest, type MissingCause } from './client.ts';
 import { labelsInBook } from './labels.ts';
+import { causeCode, isRecord } from '../unknown.ts';
 
 export interface FiguresSettings {
   graph: GraphSettings;
@@ -158,12 +159,10 @@ async function get(url: URL, timeoutMs: number, signal?: AbortSignal): Promise<s
     return body;
   } catch (error) {
     if (error instanceof ReadError) throw error;
-    const code = (
-      error instanceof Error ? (error.cause as { code?: unknown } | undefined) : undefined
-    )?.code;
+    const code = causeCode(error);
     const why = error instanceof Error ? error.name : String(error);
     throw new ReadError(
-      `${url.pathname}: no answer (${typeof code === 'string' ? `${why}: ${code}` : why})`
+      `${url.pathname}: no answer (${code === undefined ? why : `${why}: ${code}`})`
     );
   }
 }
@@ -181,7 +180,7 @@ export async function readHealth(
   } catch {
     throw new ReadError('/health answered no JSON');
   }
-  const { build, files } = (health ?? {}) as { build?: unknown; files?: unknown };
+  const { build, files } = isRecord(health) ? health : {};
   if (typeof build !== 'string') throw new ReadError('/health answered no build');
   return { build, files: typeof files === 'string' ? files : '' };
 }

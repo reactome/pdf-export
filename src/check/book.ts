@@ -45,7 +45,15 @@ import { checkFiles, neededFiles, readSummary, SUMMARY } from '../preflight/file
 import { figureRecord } from '../preflight/folder.ts';
 import { fileName } from '../preflight/names.ts';
 import { bookPathways } from '../preflight/preflight.ts';
+import {
+  annotationRect,
+  isPageRef,
+  outlineOf,
+  textTransform,
+  type OutlineNode,
+} from '../print/pdfjs.ts';
 import { UnreadPdf } from '../print/unread.ts';
+import { isRecord } from '../unknown.ts';
 
 /** FR-011's checks, in the order their faults are listed (contracts/cli.md). */
 export const CHECKS = [
@@ -151,14 +159,15 @@ type PdfJs = Awaited<ReturnType<typeof getDocument>['promise']>;
 async function land(doc: PdfJs, dest: unknown): Promise<Spot | null> {
   const explicit: unknown = typeof dest === 'string' ? await doc.getDestination(dest) : dest;
   if (!Array.isArray(explicit)) return null;
-  const [ref, kind, left, top] = explicit as unknown[];
+  const parts: unknown[] = explicit;
+  const [ref, kind, left, top] = parts;
   let page: number;
   try {
     if (typeof ref === 'number') {
       if (!Number.isInteger(ref) || ref < 0 || ref >= doc.numPages) return null;
       page = ref;
-    } else if (ref !== null && typeof ref === 'object' && 'num' in ref && 'gen' in ref) {
-      page = await doc.getPageIndex(ref as { num: number; gen: number });
+    } else if (isPageRef(ref)) {
+      page = await doc.getPageIndex(ref);
     } else {
       return null;
     }
@@ -172,9 +181,6 @@ async function land(doc: PdfJs, dest: unknown): Promise<Spot | null> {
   const [, , , pageTop = 0] = (await doc.getPage(page + 1)).view;
   return { page, y: pageTop };
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object';
 
 /** A PDF's text, links and outline, read with pdf.js. */
 async function readPdf(path: string): Promise<Read> {
@@ -192,15 +198,16 @@ async function readPdf(path: string): Promise<Read> {
       const [, , , height = 0] = page.view;
       for (const item of (await page.getTextContent()).items) {
         if (!('str' in item) || item.str.trim() === '') continue;
-        const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = item.transform as number[];
+        const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = textTransform(item.transform);
         // the stamped headers and numbers are in the margins
         if (y <= PAGE.margin || y >= height - PAGE.margin) continue;
         const size = Math.max(Math.hypot(a, b), Math.hypot(c, d));
         pieces.push({ page: i, x, y, size, str: item.str });
       }
-      for (const annot of (await page.getAnnotations()) as unknown[]) {
+      const annotations: unknown[] = await page.getAnnotations();
+      for (const annot of annotations) {
         if (!isRecord(annot) || annot['subtype'] !== 'Link') continue;
-        const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = (annot['rect'] as number[] | undefined) ?? [];
+        const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = annotationRect(annot['rect']);
         const rect: Link['rect'] = [
           Math.min(x1, x2),
           Math.min(y1, y2),
@@ -223,17 +230,15 @@ async function readPdf(path: string): Promise<Read> {
       page.cleanup();
     }
     const outline: OutlineItem[] = [];
-    const walk = async (
-      items: readonly { title: string; dest: unknown; items: unknown[] }[]
-    ): Promise<void> => {
+    const walk = async (items: readonly OutlineNode[]): Promise<void> => {
       for (const item of items) {
         outline.push({ title: item.title, landing: await land(doc, item.dest) });
-        await walk(item.items as typeof items);
+        await walk(item.items);
       }
     };
     // null, not an empty list, for a PDF with no outline, whatever its type says
-    const top = (await doc.getOutline()) as Parameters<typeof walk>[0] | null;
-    await walk(top ?? []);
+    const top: unknown = await doc.getOutline();
+    await walk(outlineOf(top));
     return { pieces: pieces.sort(byReading), links: links.sort(byReading), outline };
   } catch (error) {
     // pdf.js's errors by their kind alone: their messages quote the file

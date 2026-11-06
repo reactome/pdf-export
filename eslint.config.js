@@ -46,5 +46,26 @@ export default tseslint.config(
       ],
     },
   },
+  // Nothing taken on trust: what the code reads (graph rows, JSON, HTTP bodies, files,
+  // what pdf.js gives back) arrives as `unknown` and is checked into its type, so `src/`
+  // has no `as` at all. Scripts and tests may assert a type they have just parsed, never
+  // an object literal's.
+  {
+    files: ['src/**/*.ts'],
+    // the graph's rows are checked into their types in the next change
+    ignores: ['src/graph/**'],
+    rules: {
+      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+    },
+  },
+  {
+    files: ['ci/**/*.ts', 'test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'as', objectLiteralTypeAssertions: 'never' },
+      ],
+    },
+  },
   { files: ['eslint.config.js'], ...tseslint.configs.disableTypeChecked }
 );

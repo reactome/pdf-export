@@ -16,7 +16,6 @@ import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 
 import { AnalysisError, readAnalysis, type AnalysedEvent } from './analysis/client.ts';
@@ -39,6 +38,7 @@ import { buildSingle } from './model/build.ts';
 import type { Document, Figure, Section } from './model/types.ts';
 import { readSummary, SUMMARY, type Summary } from './preflight/files.ts';
 import { Printer } from './print/print.ts';
+import { causeCode, errorCode, isRecord } from './unknown.ts';
 
 /** Why a PDF is not made (contracts/service.md). */
 export type Reason =
@@ -214,11 +214,16 @@ export interface ServiceOptions {
 }
 
 /** The package's version, for the health answer. */
-const VERSION = (
-  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
-    version: string;
-  }
-).version;
+const VERSION = versionOf(
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+);
+
+/** A package.json's version, refusing one with none. */
+function versionOf(json: unknown): string {
+  const version = isRecord(json) ? json['version'] : undefined;
+  if (typeof version !== 'string') throw new Error('package.json gives no version');
+  return version;
+}
 
 /** The EHLD summary: the pathways it names are drawn as their illustration. */
 function summaryOf(files: string): Summary {
@@ -542,7 +547,7 @@ export async function startService(
       return await readFile(file, { encoding: 'utf8', signal: deadline });
     } catch (error) {
       if (deadline.aborted) throw stopReason(deadline);
-      const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+      const code = errorCode(error) ?? 'unknown';
       log(`not-in-folder ${key}: its file not read (${code}); drawn on request`);
       return null;
     }
@@ -746,7 +751,10 @@ export async function startService(
       resolve();
     });
   });
-  const { address, port } = server.address() as AddressInfo;
+  const bound = server.address();
+  // a server listening on a port is bound to an address, never a pipe's path
+  if (bound === null || typeof bound === 'string') throw new Error('not listening on a port');
+  const { address, port } = bound;
   const host = address.includes(':') ? `[${address}]` : address;
   // the folder's checks in full at the start, then whenever what they read has changed
   let polls: NodeJS.Timeout | null = null;
@@ -848,7 +856,6 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 /** An error for the log: its name and message, its cause's code where there is one. */
 function describe(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
-  const cause = error.cause as { code?: unknown } | undefined;
-  const code = typeof cause?.code === 'string' ? ` (${cause.code})` : '';
-  return `${error.name}: ${error.message}${code}`;
+  const code = causeCode(error);
+  return `${error.name}: ${error.message}${code === undefined ? '' : ` (${code})`}`;
 }

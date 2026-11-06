@@ -27,7 +27,7 @@ import { substituted } from '../layout/characters.ts';
 import { MARGIN_FAMILIES, pageStyles } from '../layout/document.ts';
 import { PAGE } from '../layout/figure.ts';
 import { codePointName, fontFaces, type FontFace } from '../layout/fonts.ts';
-import { FRONT, FRONT_NAMES } from '../layout/front.ts';
+import { FRONT, FRONT_NAMES, FRONT_PARTS } from '../layout/front.ts';
 import type { Joined } from './parts.ts';
 
 /** What one page carries: its header and its number, or neither (the cover). */
@@ -94,9 +94,9 @@ export function pageStamps(
 ): (PageStamp | null)[] {
   const frontPages = parts[0] ?? 0;
   const pages = parts.reduce((n, p) => n + p, 0);
-  const starts = Object.entries(FRONT).flatMap(([key, anchor]) => {
-    const index = targets.get(anchor)?.index;
-    return index === undefined ? [] : [{ index, header: FRONT_NAMES[key as keyof typeof FRONT] }];
+  const starts = FRONT_PARTS.flatMap((part) => {
+    const index = targets.get(FRONT[part])?.index;
+    return index === undefined ? [] : [{ index, header: FRONT_NAMES[part] }];
   });
   starts.sort((a, b) => a.index - b.index);
   if (!targets.has(FRONT.introduction)) {

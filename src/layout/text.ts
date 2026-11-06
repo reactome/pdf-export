@@ -4,6 +4,8 @@
 // references.json, whose authors the release's owners fill in.
 import { readFileSync } from 'node:fs';
 
+import { isRecord, isStrings } from '../unknown.ts';
+
 /** The institutions that run Reactome (content/about/team.mdx, its institution headings). */
 export const INSTITUTIONS: readonly string[] = [
   'Ontario Institute for Cancer Research',
@@ -95,10 +97,34 @@ export interface OwnReference {
 
 /** Reactome's own papers for the introduction, newest first. */
 export function ownReferences(): OwnReference[] {
-  const file = JSON.parse(readFileSync(new URL('references.json', import.meta.url), 'utf8')) as {
-    references: OwnReference[];
-  };
-  return [...file.references].sort((a, b) => b.year - a.year);
+  const file: unknown = JSON.parse(
+    readFileSync(new URL('references.json', import.meta.url), 'utf8')
+  );
+  return ownReferencesOf(file).sort((a, b) => b.year - a.year);
+}
+
+/** `references.json`'s papers, each checked: a file with anything else is refused. */
+export function ownReferencesOf(file: unknown): OwnReference[] {
+  const references = isRecord(file) ? file['references'] : undefined;
+  if (!Array.isArray(references)) throw new Error('references.json holds no references list');
+  return references.map((reference: unknown, i): OwnReference => {
+    if (isRecord(reference)) {
+      const { pubMedId, title, journal, year, doi, authors } = reference;
+      if (
+        typeof pubMedId === 'number' &&
+        Number.isInteger(pubMedId) &&
+        typeof title === 'string' &&
+        typeof journal === 'string' &&
+        typeof year === 'number' &&
+        Number.isInteger(year) &&
+        typeof doi === 'string' &&
+        isStrings(authors)
+      ) {
+        return { pubMedId, title, journal, year, doi, authors };
+      }
+    }
+    throw new Error(`references.json's reference ${String(i)} is not a paper`);
+  });
 }
 
 /** A sentence with its {placeholders} filled in. */

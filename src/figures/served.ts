@@ -17,6 +17,7 @@ import { releaseInfo, type ReleaseInfo } from '../graph/queries.ts';
 import { buildBook } from '../model/build.ts';
 import type { Figure } from '../model/types.ts';
 import type { Summary } from '../preflight/files.ts';
+import { errorCode } from '../unknown.ts';
 import {
   checkFolder,
   expectedFigures,
@@ -118,7 +119,7 @@ export class ServedFolder {
     try {
       manifest = await readFile(join(folder, MANIFEST), 'utf8').catch((error: unknown) => {
         // no folder, or no manifest in it
-        const { code } = error as NodeJS.ErrnoException;
+        const code = errorCode(error);
         if (code === 'ENOENT' || code === 'ENOTDIR') return null;
         throw error;
       });

@@ -6,6 +6,7 @@
 // and the CSV's 404 or 410 then ends the PDF instead of it reading as none found.
 import type { AnalysisProperties, Found, FoundRow } from '../model/types.ts';
 import { AnalysisError } from './error.ts';
+import { causeCode, isRecord, isStrings } from '../unknown.ts';
 import { canonicalToken } from './token.ts';
 
 export { AnalysisError, type AnalysisFailure } from './error.ts';
@@ -48,18 +49,28 @@ const JSON_TYPE = 'application/json';
 /** The CSV endpoint answers 406 to `application/json` alone (research R6). */
 const CSV_TYPE = 'text/csv, application/json';
 
-interface Summary {
+export interface Summary {
   summary: { token: string; type: string; projection: boolean; interactors: boolean };
   identifiersNotFound: number;
   pathwaysFound: number;
 }
 
-interface FoundEntities {
-  identifiers: { id: string; mapsTo: { resource: string; ids: string[] }[] }[];
+/** A resource and its identifiers, as the found lists give them. */
+interface IdMap {
+  resource: string;
+  ids: string[];
 }
 
-interface FoundInteractors {
-  identifiers: { id: string; interactsWith: { resource: string; ids: string[] } }[];
+/** An identifier of `found/entities`, and what it maps to in each resource. */
+interface FoundEntity {
+  id: string;
+  mapsTo: IdMap[];
+}
+
+/** An identifier of `found/interactors`, and the event's identifiers it interacts with. */
+interface FoundInteractor {
+  id: string;
+  interactsWith: IdMap;
 }
 
 export async function readAnalysis(
@@ -205,52 +216,58 @@ export function filterFound(found: Found, identifiers: readonly string[]): Found
   return { entities: keep(found.entities), interactors: keep(found.interactors) };
 }
 
-function checkSummary(json: unknown): Summary {
-  const answer = json as Partial<Summary> | null;
-  const summary = answer?.summary;
+/** The summary's answer, checked: anything else is not the summary. */
+export function checkSummary(json: unknown): Summary {
+  const summary = isRecord(json) ? json['summary'] : undefined;
+  if (!isRecord(json) || !isRecord(summary)) throw new Error('not the summary');
+  const { identifiersNotFound, pathwaysFound } = json;
+  const { token, type, projection, interactors } = summary;
   if (
-    typeof answer?.identifiersNotFound !== 'number' ||
-    typeof answer.pathwaysFound !== 'number' ||
-    typeof summary?.token !== 'string' ||
-    typeof summary.type !== 'string' ||
-    typeof summary.projection !== 'boolean' ||
-    typeof summary.interactors !== 'boolean'
+    typeof identifiersNotFound !== 'number' ||
+    typeof pathwaysFound !== 'number' ||
+    typeof token !== 'string' ||
+    typeof type !== 'string' ||
+    typeof projection !== 'boolean' ||
+    typeof interactors !== 'boolean'
   ) {
     throw new Error('not the summary');
   }
-  return answer as Summary;
+  return { summary: { token, type, projection, interactors }, identifiersNotFound, pathwaysFound };
 }
 
-/** Whether a value is a list of strings. */
-const strings = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
-/** Whether a value is an identifier map: a resource and its identifiers. */
-const idMap = (value: unknown): value is { resource: string; ids: string[] } =>
-  typeof (value as { resource?: unknown } | null)?.resource === 'string' &&
-  strings((value as { ids?: unknown }).ids);
+/** An identifier map, a resource and its identifiers, or null for anything else. */
+function idMap(value: unknown): IdMap | null {
+  if (!isRecord(value)) return null;
+  const { resource, ids } = value;
+  return typeof resource === 'string' && isStrings(ids) ? { resource, ids } : null;
+}
 
-/** A found list's identifiers, each checked by `valid`: anything else is not the answer. */
-function identifiersOf<T>(json: unknown, valid: (identifier: T) => boolean): T[] {
-  const identifiers = (json as { identifiers?: unknown } | null)?.identifiers;
-  if (
-    !Array.isArray(identifiers) ||
-    !identifiers.every(
-      (identifier: unknown) =>
-        typeof (identifier as { id?: unknown } | null)?.id === 'string' && valid(identifier as T)
-    )
-  ) {
-    throw new Error('not a found list');
-  }
-  return identifiers as T[];
+/**
+ * A found list's identifiers, each read by `read` (null for one that is not of its kind):
+ * a list with anything else in it is not the answer.
+ */
+function identifiersOf<T>(
+  json: unknown,
+  read: (identifier: Readonly<Record<string, unknown>>, id: string) => T | null
+): T[] {
+  const identifiers = isRecord(json) ? json['identifiers'] : undefined;
+  if (!Array.isArray(identifiers)) throw new Error('not a found list');
+  return identifiers.map((identifier: unknown) => {
+    const id = isRecord(identifier) ? identifier['id'] : undefined;
+    const found = isRecord(identifier) && typeof id === 'string' ? read(identifier, id) : null;
+    if (found === null) throw new Error('not a found list');
+    return found;
+  });
 }
 
 /** A row per identifier and resource it maps to in. */
-function entityRows(json: unknown): FoundRow[] {
-  type Identifier = FoundEntities['identifiers'][number];
-  const identifiers = identifiersOf<Identifier>(
-    json,
-    (identifier) => Array.isArray(identifier.mapsTo) && identifier.mapsTo.every(idMap)
-  );
+export function entityRows(json: unknown): FoundRow[] {
+  const identifiers = identifiersOf<FoundEntity>(json, (identifier, id) => {
+    const { mapsTo } = identifier;
+    if (!Array.isArray(mapsTo)) return null;
+    const maps = mapsTo.map(idMap);
+    return maps.every((map) => map !== null) ? { id, mapsTo: maps } : null;
+  });
   return identifiers.flatMap((identifier) =>
     identifier.mapsTo.map((to) => ({
       identifier: identifier.id,
@@ -261,11 +278,11 @@ function entityRows(json: unknown): FoundRow[] {
 }
 
 /** A row per interactor: the event's identifiers it interacts with, and their resource. */
-function interactorRows(json: unknown): FoundRow[] {
-  type Identifier = FoundInteractors['identifiers'][number];
-  const identifiers = identifiersOf<Identifier>(json, (identifier) =>
-    idMap(identifier.interactsWith)
-  );
+export function interactorRows(json: unknown): FoundRow[] {
+  const identifiers = identifiersOf<FoundInteractor>(json, (identifier, id) => {
+    const interactsWith = idMap(identifier['interactsWith']);
+    return interactsWith === null ? null : { id, interactsWith };
+  });
   return identifiers.map((identifier) => ({
     identifier: identifier.id,
     mapsTo: identifier.interactsWith.ids,
@@ -276,7 +293,6 @@ function interactorRows(json: unknown): FoundRow[] {
 /** An error's name, and its cause's code where there is one (ECONNREFUSED, say). */
 function reason(error: unknown): string {
   const name = error instanceof Error ? error.name : String(error);
-  const cause =
-    error instanceof Error ? (error.cause as { code?: unknown } | undefined) : undefined;
-  return typeof cause?.code === 'string' ? `${name}: ${cause.code}` : name;
+  const code = causeCode(error);
+  return code === undefined ? name : `${name}: ${code}`;
 }

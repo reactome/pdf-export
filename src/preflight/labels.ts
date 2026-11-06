@@ -5,25 +5,27 @@
 // modification's lettering; `{stId}.graph.json` holds no label.
 import { readFileSync } from 'node:fs';
 
+import { isRecord } from '../unknown.ts';
+
 /** The lists of a diagram file whose items carry a label. */
 const LABELLED = ['nodes', 'compartments', 'notes', 'shadows', 'links'] as const;
 
 /** Each label in a diagram file's JSON, in the file's order. */
 export function diagramLabels(json: unknown): string[] {
-  if (json === null || typeof json !== 'object') return [];
+  if (!isRecord(json)) return [];
   const labels: string[] = [];
   for (const list of LABELLED) {
-    const items: unknown = (json as Record<string, unknown>)[list];
+    const items = json[list];
     if (!Array.isArray(items)) continue;
-    for (const item of items as unknown[]) {
-      if (item === null || typeof item !== 'object') continue;
-      const name: unknown = (item as Record<string, unknown>)['displayName'];
+    for (const item of items) {
+      if (!isRecord(item)) continue;
+      const name = item['displayName'];
       if (typeof name === 'string') labels.push(name);
-      const attachments: unknown = (item as Record<string, unknown>)['nodeAttachments'];
+      const attachments = item['nodeAttachments'];
       if (!Array.isArray(attachments)) continue;
-      for (const attachment of attachments as unknown[]) {
-        if (attachment === null || typeof attachment !== 'object') continue;
-        const label: unknown = (attachment as Record<string, unknown>)['label'];
+      for (const attachment of attachments) {
+        if (!isRecord(attachment)) continue;
+        const label = attachment['label'];
         if (typeof label === 'string') labels.push(label);
       }
     }

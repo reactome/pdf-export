@@ -26,8 +26,14 @@ export const FRONT = {
   contents: 'contents',
 } as const;
 
+/** A front part, by its key in `FRONT`. */
+export type FrontPart = keyof typeof FRONT;
+
+/** Every front part, each once (a test holds it to `FRONT`'s keys). */
+export const FRONT_PARTS: readonly FrontPart[] = ['introduction', 'analysis', 'contents'];
+
 /** Each front part's name, as its running header gives it (FR-016). */
-export const FRONT_NAMES: Readonly<Record<keyof typeof FRONT, string>> = {
+export const FRONT_NAMES: Readonly<Record<FrontPart, string>> = {
   introduction: 'Introduction',
   analysis: 'Analysis properties',
   contents: 'Contents',

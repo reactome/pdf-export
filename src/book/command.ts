@@ -473,8 +473,7 @@ export async function bookCommand(
     if (failure !== null) {
       // faults found while printing or checking are exit 1, any other error exit 2, the
       // faults printed first
-      const failures =
-        failure instanceof AggregateError ? (failure.errors as unknown[]) : [failure];
+      const failures: unknown[] = failure instanceof AggregateError ? failure.errors : [failure];
       const others = failures.filter((f) => !(f instanceof BookFaults));
       for (const f of failures) if (f instanceof BookFaults) noteFaults(report, [...f.faults]);
       if (others.length > 0) return end(2, others.map(message).join('; '));
