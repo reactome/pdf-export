@@ -30,7 +30,7 @@ export class Printer {
     const folder = mkdtempSync(join(tmpdir(), 'pdf-export-'));
     // its folder removed as the process exits if it is not closed first (a run stopped by a
     // signal), from before the browser is launched
-    const onExit = () => {
+    const onExit = (): void => {
       rmSync(folder, { recursive: true, force: true });
     };
     process.once('exit', onExit);
@@ -69,7 +69,7 @@ export class Printer {
     signal?.throwIfAborted();
     const file = join(this.#folder, `${String(++this.#count)}.html`);
     const page = await this.#browser.newPage();
-    const stop = () => {
+    const stop = (): void => {
       void page.close().catch(() => undefined);
     };
     signal?.addEventListener('abort', stop, { once: true });

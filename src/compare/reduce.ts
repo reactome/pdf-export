@@ -240,7 +240,7 @@ export function reduce(layout: Layout): Reduced {
   const linksOn = byPage(layout.links, (link) => link.box.page);
   const figuresOn = byPage(figures, (box) => box.page);
   const body = bodySize(lines.filter((line) => line.page > 0));
-  const heading = (line: Line) => line.size >= body * HEADING_RATIO;
+  const heading = (line: Line): boolean => line.size >= body * HEADING_RATIO;
   const internalOn = (line: Line): Link | undefined =>
     linksOn(line.page).find((link) => link.uri === null && linkOn(line, link.box));
 
@@ -592,7 +592,7 @@ function analysis(
 function contents(region: readonly Line[], target: (line: Line) => string | null): ContentsItem[] {
   const entries: ContentsItem[] = [];
   let pending: Line[] = [];
-  const flush = () => {
+  const flush = (): void => {
     if (pending.length === 0) return;
     const title = fold(pending.map((line) => line.text).join(' ')).replace(/[.·…]*\d+$/, '');
     const landed = pending.map(target).find((t) => t !== null) ?? null;

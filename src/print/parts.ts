@@ -126,7 +126,7 @@ const CHARACTERS = 90;
 const FIGURE_MARGINS = 20;
 
 /** Points for a run of text, at least a line. */
-const text = (characters: number) => LINE * Math.max(1, Math.ceil(characters / CHARACTERS));
+const text = (characters: number): number => LINE * Math.max(1, Math.ceil(characters / CHARACTERS));
 
 /**
  * Pages filled by places in turn, estimated from the model and the figures' sizes, as a
@@ -309,7 +309,7 @@ export async function printBook(docs: readonly Document[], run: BookRun): Promis
     let printed: Uint8Array[] = [];
     const reports: Report[] = [];
     let left = parts.length;
-    const print = async (places: readonly Place[] | null, i: number) => {
+    const print = async (places: readonly Place[] | null, i: number): Promise<void> => {
       if (failures.length > 0) return;
       run.laying?.(doc, places);
       const laid = places ? layoutBookPart(doc, places, layout) : layoutBookFront(doc, layout);

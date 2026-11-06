@@ -98,7 +98,7 @@ export async function readAnalysis(
   }
 
   /** A 404 where none found is not an answer: the token names no result. */
-  const unknown = (what: string) =>
+  const unknown = (what: string): AnalysisError =>
     new AnalysisError('unknown-token', `${what}: the analysis service answered 404`);
 
   /** The answer's body: one that cannot be read is the service failing. */
@@ -198,7 +198,7 @@ export function submittedIdentifiers(csv: string): number {
  */
 export function filterFound(found: Found, identifiers: readonly string[]): Found {
   const own = new Set(identifiers);
-  const keep = (rows: readonly FoundRow[]) =>
+  const keep = (rows: readonly FoundRow[]): FoundRow[] =>
     rows
       .map((row) => ({ ...row, mapsTo: row.mapsTo.filter((id) => own.has(id)) }))
       .filter((row) => row.mapsTo.length > 0);

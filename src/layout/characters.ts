@@ -69,7 +69,11 @@ export class CharacterLog {
  * A character as a PDF made on request prints it: its substitution, itself where a font
  * draws it, otherwise U+FFFD, logged; `null` when it is printed as it is.
  */
-function onRequestChar(char: string, log: CharacterLog, covered: ReadonlySet<number>) {
+function onRequestChar(
+  char: string,
+  log: CharacterLog,
+  covered: ReadonlySet<number>
+): string | null {
   const point = char.codePointAt(0) ?? 0;
   const substitute = SUBSTITUTIONS.get(point);
   if (substitute !== undefined) return substitute;

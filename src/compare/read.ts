@@ -219,7 +219,7 @@ const TOUCH_PT = 1;
  */
 export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
   const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
-  const node = (b: Box) => b.x2 - b.x1 >= NODE_PT && b.y2 - b.y1 >= NODE_PT;
+  const node = (b: Box): boolean => b.x2 - b.x1 >= NODE_PT && b.y2 - b.y1 >= NODE_PT;
   let clusters = clustered(kept.filter(node), FIGURE_GAP_PT);
   // the lines: thin paths and waypoints, grouped where they touch
   const pieces = kept.filter((b) => !node(b));
@@ -295,7 +295,7 @@ function linesOf(pieces: Piece[], page: number): Line[] {
   const lines: Line[] = [];
   const sorted = [...pieces].sort((a, b) => b.y - a.y || a.x - b.x);
   let current: Piece[] = [];
-  const flush = () => {
+  const flush = (): void => {
     const [first] = current;
     if (!first) return;
     const row = current.sort((a, b) => a.x - b.x);

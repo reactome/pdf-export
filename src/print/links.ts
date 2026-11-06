@@ -39,7 +39,7 @@ function uriOf(annot: PDFDict): string | null {
 /** An annotation's top edge, from its rectangle. */
 function topOf(annot: PDFDict): number {
   const rect = annot.lookup(PDFName.of('Rect'), PDFArray);
-  const y = (i: number) => rect.lookup(i, PDFNumber).asNumber();
+  const y = (i: number): number => rect.lookup(i, PDFNumber).asNumber();
   return Math.max(y(1), y(3));
 }
 

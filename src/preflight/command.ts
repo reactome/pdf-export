@@ -119,7 +119,10 @@ export async function preflightCommand(
  * A graph closed, a failure to close said on stderr and never thrown: a rejection in a
  * `finally` would replace the command's exit code with an error.
  */
-export async function closing(graph: Graph | undefined, err: (text: string) => void) {
+export async function closing(
+  graph: Graph | undefined,
+  err: (text: string) => void
+): Promise<void> {
   try {
     await graph?.close();
   } catch (error) {

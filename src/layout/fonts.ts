@@ -59,7 +59,7 @@ function drawnBy(path: string): number[] {
 export function unicodeRange(points: Iterable<number>): string {
   const sorted = [...new Set(points)].sort((a, b) => a - b);
   const ranges: string[] = [];
-  const hex = (p: number) => p.toString(16).toUpperCase();
+  const hex = (p: number): string => p.toString(16).toUpperCase();
   for (let i = 0; i < sorted.length;) {
     const start = sorted[i] ?? 0;
     let end = start;

@@ -56,7 +56,7 @@ export function writeOutline(
     stack.push({ depth: entry.depth, item });
   }
   /** The top level is open, so its children show; deeper entries are closed. */
-  const open = (level: number) => level <= 1;
+  const open = (level: number): boolean => level <= 1;
   /** Links an item's children; returns how many entries beneath it show when it is open. */
   const link = (item: Item, level: number): number => {
     const { children } = item;

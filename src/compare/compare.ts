@@ -19,7 +19,13 @@ import { SettingsError } from '../preflight/command.ts';
 import { errorKind } from '../print/unread.ts';
 import { fold, hash, Output, type Difference } from './output.ts';
 import { MARGIN_BAND_PT, readLayout } from './read.ts';
-import { reduce, type ContentsItem, type Reduced, type ReducedSection } from './reduce.ts';
+import {
+  reduce,
+  type ContentsItem,
+  type PartName,
+  type Reduced,
+  type ReducedSection,
+} from './reduce.ts';
 
 export type { Difference } from './output.ts';
 
@@ -36,7 +42,7 @@ export interface Recorded {
 /** How a list differs: in its items, or only in their order. */
 function listKind(a: readonly string[], b: readonly string[]): 'text' | 'order' | null {
   if (a.length === b.length && a.every((item, i) => item === b[i])) return null;
-  const sorted = (list: readonly string[]) => [...list].sort().join('\n');
+  const sorted = (list: readonly string[]): string => [...list].sort().join('\n');
   return sorted(a) === sorted(b) ? 'order' : 'text';
 }
 
@@ -92,13 +98,16 @@ function tally(list: readonly string[]): Map<string, number> {
  * beyond the other side's are missing or extra; of the rest, those outside the longest
  * common subsequence are out of order. A section written twice is listed as often.
  */
-function sectionOrder(ref: readonly string[], neu: readonly string[]) {
+function sectionOrder(
+  ref: readonly string[],
+  neu: readonly string[]
+): { missing: string[]; extra: string[]; moved: string[] } {
   const [inRef, inNew] = [tally(ref), tally(neu)];
   const kept = tally(commonSubsequence(ref, neu).map(([i]) => ref[i] ?? ''));
   const missing: string[] = [];
   const extra: string[] = [];
   const moved: string[] = [];
-  const repeat = (list: string[], id: string, times: number) => {
+  const repeat = (list: string[], id: string, times: number): void => {
     for (let k = 0; k < times; k++) list.push(id);
   };
   for (const id of new Set(ref)) repeat(missing, id, (inRef.get(id) ?? 0) - (inNew.get(id) ?? 0));
@@ -111,8 +120,11 @@ function sectionOrder(ref: readonly string[], neu: readonly string[]) {
 }
 
 /** The pairs of sections compared: each identifier's k-th occurrence on each side. */
-function pairSections(ref: readonly ReducedSection[], neu: readonly ReducedSection[]) {
-  const occurrences = (list: readonly ReducedSection[]) => {
+function pairSections(
+  ref: readonly ReducedSection[],
+  neu: readonly ReducedSection[]
+): [ReducedSection, ReducedSection][] {
+  const occurrences = (list: readonly ReducedSection[]): Map<string, ReducedSection[]> => {
     const by = new Map<string, ReducedSection[]>();
     for (const s of list) by.set(s.stId, [...(by.get(s.stId) ?? []), s]);
     return by;
@@ -130,7 +142,7 @@ function pairSections(ref: readonly ReducedSection[], neu: readonly ReducedSecti
 }
 
 /** A file's name without `.pdf`, as a title is compared with it. */
-const stem = (file: string) => fold(basename(file).replace(/\.pdf$/i, ''));
+const stem = (file: string): string => fold(basename(file).replace(/\.pdf$/i, ''));
 
 /**
  * Two reduced PDFs' differences, grouped by part, field and kind. `files` names each side's
@@ -143,13 +155,13 @@ export function compareReduced(
   files: { reference: string; new: string } = { reference: file, new: file }
 ): Difference[] {
   const out: Difference[] = [];
-  const add = (d: Omit<Difference, 'file' | 'count'> & { count?: number }) => {
+  const add = (d: Omit<Difference, 'file' | 'count'> & { count?: number }): void => {
     out.push({ file, count: d.events?.length ?? 1, ...d });
   };
 
   // the cover: its title compared by its hash, and said only to be its file's name or not
   if (ref.cover.title.hash !== neu.cover.title.hash) {
-    const named = (title: Reduced['cover']['title'], name: string) =>
+    const named = (title: Reduced['cover']['title'], name: string): 'same' | 'differs' =>
       title.hash === hash(stem(name)) ? 'same' : 'differs';
     add({
       part: 'cover',
@@ -212,7 +224,7 @@ export function compareReduced(
     field: string | undefined,
     kind: Difference['kind'],
     stId: string
-  ) => {
+  ): void => {
     const key = `${part}\0${field ?? ''}\0${kind}`;
     let d = grouped.get(key);
     if (!d) {
@@ -223,7 +235,8 @@ export function compareReduced(
     d.count++;
   };
   for (const [a, b] of pairSections(ref.sections, neu.sections)) {
-    const byPart = (s: ReducedSection) => new Map(s.parts.map((p) => [p.part, p.items]));
+    const byPart = (s: ReducedSection): Map<PartName, string[]> =>
+      new Map(s.parts.map((p) => [p.part, p.items]));
     const [pa, pb] = [byPart(a), byPart(b)];
     for (const part of new Set([...pa.keys(), ...pb.keys()])) {
       const [ia, ib] = [pa.get(part), pb.get(part)];
@@ -355,7 +368,7 @@ export function readRecorded(path: string): Recorded[] {
   if (!Array.isArray(list)) throw new SettingsError(`${path} holds no "differences" list`);
   return list.map((item: unknown, i) => {
     const r = item as Partial<Recorded> | null;
-    const text = (v: unknown) => typeof v === 'string' && v !== '';
+    const text = (v: unknown): boolean => typeof v === 'string' && v !== '';
     if (r === null || typeof r !== 'object' || Array.isArray(r)) {
       throw new SettingsError(`${path}: difference ${String(i)} is not an object`);
     }
@@ -403,14 +416,14 @@ export async function comparePaths(
   neu: string,
   { referenceMargin = MARGIN_BAND_PT, unreadable = () => undefined }: CompareOptions = {}
 ): Promise<Difference[]> {
-  const folder = (path: string) => statSync(path).isDirectory();
+  const folder = (path: string): boolean => statSync(path).isDirectory();
   const [refFolder, newFolder] = [folder(reference), folder(neu)];
   if (refFolder !== newFolder) {
     throw new SettingsError('The reference and the new side must both be PDFs or both be folders');
   }
   /** Both sides reduced and compared; a side that cannot be read, a difference. */
   const pair = async (file: string, refPath: string, newPath: string): Promise<Difference[]> => {
-    const read = async (path: string, margin: number) => {
+    const read = async (path: string, margin: number): Promise<Reduced | null> => {
       try {
         return await reducePdf(path, margin);
       } catch (error) {
@@ -434,7 +447,7 @@ export async function comparePaths(
     return [...unread, ...compareReduced(file, a, b, { reference: refPath, new: newPath })];
   };
   if (!refFolder) return pair(basename(neu), reference, neu);
-  const pdfs = (path: string) =>
+  const pdfs = (path: string): string[] =>
     readdirSync(path)
       .filter((name) => name.toLowerCase().endsWith('.pdf'))
       .sort();
@@ -537,7 +550,7 @@ export async function withConsoleHeld<T>(
   const saved = names.map((name) => [name, Reflect.get(console, name) as unknown] as const);
   let count = 0;
   const kinds = new Set<string>();
-  const held = (...args: unknown[]) => {
+  const held = (...args: unknown[]): void => {
     count++;
     for (const arg of args) if (arg instanceof Error) kinds.add(errorKind(arg));
   };

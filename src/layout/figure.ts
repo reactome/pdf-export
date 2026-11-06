@@ -123,7 +123,7 @@ function labelSizes(svg: string): { sizes: number[]; unread: number } {
   const sizes: number[] = [];
   let unread = 0;
   /** A size's value, whole; anything that is not a finite, positive size is unread. */
-  const read = (value: string) => {
+  const read = (value: string): void => {
     const match = SIZE.exec(value.replace(/!\s*important\s*$/i, '').trim());
     const unit = match?.[2] ?? '';
     const factor = PX[unit.toLowerCase()];
@@ -260,7 +260,7 @@ export function figureHtml(
 ): { html: string; placement: Placement } {
   const measured = measure(svg);
   const placement = place(measured);
-  const size = (px: number) => `${(px * placement.scale).toFixed(2)}pt`;
+  const size = (px: number): string => `${(px * placement.scale).toFixed(2)}pt`;
   const sized = prefixIds(svg, prefix).replace(/<svg\b([^>]*)>/, (_whole, attrs: string) => {
     const kept = attrs.replace(/\s(?:width|height|role|aria-label)=(["'])[^"']*\1/g, '');
     const box = /\sviewBox=/.test(kept)

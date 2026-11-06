@@ -34,5 +34,17 @@ export default tseslint.config(
       ],
     },
   },
+  // Every exported function says what it returns, and so does every function in `src/`
+  // whose type is not given by where it is used.
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        { allowExpressions: true, allowTypedFunctionExpressions: true },
+      ],
+    },
+  },
   { files: ['eslint.config.js'], ...tseslint.configs.disableTypeChecked }
 );

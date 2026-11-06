@@ -28,7 +28,7 @@ const DECODED = /^[0-9]{14}_[0-9]{1,19}$/;
  * Anything else is `unknown-token`. Its date is not judged: that is the service's to say.
  */
 export function canonicalToken(token: string): string {
-  const malformed = () =>
+  const malformed = (): AnalysisError =>
     new AnalysisError('unknown-token', 'The analysis token is not one the service issues');
   if (token.length > MAX_TOKEN_LENGTH) throw malformed();
   const decoded = urlDecoded(token);

@@ -237,7 +237,7 @@ export class Output {
     return hash(`${this.#salt}\0${digest}`);
   }
 
-  #withheld(value: unknown): { hash: string; length: number } {
+  #withheld(value: unknown): Withheld {
     const text = typeof value === 'string' ? fold(value) : JSON.stringify(value);
     return { hash: this.#salted(hash(text)), length: text.length };
   }
@@ -269,7 +269,10 @@ export class Output {
   /** A difference, every field checked. */
   difference(d: Difference): Record<string, unknown> {
     const key = `${d.part} ${d.field ?? ''}`;
-    const named = <T extends string>(value: string | undefined, list: Iterable<T>) =>
+    const named = <T extends string>(
+      value: string | undefined,
+      list: Iterable<T>
+    ): string | Withheld | undefined =>
       value === undefined
         ? undefined
         : [...list].includes(value as T)

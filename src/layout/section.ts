@@ -27,7 +27,7 @@ export interface SectionInput {
 }
 
 /** An event's heading level: the PDF's own event or a chapter's is h1, h6 the deepest. */
-const level = (depth: number) => Math.min(depth + 1, 6);
+const level = (depth: number): number => Math.min(depth + 1, 6);
 
 /** A place: the event's full section, or a short entry linked to it (FR-004). */
 export function placeHtml(place: Place, input: SectionInput): string {
@@ -100,7 +100,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
 
   if (event.kind === 'reaction') {
     const order: [string, string][] = [];
-    const list = (refs: typeof event.before) =>
+    const list = (refs: typeof event.before): string =>
       refs.map((r) => Links.a(links.internal(anchorOf(r.stId)), r.name)).join('; ');
     if (event.before.length > 0) order.push(['Preceded by', list(event.before)]);
     if (event.after.length > 0) order.push(['Followed by', list(event.after)]);
@@ -146,7 +146,7 @@ function definitions(rows: readonly [string, string][]): string {
   return `<dl class="facts">${rows.map(([term, value]) => `<dt>${text(term)}</dt><dd>${value}</dd>`).join('')}</dl>`;
 }
 
-const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+const capital = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** A literature reference: its authors, year, title and where it was published. */
 export function reference(r: Reference): string {

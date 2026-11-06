@@ -32,7 +32,7 @@ export function outlineBoxes(d: string): Box[] | null {
   let startY = 0;
   let command = '';
   let numbers: number[] = [];
-  const point = (px: number, py: number) => {
+  const point = (px: number, py: number): void => {
     if (!open) {
       // a subpath begins at a move's point, or, begun without one, at the current point
       if (command === 'M') [x, y] = [px, py];
@@ -80,7 +80,7 @@ export function outlineBoxes(d: string): Box[] | null {
  * B, O or d). A glyph within a neighbour's box (a full stop under a T's arm) is dropped too,
  * which costs that glyph's vote only, as the neighbour stands on the same baseline.
  */
-const within = (inner: Box, outer: Box) =>
+const within = (inner: Box, outer: Box): boolean =>
   inner[0] >= outer[0] &&
   inner[1] >= outer[1] &&
   inner[2] <= outer[2] &&
@@ -178,7 +178,7 @@ const UNDRAWN = new Set([
 ]);
 
 /** An element's name without its namespace prefix, in lower case. */
-const local = (name: string) => name.slice(name.lastIndexOf(':') + 1).toLowerCase();
+const local = (name: string): string => name.slice(name.lastIndexOf(':') + 1).toLowerCase();
 
 /** The markup without its comments and character data, which may hold tags that are not. */
 function withoutComments(svg: string): string {

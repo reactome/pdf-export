@@ -44,14 +44,14 @@ export function privateTemporary(purpose: string): PrivateTemporary {
   const was = process.env['TMPDIR'];
   // a directory found not empty as it is removed, a write in flight landing in it, is tried
   // again, each time after a longer pause, by when the writes in flight have ended
-  const onExit = () => {
+  const onExit = (): void => {
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 5 });
   };
   let removed = false;
   let moving = false;
   // an exit handler added after this one (the launcher's, at a browser's spawn) is followed
   // by this one again, moved to the end before anything else runs
-  const keepLast = (event: string | symbol) => {
+  const keepLast = (event: string | symbol): void => {
     if (event !== 'exit' || moving) return;
     process.nextTick(() => {
       if (removed) return;
