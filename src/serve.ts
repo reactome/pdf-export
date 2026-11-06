@@ -370,9 +370,9 @@ export async function startService(
       : new ServedFolder({
           folder: settings.figures,
           graph: {
-            read: <T>(query: string, params?: Record<string, unknown>) =>
+            read: (query, params) =>
               within(
-                graph.read<T>(query, params, { timeoutMs: limits.deadlineMs }),
+                graph.read(query, params, { timeoutMs: limits.deadlineMs }),
                 AbortSignal.timeout(limits.deadlineMs + limits.graceMs)
               ),
             close: () => Promise.resolve(),
@@ -388,9 +388,9 @@ export async function startService(
    * have settled, so the reads in flight never outnumber the slots.
    */
   const graphFor = (signal: AbortSignal, endsAt: number, reads: Set<Promise<unknown>>): Graph => ({
-    read: <T>(query: string, params?: Record<string, unknown>) => {
+    read: (query, params) => {
       if (signal.aborted) return Promise.reject(stopReason(signal));
-      const read = graph.read<T>(query, params, { timeoutMs: Math.max(1, endsAt - Date.now()) });
+      const read = graph.read(query, params, { timeoutMs: Math.max(1, endsAt - Date.now()) });
       const settled = read.then(
         () => undefined,
         () => undefined

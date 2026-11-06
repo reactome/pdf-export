@@ -260,7 +260,7 @@ export const joined = (name: string): string =>
 export interface ReferenceOptions {
   analysis?: ReturnType<typeof sampleAnalysis> | null;
   /** The cover's names, if not the document's. */
-  names?: readonly string[];
+  names?: readonly (string | null)[];
   /** The release line's number and the counts, if not the document's. */
   release?: number;
   /** Sections drawn with no figure, by stable identifier. */
@@ -287,7 +287,7 @@ export async function printReference(
 <h1 class="title">${t(doc.cover.title)}</h1>
 ${doc.cover.figure ? `<img src="${png(30, 20)}" style="width:300pt;height:200pt">` : ''}
 <p class="label">Authors and editors</p>
-<p class="names">${names.map(joined).join('; ')}</p>
+<p class="names">${names.map((n) => (n === null ? '' : joined(n))).join('; ')}</p>
 <p>${INSTITUTIONS.map(t).join('<br>')}</p>
 <p>Shared under a Creative Commons licence.</p>
 <p>4 November 2026</p>

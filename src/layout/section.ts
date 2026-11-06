@@ -119,7 +119,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
     const rows = section.edits
       .map(
         (row) =>
-          `<tr><td>${text(row.date)}</td><td>${text(row.kinds.map(capital).join(', '))}</td><td>${text(row.authors.join('; '))}</td></tr>`
+          `<tr><td>${text(row.date)}</td><td>${text(row.kinds.map(capital).join(', '))}</td><td>${text(row.authors.map((name) => name ?? '').join('; '))}</td></tr>`
       )
       .join('');
     parts.push(

@@ -196,7 +196,7 @@ ${label ? `<p>${label}</p>` : ''}
     const body = [
       `<p style="font-size: 26pt; font-weight: bold">${t(doc.cover.title)}</p>`,
       `<p>${svg('cover')}</p>`,
-      `<p><b>Authored, edited, reviewed and revised by</b></p><p>${doc.cover.names.map(t).join('; ')}</p>`,
+      `<p><b>Authored, edited, reviewed and revised by</b></p><p>${doc.cover.names.map((n) => (n === null ? '' : t(n))).join('; ')}</p>`,
       '<p>European Bioinformatics Institute</p><p>An excerpt of the book.</p>',
       '<section class="front"><h1 id="introduction">Introduction</h1><p>Reactome release 98, holding 2 pathways and 2 reactions.</p></section>',
       `<section class="front"><h1 id="analysis">Analysis properties</h1><table>${[

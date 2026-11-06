@@ -21,6 +21,7 @@ import { parseArgs } from 'node:util';
 import { fetchFigure, type FigureRequest } from '../../src/figures/client.ts';
 import { graphSettings, openGraph } from '../../src/graph/connection.ts';
 import { eventByIdentifier } from '../../src/graph/queries.ts';
+import { text, whole } from '../../src/graph/rows.ts';
 import { layoutSingle, pageStyles } from '../../src/layout/document.ts';
 import { figureKey } from '../../src/layout/figure.ts';
 import { buildSingle } from '../../src/model/build.ts';
@@ -126,13 +127,12 @@ try {
     const printS = seconds(t3);
     const pages = (await landed(pdf, [])).pageCount;
 
-    const reactionsBeneath = (
-      await graph.read<{ n: number }>(
-        `MATCH (e:Event {stId: $id}) OPTIONAL MATCH (e)-[:hasEvent*0..]->(r:ReactionLikeEvent)
+    const [counted] = await graph.read(
+      `MATCH (e:Event {stId: $id}) OPTIONAL MATCH (e)-[:hasEvent*0..]->(r:ReactionLikeEvent)
          RETURN count(DISTINCT r) AS n`,
-        { id: found.event.stId }
-      )
-    )[0]?.n;
+      { id: found.event.stId }
+    );
+    const reactionsBeneath = counted === undefined ? undefined : whole(counted, 'n');
     const row = {
       stId: found.event.stId,
       kind: found.event.kind,
@@ -159,13 +159,13 @@ try {
   if (token) {
     const largest = Math.max(...bursts);
     const ids = (
-      await graph.read<{ stId: string }>(
+      await graph.read(
         `MATCH (p:Pathway {speciesName: 'Homo sapiens'})
          WHERE coalesce(p.hasDiagram, false) AND NOT p.stId IN $illustrated
          RETURN p.stId AS stId ORDER BY p.dbId LIMIT ${String(largest * bursts.length)}`,
         { illustrated: [...illustrated] }
       )
-    ).map((row) => row.stId);
+    ).map((row) => text(row, 'stId'));
     let offset = 0;
     tokenRuns = [];
     for (const n of bursts) {

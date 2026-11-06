@@ -16,6 +16,7 @@ import {
   type Graph,
   type GraphSettings,
 } from '../../src/graph/connection.ts';
+import type { Row } from '../../src/graph/rows.ts';
 import { releaseInfo, type ReleaseInfo } from '../../src/graph/queries.ts';
 import { buildBook } from '../../src/model/build.ts';
 import { preflightCommand } from '../../src/preflight/command.ts';
@@ -41,7 +42,7 @@ function rewriting(
   row: (value: Record<string, unknown>) => Record<string, unknown> = (r) => r
 ): Graph {
   return {
-    async read<T>(query: string, params?: Record<string, unknown>): Promise<T[]> {
+    async read(query, params): Promise<Row[]> {
       const visit = (item: unknown): unknown => {
         if (typeof item === 'string') return text(item, query);
         if (Array.isArray(item)) return item.map(visit);
@@ -50,8 +51,8 @@ function rewriting(
         }
         return item;
       };
-      const rows = await graph.read<Record<string, unknown>>(query, params);
-      return rows.map((r) => row(visit(r) as Record<string, unknown>)) as T[];
+      const rows = await graph.read(query, params);
+      return rows.map((r) => row(visit(r) as Row));
     },
     close: () => Promise.resolve(),
   };
@@ -373,10 +374,10 @@ describe("the book's preflight", { skip }, () => {
     const failing = (settings: GraphSettings): Graph => {
       const real = openGraph(settings);
       return {
-        read: <T>(query: string, params?: Record<string, unknown>): Promise<T[]> =>
+        read: (query, params) =>
           query.includes('-[:compartment]->(c)')
             ? Promise.reject(new Error('the planted failure'))
-            : real.read<T>(query, params),
+            : real.read(query, params),
         close: () => real.close(),
       };
     };
@@ -428,7 +429,7 @@ describe("the book's preflight", { skip }, () => {
     const closeRejects = (settings: GraphSettings): Graph => {
       const real = openGraph(settings);
       return {
-        read: <T>(query: string, params?: Record<string, unknown>) => real.read<T>(query, params),
+        read: (query, params) => real.read(query, params),
         close: async () => {
           await real.close();
           throw new Error('the planted close failure');

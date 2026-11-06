@@ -52,8 +52,6 @@ export default tseslint.config(
   // an object literal's.
   {
     files: ['src/**/*.ts'],
-    // the graph's rows are checked into their types in the next change
-    ignores: ['src/graph/**'],
     rules: {
       '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
     },

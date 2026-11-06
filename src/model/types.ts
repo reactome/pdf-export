@@ -1,6 +1,6 @@
 // The document model (spec 001 T015, data-model.md): what the graph's rows become, before
 // any layout. The book's PDFs and a single event's PDF are all made of these.
-import type { EventFacts, EventRef, Reference } from '../graph/queries.ts';
+import type { EventFacts, EventRef, InferredFrom, Reference } from '../graph/queries.ts';
 
 export interface Release {
   version: number;
@@ -24,7 +24,8 @@ export type Figure =
 export interface EditRow {
   date: string;
   kinds: string[];
-  authors: string[];
+  /** Each author's name; null for one the graph gives none, which prints empty. */
+  authors: (string | null)[];
 }
 
 /**
@@ -41,7 +42,7 @@ export interface Section {
   path: EventRef[];
   figure: Figure | null;
   diseases: string[];
-  inferredFrom: (EventRef & { speciesName: string })[];
+  inferredFrom: InferredFrom[];
   summations: string[];
   references: Reference[];
   edits: EditRow[];
@@ -62,8 +63,11 @@ export interface Cover {
   figure: Figure | null;
   /** Whether it notes that the PDF is an excerpt of the book. */
   excerpt: boolean;
-  /** The distinct authors of the edits of every event the PDF holds, sorted, each once. */
-  names: string[];
+  /**
+   * The distinct authors of the edits of every event the PDF holds, sorted, each once; a
+   * null for authors the graph gives no name, which prints empty.
+   */
+  names: (string | null)[];
 }
 
 export interface ContentsEntry {

@@ -3,8 +3,21 @@
 // is in its relationship's `order`, the curators' order; rows come back as plain objects
 // keyed by the event's database id.
 import type { Graph } from './connection.ts';
+import {
+  flag,
+  list,
+  maps,
+  oneOf,
+  text,
+  textOrNull,
+  texts,
+  whole,
+  wholeOrNull,
+  type Row,
+} from './rows.ts';
 
-export type EventKind = 'pathway' | 'reaction';
+export const EVENT_KINDS = ['pathway', 'reaction'] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
 
 export interface EventRef {
   dbId: number;
@@ -14,18 +27,37 @@ export interface EventRef {
 
 export interface Child extends EventRef {
   kind: EventKind;
-  schemaClass: string;
+  /** Null where the graph gives none: nothing printed reads it. */
+  schemaClass: string | null;
 }
 
+/** A compartment or a disease: printed by its name; its id, null where the graph has none, is not read. */
 export interface Named {
-  dbId: number;
+  dbId: number | null;
   name: string;
+}
+
+/** An event's species: neither its id nor its name is printed, so either may be null. */
+export interface Species {
+  dbId: number | null;
+  name: string | null;
+}
+
+/** An event an event was inferred from: printed by its stable id, name and species. */
+export interface InferredFrom {
+  /** Null where the graph gives none: not read. */
+  dbId: number | null;
+  stId: string;
+  name: string;
+  speciesName: string;
 }
 
 export interface EventFacts extends EventRef {
   kind: EventKind;
-  schemaClass: string;
-  speciesName: string;
+  /** Null where the graph gives none: nothing printed reads it. */
+  schemaClass: string | null;
+  /** Null where the graph gives none: an analysis's species is then shown empty. */
+  speciesName: string | null;
   /** A reaction's type, as the graph's `category` gives it. */
   category: string | null;
   hasDiagram: boolean;
@@ -33,12 +65,13 @@ export interface EventFacts extends EventRef {
   isInferred: boolean;
   isInDisease: boolean;
   /** The first species by `order`. */
-  species: Named | null;
+  species: Species | null;
   compartments: Named[];
   diseases: Named[];
   /** What the event was inferred from, each with its species; unordered in the graph. */
-  inferredFrom: (EventRef & { speciesName: string })[];
-  summations: string[];
+  inferredFrom: InferredFrom[];
+  /** A summation with no text is null: the model prints it empty. */
+  summations: (string | null)[];
   /** The events before this one (its `precedingEvent`s), by `order`. */
   before: EventRef[];
   /** The events after this one: those whose `precedingEvent` it is, by database id. */
@@ -48,7 +81,8 @@ export interface EventFacts extends EventRef {
 export type PublicationKind = 'article' | 'book' | 'web page';
 
 export interface Reference {
-  dbId: number;
+  /** Null where the graph gives none: not read. */
+  dbId: number | null;
   kind: PublicationKind;
   title: string;
   /** A book's chapter, where the reference is to one. */
@@ -67,16 +101,19 @@ export interface Reference {
   moreAuthors: boolean;
 }
 
-export type EditKind = 'authored' | 'edited' | 'reviewed' | 'revised';
+export const EDIT_KINDS = ['authored', 'edited', 'reviewed', 'revised'] as const;
+export type EditKind = (typeof EDIT_KINDS)[number];
 
 export interface Person {
   dbId: number;
-  name: string;
+  /** Null where the graph gives none: printed empty, as a name joined into a list. */
+  name: string | null;
   surname: string | null;
 }
 
 export interface Edit {
-  dbId: number;
+  /** Null where the graph gives none: it then sorts as 0. */
+  dbId: number | null;
   kind: EditKind;
   /** As the graph writes it, `YYYY-MM-DD hh:mm:ss`, or null. */
   dateTime: string | null;
@@ -86,11 +123,10 @@ export interface Edit {
 
 /** The release, from `DBInfo.releaseNumber`. */
 export async function release(graph: Graph): Promise<number> {
-  const [row] = await graph.read<{ release: number | null }>(
-    'MATCH (d:DBInfo) RETURN d.releaseNumber AS release LIMIT 1'
-  );
-  if (row?.release == null) throw new Error('The graph has no DBInfo.releaseNumber');
-  return row.release;
+  const [row] = await graph.read('MATCH (d:DBInfo) RETURN d.releaseNumber AS release LIMIT 1');
+  const number = row === undefined ? null : wholeOrNull(row, 'release');
+  if (number === null) throw new Error('The graph has no DBInfo.releaseNumber');
+  return number;
 }
 
 /** The release's number and checksum, from its `DBInfo` (spec 001 T024). */
@@ -105,20 +141,24 @@ export interface ReleaseInfo {
 
 /** The release's number and checksum, for the figures' folder's fingerprint (T024, T046). */
 export async function releaseInfo(graph: Graph): Promise<ReleaseInfo> {
-  const [row] = await graph.read<{ release: number | null; checksum: string | null }>(
+  const [row] = await graph.read(
     'MATCH (d:DBInfo) RETURN d.releaseNumber AS release, toString(d.checksum) AS checksum LIMIT 1'
   );
-  if (row?.release == null) throw new Error('The graph has no DBInfo.releaseNumber');
-  return { release: row.release, checksum: row.checksum ?? null };
+  const number = row === undefined ? null : wholeOrNull(row, 'release');
+  if (row === undefined || number === null) {
+    throw new Error('The graph has no DBInfo.releaseNumber');
+  }
+  return { release: number, checksum: textOrNull(row, 'checksum') };
 }
 
 /** A species' top-level pathways, by database id: the book orders them by name (FR-002). */
 export async function topLevelPathways(graph: Graph, species: string): Promise<EventRef[]> {
-  return graph.read<EventRef>(
+  const rows = await graph.read(
     `MATCH (p:TopLevelPathway {speciesName: $species})
      RETURN p.dbId AS dbId, p.stId AS stId, p.displayName AS name ORDER BY p.dbId`,
     { species }
   );
+  return rows.map(eventRef);
 }
 
 /** What an identifier names: an event, something that is not one, or nothing. */
@@ -136,14 +176,14 @@ export async function eventByIdentifier(graph: Graph, identifier: string): Promi
             CASE WHEN e:Pathway THEN 'pathway' ELSE 'reaction' END AS kind,
             (e:Pathway OR e:ReactionLikeEvent) AS isEvent
      LIMIT 1`;
-  const [row] = await graph.read<Child & { isEvent: boolean }>(query, {
+  const [row] = await graph.read(query, {
     dbId: byDbId ? Number(identifier) : null,
     stId: identifier.replace(/^(R-[A-Z]{3}-\d+)\.\d+$/, '$1'),
   });
   if (!row) return null;
-  if (!row.isEvent) return { notAnEvent: true };
-  const { isEvent: _isEvent, ...event } = row;
-  return { event };
+  // something that is not an event may have no stable id: only an event's row is read
+  if (!flag(row, 'isEvent')) return { notAnEvent: true };
+  return { event: child(row) };
 }
 
 /** Each parent's children, by `order`: one query for a level of the tree. */
@@ -151,7 +191,7 @@ export async function children(
   graph: Graph,
   parents: readonly number[]
 ): Promise<Map<number, Child[]>> {
-  const rows = await graph.read<Child & { parent: number }>(
+  const rows = await graph.read(
     `UNWIND $parents AS parent
      MATCH (p:DatabaseObject {dbId: parent})-[r:hasEvent]->(c:Event)
      WHERE p:Pathway
@@ -161,11 +201,7 @@ export async function children(
      ORDER BY parent, r.order`,
     { parents: unique(parents) }
   );
-  return group(
-    rows,
-    (row) => row.parent,
-    ({ parent: _parent, ...child }) => child
-  );
+  return group(rows, (row) => whole(row, 'parent'), child);
 }
 
 /** Each event's facts and short lists, across a level's events. */
@@ -173,7 +209,7 @@ export async function eventFacts(
   graph: Graph,
   ids: readonly number[]
 ): Promise<Map<number, EventFacts>> {
-  const rows = await graph.read<EventFacts>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (e:DatabaseObject {dbId: id})
      WHERE e:Event
@@ -191,7 +227,72 @@ export async function eventFacts(
        [(f:Event)-[:precedingEvent]->(e) | {dbId: f.dbId, stId: f.stId, name: f.displayName}] AS after`,
     { ids: unique(ids) }
   );
-  return new Map((rows as unknown as RawFacts[]).map((row) => [row.dbId, factsFromRow(row)]));
+  return new Map(
+    rows.map((row) => {
+      const raw = rawFacts(row);
+      return [raw.dbId, factsFromRow(raw)];
+    })
+  );
+}
+
+/** An event's reference: its database id, stable id and name. */
+function eventRef(row: Row): EventRef {
+  return { dbId: whole(row, 'dbId'), stId: text(row, 'stId'), name: text(row, 'name') };
+}
+
+/** A child event: its reference, kind and schema class. */
+function child(row: Row): Child {
+  return {
+    ...eventRef(row),
+    schemaClass: textOrNull(row, 'schemaClass'),
+    kind: oneOf(row, 'kind', EVENT_KINDS),
+  };
+}
+
+/** A compartment or a disease, with its relationship's order. */
+function orderedNamed(row: Row): Ordered & Named {
+  return {
+    order: wholeOrNull(row, 'order'),
+    dbId: wholeOrNull(row, 'dbId'),
+    name: text(row, 'name'),
+  };
+}
+
+/** An event's row from `eventFacts`, each column checked; its lists not yet in order. */
+export function rawFacts(row: Row): RawFacts {
+  return {
+    ...eventRef(row),
+    kind: oneOf(row, 'kind', EVENT_KINDS),
+    schemaClass: textOrNull(row, 'schemaClass'),
+    speciesName: textOrNull(row, 'speciesName'),
+    category: textOrNull(row, 'category'),
+    hasDiagram: flag(row, 'hasDiagram'),
+    hasEHLD: flag(row, 'hasEHLD'),
+    isInferred: flag(row, 'isInferred'),
+    isInDisease: flag(row, 'isInDisease'),
+    species: maps(row, 'species').map((species) => ({
+      order: wholeOrNull(species, 'order'),
+      dbId: wholeOrNull(species, 'dbId'),
+      name: textOrNull(species, 'name'),
+    })),
+    compartments: maps(row, 'compartments').map(orderedNamed),
+    diseases: maps(row, 'diseases').map(orderedNamed),
+    inferredFrom: maps(row, 'inferredFrom').map((from) => ({
+      dbId: wholeOrNull(from, 'dbId'),
+      stId: text(from, 'stId'),
+      name: text(from, 'name'),
+      speciesName: text(from, 'speciesName'),
+    })),
+    summations: maps(row, 'summations').map((summation) => ({
+      order: wholeOrNull(summation, 'order'),
+      text: textOrNull(summation, 'text'),
+    })),
+    before: maps(row, 'before').map((before) => ({
+      order: wholeOrNull(before, 'order'),
+      ...eventRef(before),
+    })),
+    after: maps(row, 'after').map(eventRef),
+  };
 }
 
 /**
@@ -230,10 +331,10 @@ export interface RawFacts extends Omit<
   EventFacts,
   'species' | 'compartments' | 'diseases' | 'summations' | 'before'
 > {
-  species: (Ordered & Named)[];
+  species: (Ordered & Species)[];
   compartments: (Ordered & Named)[];
   diseases: (Ordered & Named)[];
-  summations: (Ordered & { text: string })[];
+  summations: (Ordered & { text: string | null })[];
   before: (Ordered & EventRef)[];
 }
 
@@ -250,7 +351,7 @@ export async function literature(
   graph: Graph,
   ids: readonly number[]
 ): Promise<Map<number, Reference[]>> {
-  const rows = await graph.read<Reference & { event: number; labels: string[] }>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (e:DatabaseObject {dbId: id})-[r:literatureReference]->(p:Publication)
      WHERE e:Event
@@ -271,23 +372,28 @@ export async function literature(
      ORDER BY event, i`,
     { ids: unique(ids) }
   );
-  return group(
-    rows,
-    (row) => row.event,
-    ({ event: _event, labels, ...ref }) => ({
-      ...ref,
-      kind: labels.includes('Book') ? 'book' : labels.includes('URL') ? 'web page' : 'article',
-      chapterTitle: ref.chapterTitle ?? null,
-      journal: ref.journal ?? null,
-      volume: ref.volume ?? null,
-      pages: ref.pages ?? null,
-      year: ref.year ?? null,
-      pubMedId: ref.pubMedId ?? null,
-      isbn: ref.isbn ?? null,
-      url: ref.url ?? null,
-      publisher: ref.publisher ?? null,
-    })
-  );
+  return group(rows, (row) => whole(row, 'event'), reference);
+}
+
+/** A reference's row from `literature`, its kind from its labels. */
+export function reference(row: Row): Reference {
+  const labels = texts(row, 'labels');
+  return {
+    dbId: wholeOrNull(row, 'dbId'),
+    title: text(row, 'title'),
+    chapterTitle: textOrNull(row, 'chapterTitle'),
+    journal: textOrNull(row, 'journal'),
+    volume: wholeOrNull(row, 'volume'),
+    pages: textOrNull(row, 'pages'),
+    year: wholeOrNull(row, 'year'),
+    pubMedId: wholeOrNull(row, 'pubMedId'),
+    isbn: textOrNull(row, 'isbn'),
+    url: textOrNull(row, 'url'),
+    publisher: textOrNull(row, 'publisher'),
+    authors: texts(row, 'authors'),
+    moreAuthors: flag(row, 'moreAuthors'),
+    kind: labels.includes('Book') ? 'book' : labels.includes('URL') ? 'web page' : 'article',
+  };
 }
 
 /**
@@ -295,7 +401,7 @@ export async function literature(
  * model's, its rows' authors by database id among them (research R2), so it re-sorts them.
  */
 export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<number, Edit[]>> {
-  const rows = await graph.read<Edit & { event: number }>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (e:DatabaseObject {dbId: id})<-[k:authored|edited|reviewed|revised]-(i:InstanceEdit)
      WHERE e:Event
@@ -307,15 +413,21 @@ export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<n
      ORDER BY event, dbId`,
     { ids: unique(ids) }
   );
-  return group(
-    rows,
-    (row) => row.event,
-    ({ event: _event, ...edit }) => ({
-      ...edit,
-      dateTime: edit.dateTime ?? null,
-      authors: edit.authors.map((a) => ({ ...a, surname: a.surname ?? null })),
-    })
-  );
+  return group(rows, (row) => whole(row, 'event'), edit);
+}
+
+/** An edit's row from `edits`, with its authors. */
+export function edit(row: Row): Edit {
+  return {
+    dbId: wholeOrNull(row, 'dbId'),
+    kind: oneOf(row, 'kind', EDIT_KINDS),
+    dateTime: textOrNull(row, 'dateTime'),
+    authors: maps(row, 'authors').map((author) => ({
+      dbId: whole(author, 'dbId'),
+      name: textOrNull(author, 'name'),
+      surname: textOrNull(author, 'surname'),
+    })),
+  };
 }
 
 /**
@@ -339,7 +451,8 @@ function group<R, K, V>(rows: readonly R[], key: (row: R) => K, value: (row: R) 
 
 /** A pathway that can draw another: it has a diagram, and none lies between them. */
 export interface DiagramAncestor {
-  dbId: number;
+  /** Null where the graph gives none: it then sorts as 0. */
+  dbId: number | null;
   stId: string;
   /** How far it is from the nearest top-level pathway above it: 0 for one itself. */
   depthFromTop: number;
@@ -360,7 +473,7 @@ export async function diagramChoices(
   graph: Graph,
   ids: readonly number[]
 ): Promise<Map<number, DiagramChoice>> {
-  const rows = await graph.read<{ id: number } & DiagramChoice>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (p:DatabaseObject {dbId: id})
      WHERE p:Pathway AND NOT coalesce(p.hasDiagram, false)
@@ -383,13 +496,18 @@ export async function diagramChoices(
     { ids: unique(ids) }
   );
   return new Map(
-    rows.map(({ id, ancestors, reactions }) => [
-      id,
+    rows.map((row) => [
+      whole(row, 'id'),
       {
-        ancestors: [...ancestors].sort(
-          (a, b) => a.depthFromTop - b.depthFromTop || a.dbId - b.dbId
-        ),
-        reactions: [...reactions].sort(),
+        ancestors: maps(row, 'ancestors')
+          .map((ancestor) => ({
+            dbId: wholeOrNull(ancestor, 'dbId'),
+            stId: text(ancestor, 'stId'),
+            depthFromTop: whole(ancestor, 'depthFromTop'),
+          }))
+          // a null id sorts as 0, as it did in arithmetic before it was typed
+          .sort((a, b) => a.depthFromTop - b.depthFromTop || (a.dbId ?? 0) - (b.dbId ?? 0)),
+        reactions: texts(row, 'reactions').sort(),
       },
     ])
   );
@@ -407,7 +525,7 @@ export async function reactionIdentifiers(
   graph: Graph,
   ids: readonly number[]
 ): Promise<Map<number, string[]>> {
-  const rows = await graph.read<{ id: number; identifiers: string[] }>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (r:DatabaseObject {dbId: id})
      WHERE r:ReactionLikeEvent
@@ -429,18 +547,18 @@ export async function reactionIdentifiers(
     { ids: unique(ids) }
   );
   return new Map(
-    rows.map(({ id, identifiers }) => [id, [...new Set(identifiers)].sort(byCodeUnit)])
+    rows.map((row) => [whole(row, 'id'), [...new Set(texts(row, 'identifiers'))].sort(byCodeUnit)])
   );
 }
 
 /** A reaction's parent pathways' stable ids, by database id: the first is its first parent. */
 export async function parentPathways(graph: Graph, id: number): Promise<string[]> {
-  const rows = await graph.read<{ stId: string }>(
+  const rows = await graph.read(
     `MATCH (r:DatabaseObject {dbId: $id})<-[:hasEvent]-(p:Pathway)
      RETURN p.stId AS stId ORDER BY p.dbId`,
     { id }
   );
-  return rows.map((row) => row.stId);
+  return rows.map((row) => text(row, 'stId'));
 }
 
 const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -455,7 +573,7 @@ export async function figureNames(
   graph: Graph,
   ids: readonly number[]
 ): Promise<Map<number, string[]>> {
-  const rows = await graph.read<{ id: number; names: (string | null)[] }>(
+  const rows = await graph.read(
     `UNWIND $ids AS id
      MATCH (r:DatabaseObject {dbId: id})
      WHERE r:ReactionLikeEvent
@@ -478,9 +596,12 @@ export async function figureNames(
     { ids: unique(ids) }
   );
   return new Map(
-    rows.map(({ id, names }) => [
-      id,
-      names.filter((name): name is string => typeof name === 'string').sort(byCodeUnit),
+    rows.map((row) => [
+      whole(row, 'id'),
+      // a participant's names may hold a null, which no figure labels
+      list(row, 'names')
+        .filter((name): name is string => typeof name === 'string')
+        .sort(byCodeUnit),
     ])
   );
 }
