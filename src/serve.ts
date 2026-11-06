@@ -149,16 +149,16 @@ export function serveSettings(
     if (flags.has(name)) throw new SettingsError(`${name} is given twice`);
     flags.set(name, value);
   }
-  const setting = (flag: string, variable?: string) =>
+  const setting = (flag: string, variable?: string): string | undefined =>
     flags.get(flag) ?? (variable === undefined ? undefined : env[variable] || undefined);
-  const required = (flag: string, variable?: string) => {
+  const required = (flag: string, variable?: string): string => {
     const value = setting(flag, variable);
     if (value === undefined) {
       throw new SettingsError(`${flag}${variable ? ` (or ${variable})` : ''} is needed`);
     }
     return value;
   };
-  const whole = (flag: string, value: string, max: number) => {
+  const whole = (flag: string, value: string, max: number): number => {
     if (!/^[0-9]+$/.test(value) || Number(value) < 1 || Number(value) > max) {
       throw new SettingsError(`${flag} must be a whole number from 1 to ${String(max)}`);
     }
@@ -279,7 +279,7 @@ export async function startService(
   let stuck = 0;
   const state = { closing: false };
   // read through a call: a check before an await does not hold after it
-  const closing = () => state.closing;
+  const closing = (): boolean => state.closing;
 
   // The browser: started at once, and again whenever it goes (a crash, a kill), never twice
   // within relaunchPauseMs, so one that dies at once is not restarted in a loop.
@@ -344,7 +344,7 @@ export async function startService(
    */
   const within = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      const stop = () => {
+      const stop = (): void => {
         reject(stopReason(signal));
       };
       if (signal.aborted) stop();
@@ -419,7 +419,7 @@ export async function startService(
     reading: Graph
   ): Promise<Uint8Array> {
     // between stages: a request that has ended goes no further
-    const going = () => {
+    const going = (): void => {
       if (deadline.aborted) throw stopReason(deadline);
     };
     const doc = await buildSingle(reading, root, {
@@ -497,7 +497,7 @@ export async function startService(
     if (doc.cover.figure) wanted.set(figureKey(doc.cover.figure), doc.cover.figure);
     const queue = [...wanted];
     const drawn = new Map<string, string>();
-    const worker = async () => {
+    const worker = async (): Promise<void> => {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const [key, figure] = next;
         if (files) {
@@ -548,7 +548,11 @@ export async function startService(
     }
   }
 
-  async function answerPdf(req: IncomingMessage, res: ServerResponse, rawId: string) {
+  async function answerPdf(
+    req: IncomingMessage,
+    res: ServerResponse,
+    rawId: string
+  ): Promise<void> {
     // the request's end: its deadline, or its client gone before it is answered
     const ending = new AbortController();
     const deadline = ending.signal;
@@ -660,7 +664,7 @@ export async function startService(
   }
 
   /** A failure's answer: its reason, and a log line; never its message in the answer. */
-  function fail(res: ServerResponse, error: unknown, subject: string) {
+  function fail(res: ServerResponse, error: unknown, subject: string): void {
     const reason: Reason =
       error instanceof Refusal || error instanceof AnalysisError ? error.reason : 'unavailable';
     // a client that went is no failure of the service: logged as such, and not answered
@@ -669,8 +673,8 @@ export async function startService(
     refuse(res, reason);
   }
 
-  async function answerHealth(res: ServerResponse) {
-    const answers = async (url: string, ok: (status: number) => boolean) => {
+  async function answerHealth(res: ServerResponse): Promise<void> {
+    const answers = async (url: string, ok: (status: number) => boolean): Promise<boolean> => {
       try {
         const response = await fetch(url, {
           redirect: 'error',
@@ -682,7 +686,7 @@ export async function startService(
         return false;
       }
     };
-    const base = (url: string) => (url.endsWith('/') ? url : `${url}/`);
+    const base = (url: string): string => (url.endsWith('/') ? url : `${url}/`);
     let graphRelease: number;
     try {
       // its own short time, in the database too
@@ -826,12 +830,12 @@ function stopReason(signal: AbortSignal): Error {
     : new Refusal('unavailable', 'the request ended');
 }
 
-function refuse(res: ServerResponse, reason: Reason) {
+function refuse(res: ServerResponse, reason: Reason): void {
   if (res.writableEnded || res.destroyed) return;
   json(res, STATUS[reason], { reason });
 }
 
-function json(res: ServerResponse, status: number, body: unknown) {
+function json(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res
     .writeHead(status, {

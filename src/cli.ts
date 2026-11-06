@@ -52,7 +52,7 @@ export async function serve(args: readonly string[]): Promise<number> {
   const stopped = new Promise<void>((resolve) => {
     state.stop = resolve;
   });
-  const onSignal = (signal: NodeJS.Signals) => {
+  const onSignal = (signal: NodeJS.Signals): void => {
     if (!state.serving) process.exit(128 + osConstants.signals[signal]);
     state.serving = false;
     process.stderr.write(`stopping on ${signal}\n`);

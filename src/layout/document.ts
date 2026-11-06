@@ -144,9 +144,9 @@ export const MARGIN_FAMILIES = ['Roboto', 'Noto Sans', 'Noto Sans Symbols 2', 'N
  */
 function runningHeaders(event: string): string {
   const families = MARGIN_FAMILIES.map((family) => cssString(family)).join(', ');
-  const box = (content: string) =>
+  const box = (content: string): string =>
     `content: ${content}; font-family: ${families}; font-size: var(--mat-sys-body-small-size); color: var(--mat-sys-on-surface-variant);`;
-  const header = (name: string) => `@top-center { ${box(cssString(name))} }`;
+  const header = (name: string): string => `@top-center { ${box(cssString(name))} }`;
   return [
     `@page { ${header(event)} @bottom-center { ${box('counter(page)')} } }`,
     `@page introduction { ${header(FRONT_NAMES.introduction)} }`,

@@ -1,0 +1,19 @@
+# Version updates, weekly and grouped, so the queue stays reviewable and the
+# dependencies never drift far (as in reactome/WebsiteAngular and the exporters).
+version: 2
+updates:
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+      open-pull-requests-limit: 5
+      groups:
+          npm:
+              patterns: ['*']
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+      groups:
+          actions:
+              patterns: ['*']

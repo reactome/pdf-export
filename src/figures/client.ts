@@ -63,7 +63,7 @@ export async function fetchFigure(
 ): Promise<FigureAnswer> {
   const url = figureUrl(base, request);
   /** The caller's end is its own, not the render service failing: it is thrown, not missing. */
-  const stopped = () => {
+  const stopped = (): void => {
     if (signal?.aborted) throw signal.reason;
   };
   for (let attempt = 1; ; attempt++) {

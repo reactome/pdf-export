@@ -131,7 +131,7 @@ export interface Look {
 
 /** The look, read from the compiled theme's stylesheet (FR-015), never written here. */
 export function stampLook(theme: string = pageStyles().theme): Look {
-  const value = (name: string) => {
+  const value = (name: string): string => {
     const found = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(theme)?.[1]?.trim();
     if (found === undefined) throw new Error(`The theme has no ${name}`);
     return found;
@@ -320,7 +320,7 @@ export async function stampPages(
     const { width, height } = page.getSize();
     // each run placed, the header's and the number's, centred on the page's width
     const placed: { font: PDFFont; text: string; x: number; y: number }[] = [];
-    const centred = (text: readonly { face: FontFace; text: string }[], y: number) => {
+    const centred = (text: readonly { face: FontFace; text: string }[], y: number): void => {
       const sized = text.map((run) => {
         const font = fonts.get(run.face);
         if (!font) throw new Error(`No font embedded for ${run.face.path}`);

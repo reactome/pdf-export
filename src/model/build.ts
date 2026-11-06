@@ -27,7 +27,7 @@ import {
   inferredFrom,
   sanitiseSummation,
 } from './rules.ts';
-import type { ContentsEntry, Document, Figure, Place, Section } from './types.ts';
+import type { ContentsEntry, Document, Figure, Place, Release, Section } from './types.ts';
 
 export const anchorOf = (stId: string): string => `s-${stId}`;
 
@@ -196,7 +196,7 @@ function assemble(
   return { places, sections, names };
 }
 
-function release(version: number, sections: readonly Section[]) {
+function release(version: number, sections: readonly Section[]): Release {
   return {
     version,
     pathways: sections.filter((s) => s.event.kind === 'pathway').length,

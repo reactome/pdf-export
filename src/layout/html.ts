@@ -87,7 +87,7 @@ interface Unit {
 function breakTokens(units: readonly Unit[], escape: (unit: string) => string): string {
   let out = '';
   let token: Unit[] = [];
-  const flush = () => {
+  const flush = (): void => {
     const length = token.filter((unit) => unit.tag === undefined).length;
     const pieces = length > LONG_TOKEN ? Math.ceil(length / BREAK_EVERY) : 1;
     // the k-th piece ends at ceil(k * length / pieces) units, so the pieces differ by one at most

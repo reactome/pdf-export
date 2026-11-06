@@ -161,7 +161,12 @@ export class ServedFolder {
   ): Promise<{ state: FolderState; files: Map<string, string> }> {
     const { folder, graph, summary } = this.#options;
     const files = new Map<string, string>();
-    const not = (state: 'stale' | 'incomplete' | 'none') => ({ state: { state }, files });
+    const not = (
+      state: 'stale' | 'incomplete' | 'none'
+    ): { state: FolderState; files: Map<string, string> } => ({
+      state: { state },
+      files,
+    });
     if (manifest === null) return not('none');
     const read = readManifest(manifest);
     if (!read) return not('incomplete');

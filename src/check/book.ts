@@ -223,7 +223,9 @@ async function readPdf(path: string): Promise<Read> {
       page.cleanup();
     }
     const outline: OutlineItem[] = [];
-    const walk = async (items: readonly { title: string; dest: unknown; items: unknown[] }[]) => {
+    const walk = async (
+      items: readonly { title: string; dest: unknown; items: unknown[] }[]
+    ): Promise<void> => {
       for (const item of items) {
         outline.push({ title: item.title, landing: await land(doc, item.dest) });
         await walk(item.items as typeof items);
@@ -259,7 +261,7 @@ interface Expected {
 
 /** The items of a list in reading order from `start` (at or below it) to `next` (above it). */
 function between<T extends Spot>(sorted: readonly T[], start: Spot, next: Spot | undefined): T[] {
-  const first = (before: (item: T) => boolean) => {
+  const first = (before: (item: T) => boolean): number => {
     let lo = 0;
     let hi = sorted.length;
     while (lo < hi) {
@@ -288,7 +290,8 @@ function checkPdf(
   sourced: (stId: string, figure: Figure) => boolean
 ): string[] {
   const site = new Links(true, '', new Set());
-  const fault = (kind: CheckKind, stId: string) => `${kind} ${JSON.stringify(file)} ${stId}`;
+  const fault = (kind: CheckKind, stId: string): string =>
+    `${kind} ${JSON.stringify(file)} ${stId}`;
 
   // each event's first link to its page on the website: its heading's, unless that is lost;
   // a link whose address cannot be decoded is broken, never a stop
@@ -357,7 +360,7 @@ function checkPdf(
   };
   // where the outline's entries and the contents' land, by the name each reads, once
   const byName = new Map<string, { outline: Spot[]; contents: Spot[] }>();
-  const named = (name: string) => {
+  const named = (name: string): { outline: Spot[]; contents: Spot[] } => {
     let spots = byName.get(name);
     if (!spots) {
       spots = { outline: [], contents: [] };

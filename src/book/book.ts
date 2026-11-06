@@ -45,7 +45,7 @@ export const OBJECT_STREAMS = false;
  */
 export function printedDocument(doc: Document, characters: BookCharacters): Document {
   const root = bookPathways([doc])[0]?.stId ?? '';
-  const text = (value: string, subject: string) => characters.text(value, subject);
+  const text = (value: string, subject: string): string => characters.text(value, subject);
   return {
     ...doc,
     cover: {
@@ -206,7 +206,8 @@ export async function writeBook(
   });
   ms.parts = performance.now() - started;
   ms.figures = figures.ms;
-  const each = (list: (r: Report) => string[]) => [...new Set(reports.flatMap(list))].sort();
+  const each = (list: (r: Report) => string[]): string[] =>
+    [...new Set(reports.flatMap(list))].sort();
   return {
     pdfs: printed.flatMap((doc) => {
       const written = files.get(doc);

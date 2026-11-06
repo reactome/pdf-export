@@ -83,16 +83,16 @@ export function bookSettings(
     if (flags.has(name)) throw new SettingsError(`${name} is given twice`);
     flags.set(name, value);
   }
-  const setting = (flag: string, variable?: string) =>
+  const setting = (flag: string, variable?: string): string | undefined =>
     flags.get(flag) ?? (variable === undefined ? undefined : env[variable] || undefined);
-  const required = (flag: string, variable?: string) => {
+  const required = (flag: string, variable?: string): string => {
     const value = setting(flag, variable);
     if (value === undefined) {
       throw new SettingsError(`${flag}${variable ? ` (or ${variable})` : ''} is needed`);
     }
     return value;
   };
-  const whole = (flag: string, fallback: number) => {
+  const whole = (flag: string, fallback: number): number => {
     const value = flags.get(flag) ?? String(fallback);
     if (!/^[0-9]+$/.test(value) || Number(value) < 1 || Number(value) > 64) {
       throw new SettingsError(`${flag} must be a whole number from 1 to 64`);
@@ -414,7 +414,7 @@ export async function bookCommand(
     let failure: unknown = null;
     const characters = new BookCharacters();
     // closed once the book is printed, so its browser is not held through the check
-    const closePrinter = async () => {
+    const closePrinter = async (): Promise<void> => {
       const open = printer;
       printer = undefined;
       try {
