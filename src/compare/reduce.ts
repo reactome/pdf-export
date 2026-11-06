@@ -212,13 +212,13 @@ function bodySize(lines: readonly Line[]): number {
   return [...counts].sort(([, m], [, n]) => n - m)[0]?.[0] ?? 0;
 }
 
-const FRONT_HEADINGS = {
-  introduction: /^introduction$/i,
-  analysis: /^analysis/i,
-  contents: /^(?:table of )?contents$/i,
-} as const;
+const FRONT_HEADINGS = [
+  ['introduction', /^introduction$/i],
+  ['analysis', /^analysis/i],
+  ['contents', /^(?:table of )?contents$/i],
+] as const;
 
-type FrontName = keyof typeof FRONT_HEADINGS;
+type FrontName = (typeof FRONT_HEADINGS)[number][0];
 
 const linkOn = (line: Line, box: Box): boolean =>
   box.page === line.page && line.y >= box.y1 - 2 && line.y <= box.y2 + 2;
@@ -241,6 +241,11 @@ export function reduce(layout: Layout): Reduced {
   const figuresOn = byPage(figures, (box) => box.page);
   const body = bodySize(lines.filter((line) => line.page > 0));
   const heading = (line: Line): boolean => line.size >= body * HEADING_RATIO;
+  /** Whether there is a line at an index, and it is a heading. */
+  const headingAt = (k: number): boolean => {
+    const line = lines[k];
+    return line !== undefined && heading(line);
+  };
   const internalOn = (line: Line): Link | undefined =>
     linksOn(line.page).find((link) => link.uri === null && linkOn(line, link.box));
 
@@ -264,7 +269,7 @@ export function reduce(layout: Layout): Reduced {
       }
     }
     let start = j + 1;
-    while (start - 1 >= floor && lines[start - 1] && heading(lines[start - 1] as Line)) start--;
+    while (start - 1 >= floor && headingAt(start - 1)) start--;
     return start;
   });
   const startSet = new Set(starts);
@@ -277,8 +282,8 @@ export function reduce(layout: Layout): Reduced {
   lines.forEach((line, i) => {
     if (line.page === 0 || !heading(line) || startSet.has(i)) return;
     const text = plain(line.text).trim();
-    for (const name of Object.keys(FRONT_HEADINGS) as FrontName[]) {
-      if (front.has(name) || !FRONT_HEADINGS[name].test(text)) continue;
+    for (const [name, pattern] of FRONT_HEADINGS) {
+      if (front.has(name) || !pattern.test(text)) continue;
       if (name !== 'contents' && i >= firstSection) continue;
       if (name === 'contents' && i >= firstSection && i < lastAnchor) continue;
       front.set(name, i);
@@ -345,8 +350,10 @@ export function reduce(layout: Layout): Reduced {
     }
     const parts: { part: PartName; texts: string[] }[] = [];
     const headingLines: Line[] = [];
-    for (let k = start; k < i && lines[k] && heading(lines[k] as Line); k++) {
-      headingLines.push(lines[k] as Line);
+    for (let k = start; k < i; k++) {
+      const line = lines[k];
+      if (!line || !heading(line)) break;
+      headingLines.push(line);
     }
     parts.push({ part: 'name', texts: headingLines.map((line) => line.text) });
     let current: { part: PartName; texts: string[] } | null = null;

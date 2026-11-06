@@ -19,6 +19,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { canonicalToken } from '../analysis/token.ts';
 import { NEVER_DRAWN } from '../layout/characters.ts';
+import { isRecord } from '../unknown.ts';
 
 const UNPRINTED = new RegExp(`${NEVER_DRAWN.source}+`, 'gu');
 
@@ -217,9 +218,6 @@ export interface Difference {
   recorded?: string;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object';
-
 /**
  * The report's printer: every value a difference holds passes through here. A value of its
  * field's shape is printed; a Hashed list of names as its count and salted hash; anything
@@ -269,15 +267,11 @@ export class Output {
   /** A difference, every field checked. */
   difference(d: Difference): Record<string, unknown> {
     const key = `${d.part} ${d.field ?? ''}`;
-    const named = <T extends string>(
+    const named = (
       value: string | undefined,
-      list: Iterable<T>
+      list: Iterable<string>
     ): string | Withheld | undefined =>
-      value === undefined
-        ? undefined
-        : [...list].includes(value as T)
-          ? value
-          : this.#withheld(value);
+      value === undefined ? undefined : [...list].includes(value) ? value : this.#withheld(value);
     const out: Record<string, unknown> = {
       file: d.file,
       part: named(d.part, PARTS),

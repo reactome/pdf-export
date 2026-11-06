@@ -42,7 +42,7 @@ export function fontFiles(): FontFile[] {
     for (const file of readdirSync(folder)) {
       const match = new RegExp(`^${name}-(.+)-(\\d+)-normal\\.woff2$`).exec(file);
       const weight = Number(match?.[2]);
-      if (!match?.[1] || !(weights as readonly number[]).includes(weight)) continue;
+      if (!match?.[1] || !weights.some((w) => w === weight)) continue;
       files.push({ family, weight, subset: match[1], path: join(folder, file) });
     }
   }

@@ -9,6 +9,7 @@
 // single-event PDF). The caller's own end (its signal) is thrown as it is, never read as a
 // missing figure.
 import { setTimeout as pause } from 'node:timers/promises';
+import { causeCode } from '../unknown.ts';
 
 /** What to draw (data-model.md's Figure). */
 export type FigureRequest =
@@ -142,7 +143,6 @@ function timedOut(error: unknown): boolean {
 /** An error's name, and its cause's code where there is one (ECONNREFUSED, say). */
 function reason(error: unknown): string {
   const name = error instanceof Error ? error.name : String(error);
-  const cause =
-    error instanceof Error ? (error.cause as { code?: unknown } | undefined) : undefined;
-  return typeof cause?.code === 'string' ? `${name}: ${cause.code}` : name;
+  const code = causeCode(error);
+  return code === undefined ? name : `${name}: ${code}`;
 }

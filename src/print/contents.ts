@@ -30,6 +30,7 @@ import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { layoutBookFront, type LayoutOptions } from '../layout/document.ts';
 import { probeTargets, type Target } from './links.ts';
 import type { Joined, PartPrinter } from './parts.ts';
+import { isPageRef } from './pdfjs.ts';
 import { UnreadPdf } from './unread.ts';
 
 /** An entry's placeholder, as the layout writes it (src/layout/front.ts). */
@@ -76,7 +77,9 @@ export async function landed(pdf: Uint8Array, targets: Iterable<string>): Promis
       if (page === undefined || typeof page !== 'object' || page === null) {
         throw new MissingDestination(target);
       }
-      pages.set(target, (await doc.getPageIndex(page as { num: number; gen: number })) + 1);
+      // a reference that is not one is pdf.js's error, not a missing destination
+      if (!isPageRef(page)) throw new Error("a destination's page is not a reference");
+      pages.set(target, (await doc.getPageIndex(page)) + 1);
     }
     return { pages, pageCount: doc.numPages };
   } catch (error) {

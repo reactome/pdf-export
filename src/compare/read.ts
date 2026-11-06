@@ -15,6 +15,9 @@
 //   table with shaded cells can still be read as one, its text then left out (figureBoxes).
 import { getDocument, OPS, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
+import { annotationRect, isPageRef, numbersOf, textTransform } from '../print/pdfjs.ts';
+import { isRecord } from '../unknown.ts';
+
 /**
  * The bands at a page's top and bottom read as margins, by default: within pdf-export's 20 mm
  * (56.7 pt, src/layout/figure.ts), where its running headers and page numbers are, and above
@@ -139,10 +142,11 @@ function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page:
       ctm = multiply(args, ctm);
     } else if (fn === OPS.constructPath && Array.isArray(args)) {
       // [how it is painted, its drawing, its box]: a path only clipped to is not drawn
-      const [paint, , minMax] = args as [unknown, unknown, unknown];
-      if (paint === OPS.endPath || minMax === null || typeof minMax !== 'object') continue;
-      const rect = Array.from(minMax as ArrayLike<number>);
-      if (rect.length === 4 && rect.every(Number.isFinite)) boxes.push(through(rect, ctm, page));
+      const parts: unknown[] = args;
+      const [paint, , minMax] = parts;
+      if (paint === OPS.endPath) continue;
+      const rect = numbersOf(minMax);
+      if (rect?.length === 4 && rect.every(Number.isFinite)) boxes.push(through(rect, ctm, page));
     } else if (fn !== undefined && IMAGES.has(fn)) {
       boxes.push(through([0, 0, 1, 1], ctm, page));
     }
@@ -255,21 +259,19 @@ export const inside = (x: number, y: number, box: Box): boolean =>
 
 type PdfJs = Awaited<ReturnType<typeof getDocument>['promise']>;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object';
-
 /** Where a destination lands, or null where it names no page of the PDF. */
 async function land(doc: PdfJs, dest: unknown): Promise<Spot | null> {
   try {
     const explicit: unknown = typeof dest === 'string' ? await doc.getDestination(dest) : dest;
     if (!Array.isArray(explicit)) return null;
-    const [ref, kind, left, top] = explicit as unknown[];
+    const parts: unknown[] = explicit;
+    const [ref, kind, left, top] = parts;
     let page: number;
     if (typeof ref === 'number') {
       if (!Number.isInteger(ref) || ref < 0 || ref >= doc.numPages) return null;
       page = ref;
-    } else if (isRecord(ref) && 'num' in ref && 'gen' in ref) {
-      page = await doc.getPageIndex(ref as { num: number; gen: number });
+    } else if (isPageRef(ref)) {
+      page = await doc.getPageIndex(ref);
     } else {
       return null;
     }
@@ -342,15 +344,16 @@ export async function readLayout(
       const pieces: Piece[] = [];
       for (const item of (await page.getTextContent()).items) {
         if (!('str' in item) || item.str === '') continue;
-        const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = item.transform as number[];
+        const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = textTransform(item.transform);
         if (y <= margin || y >= height - margin) continue;
         if (figures.some((box) => inside(x, y, box))) continue;
         pieces.push({ x, y, size: Math.max(Math.hypot(a, b), Math.hypot(c, d)), str: item.str });
       }
       layout.lines.push(...linesOf(pieces, i).filter((line) => line.text.trim() !== ''));
-      for (const annot of (await page.getAnnotations()) as unknown[]) {
+      const annotations: unknown[] = await page.getAnnotations();
+      for (const annot of annotations) {
         if (!isRecord(annot) || annot['subtype'] !== 'Link') continue;
-        const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = (annot['rect'] as number[] | undefined) ?? [];
+        const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = annotationRect(annot['rect']);
         const address = annot['unsafeUrl'] ?? annot['url'];
         const uri = typeof address === 'string' ? address : null;
         const dest = annot['dest'];

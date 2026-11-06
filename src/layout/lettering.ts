@@ -42,7 +42,9 @@ export function outlineBoxes(d: string): Box[] | null {
     }
     x = px;
     y = py;
-    const box = boxes[boxes.length - 1] as Box;
+    const box = boxes.at(-1);
+    // a point is always in a subpath, begun above if not before
+    if (box === undefined) throw new Error('a point outside any subpath');
     boxes[boxes.length - 1] = [
       Math.min(box[0], px),
       Math.min(box[1], py),
@@ -144,7 +146,7 @@ function plainScale(transform: string | undefined): number | null {
     .split(/[\s,]+/)
     .map(Number);
   if (matrix?.length !== 6) return null;
-  const [a, b, c, d] = matrix as [number, number, number, number];
+  const [a = NaN, b = NaN, c = NaN, d = NaN] = matrix;
   return a > 0 && b === 0 && c === 0 && d === a ? a : null;
 }
 

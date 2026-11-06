@@ -177,13 +177,26 @@ export function onRequestMarkupText(
  */
 export function onRequestStrings<T>(value: T, log: CharacterLog): T {
   const covered = coveredCodePoints();
-  const visit = (item: unknown, markup: boolean): unknown => {
-    if (typeof item === 'string') {
-      return markup
-        ? markupText(item, (text) => onRequestMarkupText(text, log, covered))
-        : onRequestText(item, log, covered);
-    }
-    if (Array.isArray(item)) return item.map((element: unknown) => visit(element, markup));
+  return mapStrings(
+    value,
+    (text) => onRequestText(text, log, covered),
+    (markup) => markupText(markup, (text) => onRequestMarkupText(text, log, covered))
+  );
+}
+
+/**
+ * A value with every string in it mapped: a summation's (any string under a `summations`
+ * key) by `markup`, every other by `text`. Objects, lists and maps are copied, a map's keys
+ * kept as they are; anything else is kept.
+ */
+function mapStrings<T>(
+  value: T,
+  text: (text: string) => string,
+  markup: (markup: string) => string
+): T {
+  const visit = (item: unknown, isMarkup: boolean): unknown => {
+    if (typeof item === 'string') return isMarkup ? markup(item) : text(item);
+    if (Array.isArray(item)) return item.map((element: unknown) => visit(element, isMarkup));
     if (item instanceof Map) {
       return new Map([...item].map(([key, element]) => [key, visit(element, false)]));
     }
@@ -194,6 +207,7 @@ export function onRequestStrings<T>(value: T, log: CharacterLog): T {
     }
     return item;
   };
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the copy has T's shape, every string mapped to a string, which TypeScript cannot say of a walk over any T
   return visit(value, false) as T;
 }
 
@@ -267,21 +281,10 @@ export class BookCharacters {
    * plain text. Objects, lists and maps are copied.
    */
   strings<T>(value: T, subject: string): T {
-    const visit = (item: unknown, markup: boolean): unknown => {
-      if (typeof item === 'string') {
-        return markup ? this.markup(item, subject) : this.text(item, subject);
-      }
-      if (Array.isArray(item)) return item.map((element: unknown) => visit(element, markup));
-      if (item instanceof Map) {
-        return new Map([...item].map(([key, element]) => [key, visit(element, false)]));
-      }
-      if (item !== null && typeof item === 'object') {
-        return Object.fromEntries(
-          Object.entries(item).map(([key, element]) => [key, visit(element, key === 'summations')])
-        );
-      }
-      return item;
-    };
-    return visit(value, false) as T;
+    return mapStrings(
+      value,
+      (text) => this.text(text, subject),
+      (markup) => this.markup(markup, subject)
+    );
   }
 }

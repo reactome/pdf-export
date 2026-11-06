@@ -7,6 +7,7 @@ import { join } from 'node:path';
 
 import type { ReleaseInfo } from '../graph/queries.ts';
 import type { Document, Figure } from '../model/types.ts';
+import { isRecord, isStrings } from '../unknown.ts';
 
 export const MANIFEST = 'figures.jsonl';
 
@@ -73,22 +74,33 @@ export function expectedFigures(docs: readonly Document[]): Map<string, FigureRe
 }
 
 const FINGERPRINT_FIELDS = ['release', 'checksum', 'summary', 'content', 'build'] as const;
-const KINDS: readonly string[] = ['diagram', 'ancestor', 'ehld', 'reaction'];
+const KINDS: readonly FigureRecord['kind'][] = ['diagram', 'ancestor', 'ehld', 'reaction'];
 
-const isFingerprint = (o: Record<string, unknown>): boolean =>
-  Number.isInteger(o['release']) &&
-  typeof o['checksum'] === 'string' &&
-  typeof o['summary'] === 'string' &&
-  Number.isInteger(o['content']) &&
-  typeof o['build'] === 'string';
+/** A line's fingerprint, or null where it is not one. */
+function fingerprintOf(o: Readonly<Record<string, unknown>>): Fingerprint | null {
+  const { release, checksum, summary, content, build } = o;
+  return typeof release === 'number' &&
+    Number.isInteger(release) &&
+    typeof checksum === 'string' &&
+    typeof summary === 'string' &&
+    typeof content === 'number' &&
+    Number.isInteger(content) &&
+    typeof build === 'string'
+    ? { release, checksum, summary, content, build }
+    : null;
+}
 
-const isFigure = (o: Record<string, unknown>): boolean =>
-  typeof o['stId'] === 'string' &&
-  typeof o['kind'] === 'string' &&
-  KINDS.includes(o['kind']) &&
-  typeof o['source'] === 'string' &&
-  Array.isArray(o['highlight']) &&
-  o['highlight'].every((id) => typeof id === 'string');
+/** A line's figure, or null where it is not one. */
+function figureOf(o: Readonly<Record<string, unknown>>): FigureRecord | null {
+  const { stId, kind, source, highlight } = o;
+  const figureKind = KINDS.find((k) => k === kind);
+  return typeof stId === 'string' &&
+    figureKind !== undefined &&
+    typeof source === 'string' &&
+    isStrings(highlight)
+    ? { stId, kind: figureKind, source, highlight }
+    : null;
+}
 
 /**
  * The manifest's lines, or null when it is not whole (`incomplete-folder`): a line that is
@@ -100,7 +112,7 @@ export function readManifest(
   text: string
 ): { fingerprint: Fingerprint; figures: Map<string, FigureRecord> } | null {
   if (!text.endsWith('\n')) return null;
-  const lines: Record<string, unknown>[] = [];
+  const lines: Readonly<Record<string, unknown>>[] = [];
   for (const raw of text.slice(0, -1).split('\n')) {
     let parsed: unknown;
     try {
@@ -108,30 +120,22 @@ export function readManifest(
     } catch {
       return null;
     }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    lines.push(parsed as Record<string, unknown>);
+    if (!isRecord(parsed) || Array.isArray(parsed)) return null;
+    lines.push(parsed);
   }
   const first = lines[0];
   const last = lines.at(-1);
   if (lines.length < 2 || !first || !last) return null;
-  if (first['type'] !== 'fingerprint' || !isFingerprint(first)) return null;
-  if (last['type'] !== 'complete' || !isFingerprint(last)) return null;
-  if (FINGERPRINT_FIELDS.some((field) => first[field] !== last[field])) return null;
+  const fingerprint = first['type'] === 'fingerprint' ? fingerprintOf(first) : null;
+  const complete = last['type'] === 'complete' ? fingerprintOf(last) : null;
+  if (fingerprint === null || complete === null) return null;
+  if (FINGERPRINT_FIELDS.some((field) => fingerprint[field] !== complete[field])) return null;
   const figures = new Map<string, FigureRecord>();
   for (const line of lines.slice(1, -1)) {
-    if (line['type'] !== 'figure' || !isFigure(line)) return null;
-    const record = line as unknown as FigureRecord;
-    if (figures.has(record.stId)) return null;
-    figures.set(record.stId, {
-      stId: record.stId,
-      kind: record.kind,
-      source: record.source,
-      highlight: record.highlight,
-    });
+    const record = line['type'] === 'figure' ? figureOf(line) : null;
+    if (record === null || figures.has(record.stId)) return null;
+    figures.set(record.stId, record);
   }
-  const fingerprint = Object.fromEntries(
-    FINGERPRINT_FIELDS.map((field) => [field, first[field]])
-  ) as unknown as Fingerprint;
   return { fingerprint, figures };
 }
 

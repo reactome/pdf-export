@@ -1,12 +1,13 @@
 // Errors from reading a PDF with pdf.js (spec 001 T035). pdf.js's messages quote the file
 // (`Bad filter name "…"`), and the PDFs read hold people's names (FR-013), so an error from
 // reading one is said by its kind and code alone, never its message.
+import { errorCode } from '../unknown.ts';
 
 /** An error as it may be printed: its kind and code, never its message, which may quote a file. */
 export const errorKind = (error: unknown): string => {
   if (!(error instanceof Error)) return 'error';
-  const code = (error as { code?: unknown }).code;
-  return typeof code === 'string' && /^[A-Z_]+$/.test(code) ? `${error.name} ${code}` : error.name;
+  const code = errorCode(error);
+  return code !== undefined && /^[A-Z_]+$/.test(code) ? `${error.name} ${code}` : error.name;
 };
 
 /**

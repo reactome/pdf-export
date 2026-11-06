@@ -17,6 +17,7 @@ import { basename, join } from 'node:path';
 
 import { SettingsError } from '../preflight/command.ts';
 import { errorKind } from '../print/unread.ts';
+import { isRecord } from '../unknown.ts';
 import { fold, hash, Output, type Difference } from './output.ts';
 import { MARGIN_BAND_PT, readLayout } from './read.ts';
 import {
@@ -367,30 +368,37 @@ export function readRecorded(path: string): Recorded[] {
       : undefined;
   if (!Array.isArray(list)) throw new SettingsError(`${path} holds no "differences" list`);
   return list.map((item: unknown, i) => {
-    const r = item as Partial<Recorded> | null;
-    const text = (v: unknown): boolean => typeof v === 'string' && v !== '';
-    if (r === null || typeof r !== 'object' || Array.isArray(r)) {
+    const text = (v: unknown): v is string => typeof v === 'string' && v !== '';
+    if (!isRecord(item) || Array.isArray(item)) {
       throw new SettingsError(`${path}: difference ${String(i)} is not an object`);
     }
-    const unknown = Object.keys(r).filter((key) => !RECORD_KEYS.has(key));
+    const unknown = Object.keys(item).filter((key) => !RECORD_KEYS.has(key));
     if (unknown.length > 0) {
       throw new SettingsError(
         `${path}: difference ${String(i)} has keys not known: ${unknown.join(', ')}`
       );
     }
-    const ok =
-      text(r.part) &&
-      text(r.kind) &&
-      text(r.reason) &&
-      (r.field === undefined || text(r.field)) &&
-      (r.file === undefined || text(r.file)) &&
-      (r.events === undefined || (Array.isArray(r.events) && r.events.every(text)));
-    if (!ok) {
+    const { part, kind, reason, field, file, events } = item;
+    if (
+      !text(part) ||
+      !text(kind) ||
+      !text(reason) ||
+      !(field === undefined || text(field)) ||
+      !(file === undefined || text(file)) ||
+      !(events === undefined || (Array.isArray(events) && events.every(text)))
+    ) {
       throw new SettingsError(
         `${path}: difference ${String(i)} needs a part, a kind and a reason, and its field, file and events as text`
       );
     }
-    return r as Recorded;
+    return {
+      part,
+      kind,
+      ...(field === undefined ? {} : { field }),
+      ...(file === undefined ? {} : { file }),
+      ...(events === undefined ? {} : { events }),
+      reason,
+    };
   });
 }
 
@@ -547,7 +555,7 @@ export async function withConsoleHeld<T>(
 ): Promise<T> {
   const names = WRITING.filter((name) => typeof Reflect.get(console, name) === 'function');
   // the methods as they are, put back as they were
-  const saved = names.map((name) => [name, Reflect.get(console, name) as unknown] as const);
+  const saved = names.map((name): [string, unknown] => [name, Reflect.get(console, name)]);
   let count = 0;
   const kinds = new Set<string>();
   const held = (...args: unknown[]): void => {

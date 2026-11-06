@@ -78,7 +78,8 @@ interface Run {
   out: string;
   err: string;
   dir: string;
-  report: FiguresReport;
+  /** The report, parsed: reading it where none was written fails the test. */
+  readonly report: FiguresReport;
   /** The manifest's lines, parsed. */
   lines: Record<string, unknown>[];
   /** The files in `--out`, sorted. */
@@ -157,14 +158,18 @@ describe('pdf-export figures', { skip }, () => {
     });
     const dir = settings['--out'] ?? '';
     const manifest = join(dir, MANIFEST);
+    const report = existsSync(settings['--report'] ?? '')
+      ? (JSON.parse(readFileSync(settings['--report'] ?? '', 'utf8')) as FiguresReport)
+      : null;
     return {
       code,
       out,
       err,
       dir,
-      report: existsSync(settings['--report'] ?? '')
-        ? (JSON.parse(readFileSync(settings['--report'] ?? '', 'utf8')) as FiguresReport)
-        : ({} as FiguresReport),
+      get report(): FiguresReport {
+        if (report === null) throw new Error('no report was written');
+        return report;
+      },
       lines: existsSync(manifest)
         ? readFileSync(manifest, 'utf8')
             .split('\n')

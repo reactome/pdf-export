@@ -13,6 +13,7 @@ import { labelsInBook } from '../figures/labels.ts';
 import { BookCharacters } from '../layout/characters.ts';
 import { figureKey, type FigureSvgs } from '../layout/figure.ts';
 import type { Document } from '../model/types.ts';
+import { errorCode } from '../unknown.ts';
 
 /** Faults found while the book is printed, each a line as the preflight's are. */
 export class BookFaults extends Error {
@@ -63,7 +64,7 @@ export class FolderFigures implements FigureSvgs {
       return { stId, svg: readFileSync(join(this.#folder, `${stId}.svg`), 'utf8') };
     } catch (error) {
       // a file gone since the preflight (deleted by hand) is a fault, not an error
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { stId, svg: null };
+      if (errorCode(error) === 'ENOENT') return { stId, svg: null };
       throw error;
     } finally {
       this.#ms += performance.now() - started;
