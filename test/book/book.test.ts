@@ -41,6 +41,7 @@ import {
   type GraphOptions,
   type GraphSettings,
 } from '../../src/graph/connection.ts';
+import type { Row } from '../../src/graph/rows.ts';
 import { CHECKS } from '../../src/check/book.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PAGE } from '../../src/layout/figure.ts';
@@ -67,7 +68,7 @@ const BOOK = ['Alpha pathway.pdf', 'Gamma pathway.pdf', 'beta pathway.pdf'];
 /** The graph, its rows' strings rewritten: a character or a name planted. */
 function rewriting(graph: Graph, text: (value: string) => string): Graph {
   return {
-    async read<T>(query: string, params?: Record<string, unknown>): Promise<T[]> {
+    async read(query, params): Promise<Row[]> {
       const visit = (item: unknown): unknown => {
         if (typeof item === 'string') return text(item);
         if (Array.isArray(item)) return item.map(visit);
@@ -76,7 +77,7 @@ function rewriting(graph: Graph, text: (value: string) => string): Graph {
         }
         return item;
       };
-      return (await graph.read<unknown>(query, params)).map(visit) as T[];
+      return (await graph.read(query, params)).map((row) => visit(row) as Row);
     },
     close: () => graph.close(),
   };

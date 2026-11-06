@@ -26,6 +26,7 @@ import {
   type GraphOptions,
   type GraphSettings,
 } from '../../src/graph/connection.ts';
+import type { Row } from '../../src/graph/rows.ts';
 import { releaseInfo, type ReleaseInfo } from '../../src/graph/queries.ts';
 import { buildBook } from '../../src/model/build.ts';
 import { readSummary } from '../../src/preflight/files.ts';
@@ -53,9 +54,9 @@ function rewriting(
   rewrite: (row: Record<string, unknown>, query: string) => Record<string, unknown>
 ): Graph {
   return {
-    async read<T>(query: string, params?: Record<string, unknown>): Promise<T[]> {
-      const rows = await graph.read<Record<string, unknown>>(query, params);
-      return rows.map((row) => rewrite(row, query)) as T[];
+    async read(query, params): Promise<Row[]> {
+      const rows = await graph.read(query, params);
+      return rows.map((row) => rewrite(row, query));
     },
     close: () => graph.close(),
   };
@@ -567,10 +568,10 @@ describe('pdf-export figures', { skip }, () => {
     const run = await figures({ '--files': files }, (settings, options) => {
       const graph = openGraph(settings, options);
       return {
-        read: <T>(query: string, params?: Record<string, unknown>): Promise<T[]> =>
+        read: (query, params) =>
           query.includes('WHERE r:ReactionLikeEvent')
             ? Promise.reject(new Error('the graph failed'))
-            : graph.read<T>(query, params),
+            : graph.read(query, params),
         close: () => graph.close(),
       };
     });

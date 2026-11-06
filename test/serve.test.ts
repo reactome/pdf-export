@@ -18,6 +18,7 @@ import { after, afterEach, before, describe, test } from 'node:test';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { graphSettings, openGraph, type Graph, type ReadOptions } from '../src/graph/connection.ts';
+import type { Row } from '../src/graph/rows.ts';
 import { releaseInfo } from '../src/graph/queries.ts';
 import { buildBook } from '../src/model/build.ts';
 import { readSummary } from '../src/preflight/files.ts';
@@ -146,11 +147,11 @@ function plantingGraph(): Graph & {
     inFlight: 0,
     maxInFlight: 0,
     timeouts: [] as number[],
-    async read<T>(
+    async read(
       query: string,
       params?: Record<string, unknown>,
       options?: ReadOptions
-    ): Promise<T[]> {
+    ): Promise<Row[]> {
       graph.queries.push(query);
       if (graph.failOnce?.test(query)) {
         graph.failOnce = null;
@@ -162,7 +163,7 @@ function plantingGraph(): Graph & {
       // a read whose end comes back after its transaction timeout
       if (graph.late?.test(query)) {
         const end = (options?.timeoutMs ?? 0) + graph.lateByMs;
-        return new Promise<T[]>((_resolve, reject) => {
+        return new Promise<Row[]>((_resolve, reject) => {
           setTimeout(() => {
             reject(new Error('the transaction timed out'));
           }, end);
@@ -170,7 +171,7 @@ function plantingGraph(): Graph & {
       }
       // a read on a silent connection: it never settles, whatever its timeout
       if (graph.blackhole?.test(query)) {
-        return new Promise<T[]>((_resolve, reject) => {
+        return new Promise<Row[]>((_resolve, reject) => {
           blocked.push(() => {
             reject(new Error('the connection was closed'));
           });
@@ -179,7 +180,7 @@ function plantingGraph(): Graph & {
       // a stalled read: the database ends it at its transaction timeout, if it has one
       if (graph.hanging?.test(query)) {
         const limit = options?.timeoutMs;
-        return new Promise<T[]>((_resolve, reject) => {
+        return new Promise<Row[]>((_resolve, reject) => {
           if (limit !== undefined) {
             setTimeout(() => {
               reject(new Error('the transaction timed out'));
@@ -199,11 +200,11 @@ function plantingGraph(): Graph & {
         }
         if (limit < graph.holdMs) throw new Error('the transaction timed out');
       }
-      const rows = await real.read<T>(query, params);
+      const rows = await real.read(query, params);
       if (graph.planted.size === 0) return rows;
       let json = JSON.stringify(rows);
       for (const [from, to] of graph.planted) json = json.replaceAll(from, to);
-      return JSON.parse(json) as T[];
+      return JSON.parse(json) as Row[];
     },
     close: () => real.close(),
   };

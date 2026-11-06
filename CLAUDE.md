@@ -51,6 +51,28 @@ Feature-sized work goes through Spec Kit before any code, and the specs live in
   stripping, which does not work from an installed package. Publishing would need a
   build step.
 
+## Types, as fully as possible
+
+The compiler is as strict as WebsiteAngular's (`tsconfig.json`): `strict`,
+`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noUnusedLocals`,
+`noUnusedParameters`, `noImplicitOverride`. Beyond the compiler:
+
+- **Nothing on trust in `src/`.** What the code reads (a graph row, an analysis
+  answer, a manifest, a JSON file, what pdf.js gives back, a thrown error) arrives
+  as `unknown` and is checked into its type, refusing what does not fit: a graph
+  row through `src/graph/rows.ts`, whose errors name the column and never the
+  value; pdf.js's values through `src/print/pdfjs.ts`; the rest through
+  `src/unknown.ts`'s checks or a reader of its own. Lint allows no `as` in
+  `src/`, and no `any` or non-null `!` anywhere. The one assertion left,
+  `mapStrings` in `src/layout/characters.ts`, says why on its line.
+- **Say what is returned.** Every exported function has its return type written,
+  and so has every function in `src/` whose type its use does not give.
+- **Name the domain.** An event's kind, an edit's kind, a figure's kind, a front
+  part: a union, not a bare string, where it lets the compiler catch a mix-up.
+- **Scripts and tests** may assert the type of something they have just parsed,
+  but never an object literal's.
+
 ## Proving what is written
 
 - **The reference** is what `event-pdf` writes today, and the release's published

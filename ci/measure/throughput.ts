@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs, promisify } from 'node:util';
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
 import { diagramChoices, release } from '../../src/graph/queries.ts';
+import { text, whole as wholeColumn } from '../../src/graph/rows.ts';
 import { nearestAncestor } from '../../src/model/build.ts';
 import { fetchFigure, type FigureRequest } from '../../src/figures/client.ts';
 
@@ -83,11 +84,13 @@ function pick<T>(from: readonly T[], n: number, next: () => number): T[] {
 async function sample(graph: Graph, species: string, n: number, seed: number) {
   const next = random(seed);
   const ids = async (where: string) =>
-    await graph.read<{ stId: string; dbId: number }>(
-      `MATCH (e:Event {speciesName: $species}) WHERE ${where}
+    (
+      await graph.read(
+        `MATCH (e:Event {speciesName: $species}) WHERE ${where}
          RETURN e.stId AS stId, e.dbId AS dbId ORDER BY e.dbId`,
-      { species }
-    );
+        { species }
+      )
+    ).map((row) => ({ stId: text(row, 'stId'), dbId: wholeColumn(row, 'dbId') }));
   const reactions = await ids('e:ReactionLikeEvent');
   const diagrams = await ids(
     'e:Pathway AND coalesce(e.hasDiagram, false) AND NOT coalesce(e.hasEHLD, false)'

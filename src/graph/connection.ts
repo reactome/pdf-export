@@ -2,6 +2,8 @@
 // database name and credentials from settings, never from the command line.
 import neo4j, { type Driver } from 'neo4j-driver';
 
+import type { Row } from './rows.ts';
+
 export interface GraphSettings {
   uri: string;
   user: string;
@@ -22,9 +24,12 @@ export function graphSettings(env: Readonly<Record<string, string | undefined>>)
   };
 }
 
-/** A read-only view of the graph: one query, its rows as plain objects. */
+/**
+ * A read-only view of the graph: one query, its rows as plain objects, their values
+ * unchecked (each query checks its own, src/graph/rows.ts).
+ */
 export interface Graph {
-  read<T>(query: string, params?: Record<string, unknown>, options?: ReadOptions): Promise<T[]>;
+  read(query: string, params?: Record<string, unknown>, options?: ReadOptions): Promise<Row[]>;
   close(): Promise<void>;
 }
 
@@ -72,11 +77,11 @@ export function openGraph(settings: GraphSettings, options: GraphOptions = {}): 
     }
   );
   return {
-    async read<T>(
+    async read(
       query: string,
       params: Record<string, unknown> = {},
       { timeoutMs = options.transactionTimeoutMs }: ReadOptions = {}
-    ): Promise<T[]> {
+    ): Promise<Row[]> {
       // the driver's transaction timeout: Neo4j ends the read there, whoever still waits
       const config = timeoutMs === undefined ? {} : { timeout: Math.max(1, Math.ceil(timeoutMs)) };
       const session = driver.session({
@@ -85,7 +90,7 @@ export function openGraph(settings: GraphSettings, options: GraphOptions = {}): 
       });
       try {
         const result = await session.executeRead((tx) => tx.run(query, params), config);
-        return result.records.map((record) => record.toObject() as T);
+        return result.records.map((record): Row => record.toObject());
       } finally {
         await session.close();
       }
