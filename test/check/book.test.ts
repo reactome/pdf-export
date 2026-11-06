@@ -36,6 +36,7 @@ import {
 import { bookCommand } from '../../src/book/command.ts';
 import { CHECKS, checkBook, checkBookCommand } from '../../src/check/book.ts';
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
+import type { Row } from '../../src/graph/rows.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PLACEHOLDER } from '../../src/layout/html.ts';
 import { buildBook } from '../../src/model/build.ts';
@@ -507,11 +508,11 @@ describe('pdf-export check-book', { skip }, () => {
     // Reaction eight printed as `Shared reaction`, the name of another section of beta's
     // (R-HSA-90000220), and a link on the cover to its page, before both
     const renamed = (graph: Graph): Graph => ({
-      read: async <T>(query: string, params?: Record<string, unknown>) => {
-        const rows = await graph.read<unknown>(query, params);
+      read: async (query, params) => {
+        const rows = await graph.read(query, params);
         return JSON.parse(
           JSON.stringify(rows).split('"Reaction eight"').join('"Shared reaction"')
-        ) as T[];
+        ) as Row[];
       },
       close: () => graph.close(),
     });
