@@ -62,11 +62,12 @@ export function chooseFigure(
  * nearest a top-level pathway below it, a top-level pathway itself last (graph-core gives
  * it no level, and Neo4j sorts that last), then by database id.
  */
-export function nearestAncestor<T extends { dbId: number; depthFromTop: number }>(
+export function nearestAncestor<T extends { dbId: number | null; depthFromTop: number }>(
   ancestors: readonly T[]
 ): T | undefined {
   const rank = (a: T): number => (a.depthFromTop === 0 ? Infinity : a.depthFromTop);
-  return [...ancestors].sort((a, b) => rank(a) - rank(b) || a.dbId - b.dbId)[0];
+  // a null id sorts as 0, as it did in arithmetic before it was typed
+  return [...ancestors].sort((a, b) => rank(a) - rank(b) || (a.dbId ?? 0) - (b.dbId ?? 0))[0];
 }
 
 /** A place as the walk finds it, before its event's facts are read. */
@@ -148,7 +149,7 @@ function assemble(
   walked: readonly Walked[],
   read: Read,
   illustrated: ReadonlySet<string>
-): { places: Place[]; sections: Section[]; names: string[] } {
+): { places: Place[]; sections: Section[]; names: (string | null)[] } {
   const ids = walked.filter((p) => p.full).map((p) => p.child.dbId);
   const held = new Set(ids);
   const sections: Section[] = [];
@@ -184,7 +185,10 @@ function assemble(
       figure: chooseFigure(event, read.choices.get(event.dbId), illustrated),
       diseases: diseases(rawDiseases),
       inferredFrom: inferredFrom(rawInferred),
-      summations: rawSummations.map(sanitiseSummation),
+      // a summation with no text printed empty, as sanitize-html gives for null
+      summations: rawSummations.map((summation) =>
+        summation === null ? '' : sanitiseSummation(summation)
+      ),
       references: read.refs.get(event.dbId) ?? [],
       edits: editRows(read.edits.get(event.dbId) ?? []),
       depth,

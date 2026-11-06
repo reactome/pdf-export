@@ -61,6 +61,8 @@ describe("a row's columns", () => {
     assert.equal(whole(row, 'n'), 3);
     assert.equal(wholeOrNull(row, 'none'), null);
     assert.equal(flag(row, 'b'), false);
+    assert.equal(flag(row, 'none'), false);
+    assert.equal(flag(row, 'absent'), false);
     assert.equal(oneOf(row, 'k', ['pathway', 'reaction']), 'pathway');
     assert.deepEqual(texts(row, 'l'), ['x', 'y']);
     assert.deepEqual(maps(row, 'm'), [{ a: 1 }]);
@@ -110,15 +112,39 @@ describe("an event's facts", () => {
     assert.equal(facts.get(1)?.species?.name, 'a species');
   });
 
-  test('a row missing a column, or with one of the wrong type, is refused', () => {
-    const { speciesName: _speciesName, ...noSpecies } = factsRow;
-    assert.throws(() => rawFacts(noSpecies), refused('speciesName'));
+  test('what nothing printed reads, or reads as none, may be null or missing, as before', () => {
+    const { speciesName: _speciesName, schemaClass: _schemaClass, ...bare } = factsRow;
+    const read = rawFacts({
+      ...bare,
+      hasDiagram: null,
+      species: [{ order: null, dbId: null, name: null }],
+      compartments: [{ order: 0, dbId: null, name: 'a compartment' }],
+      inferredFrom: [
+        { dbId: null, stId: 'R-MMU-70', name: 'event 70', speciesName: 'Mus musculus' },
+      ],
+      summations: [{ order: 0, text: null }],
+    });
+    assert.equal(read.speciesName, null);
+    assert.equal(read.schemaClass, null);
+    assert.equal(read.hasDiagram, false);
+    assert.deepEqual(read.species, [{ order: null, dbId: null, name: null }]);
+    assert.equal(read.compartments[0]?.dbId, null);
+    assert.equal(read.inferredFrom[0]?.dbId, null);
+    assert.deepEqual(read.summations, [{ order: 0, text: null }]);
+  });
+
+  test('what would have printed "null", or thrown, is refused', () => {
+    assert.throws(() => rawFacts({ ...factsRow, name: null }), refused('name'));
     assert.throws(() => rawFacts({ ...factsRow, kind: 'complex' }), refused('kind'));
-    assert.throws(() => rawFacts({ ...factsRow, hasDiagram: null }), refused('hasDiagram'));
+    assert.throws(() => rawFacts({ ...factsRow, hasDiagram: 'true' }), refused('hasDiagram'));
     assert.throws(() => rawFacts({ ...factsRow, dbId: '1' }), refused('dbId'));
     assert.throws(
-      () => rawFacts({ ...factsRow, summations: [{ order: 0, text: null }] }),
-      refused('text')
+      () => rawFacts({ ...factsRow, compartments: [{ order: 0, dbId: 30, name: null }] }),
+      refused('name')
+    );
+    assert.throws(
+      () => rawFacts({ ...factsRow, before: [{ order: 0, ...ref(50), dbId: null }] }),
+      refused('dbId')
     );
     assert.throws(
       () => rawFacts({ ...factsRow, after: [{ dbId: 60, stId: null, name: 'x' }] }),
@@ -177,7 +203,27 @@ test("a reference's row: its kind from its labels, a missing optional column as 
   assert.equal(read.volume, null);
   assert.equal(read.publisher, null);
   assert.throws(() => reference({ ...row, volume: '12' }), refused('volume'));
+  assert.equal(reference({ ...row, dbId: null }).dbId, null);
   assert.throws(() => reference({ ...row, title: null }), refused('title'));
+});
+
+test('an author with no name is read as null, as the edit history printed it before: empty', () => {
+  const row: Row = {
+    dbId: null,
+    kind: 'authored',
+    dateTime: '2026-01-01 10:00:00',
+    authors: [
+      { dbId: 3, name: null, surname: null },
+      { dbId: 4, surname: 'Placeholder02' },
+      { dbId: 5, name: 'Placeholder03, P.', surname: 'Placeholder03' },
+    ],
+  };
+  assert.deepEqual(edit(row).authors, [
+    { dbId: 3, name: null, surname: null },
+    { dbId: 4, name: null, surname: 'Placeholder02' },
+    { dbId: 5, name: 'Placeholder03, P.', surname: 'Placeholder03' },
+  ]);
+  assert.equal(edit(row).dbId, null);
 });
 
 test("an edit's row: its kind one of four, its authors each checked", () => {
@@ -190,7 +236,12 @@ test("an edit's row: its kind one of four, its authors each checked", () => {
   assert.deepEqual(edit(row), row);
   assert.throws(() => edit({ ...row, kind: 'created' }), refused('kind'));
   assert.throws(
-    () => edit({ ...row, authors: [{ dbId: 3, name: null, surname: null }] }),
+    () => edit({ ...row, authors: [{ dbId: 3, name: 7, surname: null }] }),
     refused('name')
+  );
+  // two authors with no id would be one author in the history, the other dropped
+  assert.throws(
+    () => edit({ ...row, authors: [{ dbId: null, name: 'Placeholder01, P.', surname: null }] }),
+    refused('dbId')
   );
 });

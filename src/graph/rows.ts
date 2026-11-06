@@ -1,7 +1,10 @@
 // A graph row's columns, checked into their types (spec 001 T013's queries): the driver
 // gives each row's values as whatever the database held, so each query reads its rows
-// through these, and a row that does not fit is refused, never taken on trust. An error
-// names the column and the type it is not, never the value, which may be a person's name.
+// through these, and a row that does not fit is refused, never taken on trust. What the
+// code tolerated before its rows were typed (a null, a missing column, an empty list) is
+// tolerated still, its type saying so; only what threw, or printed nonsense, is refused.
+// An error names the column and the type it is not, never the value, which may be a
+// person's name.
 import { isRecord } from '../unknown.ts';
 
 /** A row as the graph gives it, or a map within one: each value by its name, unchecked. */
@@ -49,10 +52,14 @@ export function wholeOrNull(row: Row, column: string): number | null {
   return value;
 }
 
-/** A column's true or false. */
+/**
+ * A column's true or false; false where it has none, as the code's tests of its truth read
+ * a null before the column was typed.
+ */
 export function flag(row: Row, column: string): boolean {
   const value = row[column];
-  if (typeof value !== 'boolean') throw new RowError(column, 'true or false');
+  if (value === null || value === undefined) return false;
+  if (typeof value !== 'boolean') throw new RowError(column, 'true, false or null');
   return value;
 }
 

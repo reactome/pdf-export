@@ -51,7 +51,8 @@ export function printedDocument(doc: Document, characters: BookCharacters): Docu
     cover: {
       ...doc.cover,
       title: text(doc.cover.title, root),
-      names: doc.cover.names.map((name) => text(name, root)),
+      // a name the graph does not give stays null, printed empty
+      names: doc.cover.names.map((name) => (name === null ? null : text(name, root))),
     },
     contents: doc.contents?.map((entry) => ({ ...entry, title: text(entry.title, root) })) ?? null,
     places: doc.places.map((place): Place => {

@@ -2,7 +2,7 @@
 // in the curators' order.
 import sanitizeHtml from 'sanitize-html';
 
-import type { Edit, EventRef, Named } from '../graph/queries.ts';
+import type { Edit, Named } from '../graph/queries.ts';
 import type { EditRow } from './types.ts';
 
 /**
@@ -19,7 +19,7 @@ export function diseases(list: readonly Named[]): string[] {
 }
 
 /** What an event was inferred from, by species name, then name (the graph gives no order). */
-export function inferredFrom<T extends EventRef & { speciesName: string }>(
+export function inferredFrom<T extends { name: string; speciesName: string }>(
   list: readonly T[]
 ): T[] {
   return [...list].sort(
@@ -48,7 +48,8 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
         byCodeUnits(a.authors[0]?.surname ?? '', b.authors[0]?.surname ?? '') ||
         // ties as event-pdf leaves them: it lists edits kind by kind, then sorts stably
         KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) ||
-        a.dbId - b.dbId
+        // a null id sorts as 0, as it did in arithmetic before it was typed
+        (a.dbId ?? 0) - (b.dbId ?? 0)
     );
   const sameAuthors = (a: Edit, b: Edit): boolean => {
     const ids = new Set(a.authors.map((p) => p.dbId));
@@ -57,7 +58,7 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
       b.authors.every((p) => ids.has(p.dbId))
     );
   };
-  const rows: { date: string; kinds: Set<string>; authors: Map<number, string> }[] = [];
+  const rows: { date: string; kinds: Set<string>; authors: Map<number, string | null> }[] = [];
   kept.forEach((edit, i) => {
     const before = kept[i - 1];
     const row = rows.at(-1);
@@ -87,10 +88,19 @@ export function editRows(edits: readonly Edit[]): EditRow[] {
  * The cover's names: every author of the edits of the events held, each name once (as
  * event-pdf removes duplicates, by name), sorted by code units, case and all.
  */
-export function coverNames(edits: Iterable<readonly Edit[]>): string[] {
-  const names = new Set<string>();
+export function coverNames(edits: Iterable<readonly Edit[]>): (string | null)[] {
+  const names = new Set<string | null>();
   for (const list of edits) for (const e of list) for (const a of e.authors) names.add(a.name);
-  return [...names].sort(byCodeUnits);
+  return [...names].sort(byCodeUnitsOrNull);
+}
+
+/**
+ * Names compared by their code units, a null (a name the graph does not give) equal to any
+ * other, as JavaScript's `<` compared it before the name was typed (a name of digits alone
+ * aside, which `<` compared to null as a number).
+ */
+function byCodeUnitsOrNull(a: string | null, b: string | null): number {
+  return a === null || b === null ? 0 : byCodeUnits(a, b);
 }
 
 /**

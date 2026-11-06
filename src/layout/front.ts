@@ -61,7 +61,7 @@ export function coverHtml(doc: Document, links: Links, figures: FigureSvgs, date
   }
   if (cover.names.length > 0) {
     parts.push(
-      `<p class="part">${text(CONTRIBUTORS)}</p><p class="names">${text(cover.names.join('; '))}</p>`
+      `<p class="part">${text(CONTRIBUTORS)}</p><p class="names">${text(cover.names.map((name) => name ?? '').join('; '))}</p>`
     );
   }
   parts.push(

@@ -17,7 +17,7 @@ const edit = (
   dbId: number,
   kind: Edit['kind'],
   dateTime: string | null,
-  authors: ReturnType<typeof person>[]
+  authors: Edit['authors']
 ): Edit => ({ dbId, kind, dateTime, authors });
 
 test('leaves out the disease named exactly "disease", and only that one', () => {
@@ -175,4 +175,19 @@ test("a summation's HTML keeps its formatting, tables and web links, and loses a
   ]) {
     assert.doesNotMatch(clean, gone);
   }
+});
+
+test('an author with no name prints empty, where the old code joined a null: the history and the cover', () => {
+  const day = '2026-01-01 10:00:00';
+  const unnamed = { dbId: 3, name: null, surname: null };
+  const edits = [
+    edit(1, 'authored', day, [unnamed, person(4, 'Placeholder02')]),
+    edit(2, 'edited', '2026-02-01 10:00:00', [unnamed]),
+  ];
+  assert.deepEqual(
+    editRows(edits).map((row) => row.authors),
+    [[null, 'Placeholder02, P.'], [null]]
+  );
+  // the null kept where the old sort, comparing it equal to any name, left it
+  assert.deepEqual(coverNames([edits]), [null, 'Placeholder02, P.']);
 });

@@ -27,18 +27,37 @@ export interface EventRef {
 
 export interface Child extends EventRef {
   kind: EventKind;
-  schemaClass: string;
+  /** Null where the graph gives none: nothing printed reads it. */
+  schemaClass: string | null;
 }
 
+/** A compartment or a disease: printed by its name; its id, null where the graph has none, is not read. */
 export interface Named {
-  dbId: number;
+  dbId: number | null;
   name: string;
+}
+
+/** An event's species: neither its id nor its name is printed, so either may be null. */
+export interface Species {
+  dbId: number | null;
+  name: string | null;
+}
+
+/** An event an event was inferred from: printed by its stable id, name and species. */
+export interface InferredFrom {
+  /** Null where the graph gives none: not read. */
+  dbId: number | null;
+  stId: string;
+  name: string;
+  speciesName: string;
 }
 
 export interface EventFacts extends EventRef {
   kind: EventKind;
-  schemaClass: string;
-  speciesName: string;
+  /** Null where the graph gives none: nothing printed reads it. */
+  schemaClass: string | null;
+  /** Null where the graph gives none: an analysis's species is then shown empty. */
+  speciesName: string | null;
   /** A reaction's type, as the graph's `category` gives it. */
   category: string | null;
   hasDiagram: boolean;
@@ -46,12 +65,13 @@ export interface EventFacts extends EventRef {
   isInferred: boolean;
   isInDisease: boolean;
   /** The first species by `order`. */
-  species: Named | null;
+  species: Species | null;
   compartments: Named[];
   diseases: Named[];
   /** What the event was inferred from, each with its species; unordered in the graph. */
-  inferredFrom: (EventRef & { speciesName: string })[];
-  summations: string[];
+  inferredFrom: InferredFrom[];
+  /** A summation with no text is null: the model prints it empty. */
+  summations: (string | null)[];
   /** The events before this one (its `precedingEvent`s), by `order`. */
   before: EventRef[];
   /** The events after this one: those whose `precedingEvent` it is, by database id. */
@@ -61,7 +81,8 @@ export interface EventFacts extends EventRef {
 export type PublicationKind = 'article' | 'book' | 'web page';
 
 export interface Reference {
-  dbId: number;
+  /** Null where the graph gives none: not read. */
+  dbId: number | null;
   kind: PublicationKind;
   title: string;
   /** A book's chapter, where the reference is to one. */
@@ -85,12 +106,14 @@ export type EditKind = (typeof EDIT_KINDS)[number];
 
 export interface Person {
   dbId: number;
-  name: string;
+  /** Null where the graph gives none: printed empty, as a name joined into a list. */
+  name: string | null;
   surname: string | null;
 }
 
 export interface Edit {
-  dbId: number;
+  /** Null where the graph gives none: it then sorts as 0. */
+  dbId: number | null;
   kind: EditKind;
   /** As the graph writes it, `YYYY-MM-DD hh:mm:ss`, or null. */
   dateTime: string | null;
@@ -221,14 +244,18 @@ function eventRef(row: Row): EventRef {
 function child(row: Row): Child {
   return {
     ...eventRef(row),
-    schemaClass: text(row, 'schemaClass'),
+    schemaClass: textOrNull(row, 'schemaClass'),
     kind: oneOf(row, 'kind', EVENT_KINDS),
   };
 }
 
-/** A named object (a species, a compartment, a disease) with its relationship's order. */
+/** A compartment or a disease, with its relationship's order. */
 function orderedNamed(row: Row): Ordered & Named {
-  return { order: wholeOrNull(row, 'order'), dbId: whole(row, 'dbId'), name: text(row, 'name') };
+  return {
+    order: wholeOrNull(row, 'order'),
+    dbId: wholeOrNull(row, 'dbId'),
+    name: text(row, 'name'),
+  };
 }
 
 /** An event's row from `eventFacts`, each column checked; its lists not yet in order. */
@@ -236,23 +263,29 @@ export function rawFacts(row: Row): RawFacts {
   return {
     ...eventRef(row),
     kind: oneOf(row, 'kind', EVENT_KINDS),
-    schemaClass: text(row, 'schemaClass'),
-    speciesName: text(row, 'speciesName'),
+    schemaClass: textOrNull(row, 'schemaClass'),
+    speciesName: textOrNull(row, 'speciesName'),
     category: textOrNull(row, 'category'),
     hasDiagram: flag(row, 'hasDiagram'),
     hasEHLD: flag(row, 'hasEHLD'),
     isInferred: flag(row, 'isInferred'),
     isInDisease: flag(row, 'isInDisease'),
-    species: maps(row, 'species').map(orderedNamed),
+    species: maps(row, 'species').map((species) => ({
+      order: wholeOrNull(species, 'order'),
+      dbId: wholeOrNull(species, 'dbId'),
+      name: textOrNull(species, 'name'),
+    })),
     compartments: maps(row, 'compartments').map(orderedNamed),
     diseases: maps(row, 'diseases').map(orderedNamed),
     inferredFrom: maps(row, 'inferredFrom').map((from) => ({
-      ...eventRef(from),
+      dbId: wholeOrNull(from, 'dbId'),
+      stId: text(from, 'stId'),
+      name: text(from, 'name'),
       speciesName: text(from, 'speciesName'),
     })),
     summations: maps(row, 'summations').map((summation) => ({
       order: wholeOrNull(summation, 'order'),
-      text: text(summation, 'text'),
+      text: textOrNull(summation, 'text'),
     })),
     before: maps(row, 'before').map((before) => ({
       order: wholeOrNull(before, 'order'),
@@ -298,10 +331,10 @@ export interface RawFacts extends Omit<
   EventFacts,
   'species' | 'compartments' | 'diseases' | 'summations' | 'before'
 > {
-  species: (Ordered & Named)[];
+  species: (Ordered & Species)[];
   compartments: (Ordered & Named)[];
   diseases: (Ordered & Named)[];
-  summations: (Ordered & { text: string })[];
+  summations: (Ordered & { text: string | null })[];
   before: (Ordered & EventRef)[];
 }
 
@@ -346,7 +379,7 @@ export async function literature(
 export function reference(row: Row): Reference {
   const labels = texts(row, 'labels');
   return {
-    dbId: whole(row, 'dbId'),
+    dbId: wholeOrNull(row, 'dbId'),
     title: text(row, 'title'),
     chapterTitle: textOrNull(row, 'chapterTitle'),
     journal: textOrNull(row, 'journal'),
@@ -386,12 +419,12 @@ export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<n
 /** An edit's row from `edits`, with its authors. */
 export function edit(row: Row): Edit {
   return {
-    dbId: whole(row, 'dbId'),
+    dbId: wholeOrNull(row, 'dbId'),
     kind: oneOf(row, 'kind', EDIT_KINDS),
     dateTime: textOrNull(row, 'dateTime'),
     authors: maps(row, 'authors').map((author) => ({
       dbId: whole(author, 'dbId'),
-      name: text(author, 'name'),
+      name: textOrNull(author, 'name'),
       surname: textOrNull(author, 'surname'),
     })),
   };
@@ -418,7 +451,8 @@ function group<R, K, V>(rows: readonly R[], key: (row: R) => K, value: (row: R) 
 
 /** A pathway that can draw another: it has a diagram, and none lies between them. */
 export interface DiagramAncestor {
-  dbId: number;
+  /** Null where the graph gives none: it then sorts as 0. */
+  dbId: number | null;
   stId: string;
   /** How far it is from the nearest top-level pathway above it: 0 for one itself. */
   depthFromTop: number;
@@ -467,11 +501,12 @@ export async function diagramChoices(
       {
         ancestors: maps(row, 'ancestors')
           .map((ancestor) => ({
-            dbId: whole(ancestor, 'dbId'),
+            dbId: wholeOrNull(ancestor, 'dbId'),
             stId: text(ancestor, 'stId'),
             depthFromTop: whole(ancestor, 'depthFromTop'),
           }))
-          .sort((a, b) => a.depthFromTop - b.depthFromTop || a.dbId - b.dbId),
+          // a null id sorts as 0, as it did in arithmetic before it was typed
+          .sort((a, b) => a.depthFromTop - b.depthFromTop || (a.dbId ?? 0) - (b.dbId ?? 0)),
         reactions: texts(row, 'reactions').sort(),
       },
     ])

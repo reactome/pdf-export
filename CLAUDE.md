@@ -62,7 +62,8 @@ The compiler is as strict as WebsiteAngular's (`tsconfig.json`): `strict`,
   answer, a manifest, a JSON file, what pdf.js gives back, a thrown error) arrives
   as `unknown` and is checked into its type, refusing what does not fit: a graph
   row through `src/graph/rows.ts`, whose errors name the column and never the
-  value; pdf.js's values through `src/print/pdfjs.ts`; the rest through
+  value (a null the graph may give is typed as one, not refused, where the code
+  prints it sensibly: an author with no name prints empty); pdf.js's values through `src/print/pdfjs.ts`; the rest through
   `src/unknown.ts`'s checks or a reader of its own. Lint allows no `as` in
   `src/`, and no `any` or non-null `!` anywhere. The one assertion left,
   `mapStrings` in `src/layout/characters.ts`, says why on its line.
