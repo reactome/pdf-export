@@ -46,7 +46,7 @@ As plan.md's structure: the report's code in `src/report/`, its analysis calls i
 **Purpose:** what the new report is compared with (plan, Order of work, step 1), recorded
 before anything is built, so no comparison is fitted to the new code.
 
-- [ ] T001 [P] Today's answers, recorded for the replay (User Story 2, research R5), from
+- [x] T001 [P] Today's answers, recorded for the replay (User Story 2, research R5), from
       the private analysis service on loopback, with tokens of made-up identifiers.
   - **The deployed build:** the analysis service's commit, from the deployment's own pins,
     and, from that commit's source, whether its report controller streams the PDF (main)
@@ -65,6 +65,13 @@ before anything is built, so no comparison is fitted to the new code.
     private build of the deployed commit is at hand (WebsiteAngular spec 010 T036 builds
     one). Otherwise research R5 records the answer read from the deployed build's source,
     and the replay says it was not run.
+  - **Done (#192):** research R5 records the deployed build (`9b147e1`, whose report
+    controller is `main`'s: it streams the PDF, so a failure while it is made ends the
+    answer early) and the replay set's 33 cases on the development host's own service:
+    the statuses, headers and JSON bodies, and each PDF's size and page count. A number
+    or flag that is not one is the framework's default 400 body (a timestamp and the
+    path), not the service's form; a malformed token its catch-all 500 (research R8).
+    The failure while the PDF is made was not replayed: no private build exists yet.
 
 - [ ] T002 [P] Today's report's time and size (SC-203's baseline) and R1's call 4, measured
       on the same private services, one request at a time with pauses between, never
