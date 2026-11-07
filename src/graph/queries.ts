@@ -101,8 +101,28 @@ export interface Reference {
   moreAuthors: boolean;
 }
 
-export const EDIT_KINDS = ['authored', 'edited', 'reviewed', 'revised'] as const;
+/**
+ * The kinds of edit read: spec 001's four, and `created` and `modified`, which only the
+ * analysis report shows (spec 002 research R2). Each points, as the four do, from the
+ * InstanceEdit to the event. The graph keeps one `modified` an object, the latest.
+ */
+export const EDIT_KINDS = [
+  'authored',
+  'edited',
+  'reviewed',
+  'revised',
+  'created',
+  'modified',
+] as const;
 export type EditKind = (typeof EDIT_KINDS)[number];
+
+/** The kinds spec 001's PDFs show, in the edit history and among the cover's names. */
+export const SECTION_EDIT_KINDS: readonly EditKind[] = [
+  'authored',
+  'edited',
+  'reviewed',
+  'revised',
+];
 
 export interface Person {
   dbId: number;
@@ -403,7 +423,7 @@ export function reference(row: Row): Reference {
 export async function edits(graph: Graph, ids: readonly number[]): Promise<Map<number, Edit[]>> {
   const rows = await graph.read(
     `UNWIND $ids AS id
-     MATCH (e:DatabaseObject {dbId: id})<-[k:authored|edited|reviewed|revised]-(i:InstanceEdit)
+     MATCH (e:DatabaseObject {dbId: id})<-[k:authored|edited|reviewed|revised|created|modified]-(i:InstanceEdit)
      WHERE e:Event
      OPTIONAL MATCH (a:Person)-[ra:author]->(i)
      WITH id, k, i, a ORDER BY id, i.dbId, ra.order

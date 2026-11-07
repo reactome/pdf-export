@@ -99,11 +99,11 @@ before anything is built, so no comparison is fitted to the new code.
 **Purpose:** the report's data, from the analysis service and the graph, before any
 layout. Blocks every later phase.
 
-- [ ] T003 Spec 001's edits, widened (research R2): `src/graph/queries.ts`'s `edits` reads
+- [x] T003 Spec 001's edits, widened (research R2): `src/graph/queries.ts`'s `edits` reads
       `created` and `modified` too, and `EditKind` gains them.
-  - The graph holds `created` and `modified` in the other direction from the four kinds
-    spec 001 reads (the event to its InstanceEdit): the query reads each by its own
-    direction, as the fixture and the release's graph show it.
+  - The graph holds `created` and `modified` in the same direction as the four kinds spec
+    001 reads, from the InstanceEdit to the object (graph-core's `DatabaseObject`, at the
+    commit the website's pins name), so the query reads all six in one pattern.
   - Spec 001's build filters the edits to its four kinds where it reads them
     (`src/model/build.ts`), before `editRows` and `coverNames`, so spec 001's PDFs are
     unchanged.
@@ -113,6 +113,15 @@ layout. Blocks every later phase.
   - Tests: the query reads all six kinds on the fixture; spec 001's rows and cover names
     are what they were, seen failing with the filter removed (the created edit's author
     then appears among the cover's names).
+  - **Done (#194):** `EDIT_KINDS` holds six kinds and the query reads them;
+    `SECTION_EDIT_KINDS` holds spec 001's four, and `sectionEdits` in `build.ts` keeps
+    those before the history and the cover. The fixture gains a placeholder person, a
+    dated `created` with an author and a `modified` with none on `Alpha pathway`, and an
+    undated `created` on `Reaction one`. Seen failing: with the filter removed, the
+    cover's names gain the created edit's author and `Alpha pathway`'s history gains a
+    row (2 tests); with the query back to four kinds, the reader's two edit tests fail.
+    The fixture's new edits alone (the old code) left all 59 graph and model tests
+    passing. An edit's row now refuses a kind outside the six (`deleted`).
 
 - [ ] T004 [P] The analysis stub, extended (research R8), `test/stubs/analysis.ts`: R1's
       five calls (contracts/analysis-api.md) for made-up tokens on the fixture graph's

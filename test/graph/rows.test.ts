@@ -226,7 +226,7 @@ test('an author with no name is read as null, as the edit history printed it bef
   assert.equal(edit(row).dbId, null);
 });
 
-test("an edit's row: its kind one of four, its authors each checked", () => {
+test("an edit's row: its kind one of six, its authors each checked", () => {
   const row: Row = {
     dbId: 9,
     kind: 'reviewed',
@@ -234,7 +234,8 @@ test("an edit's row: its kind one of four, its authors each checked", () => {
     authors: [{ dbId: 3, name: 'Placeholder01, P.', surname: null }],
   };
   assert.deepEqual(edit(row), row);
-  assert.throws(() => edit({ ...row, kind: 'created' }), refused('kind'));
+  assert.deepEqual(edit({ ...row, kind: 'created' }), { ...row, kind: 'created' });
+  assert.throws(() => edit({ ...row, kind: 'deleted' }), refused('kind'));
   assert.throws(
     () => edit({ ...row, authors: [{ dbId: 3, name: 7, surname: null }] }),
     refused('name')

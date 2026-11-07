@@ -14,6 +14,7 @@ import {
   topLevelPathways,
   type Child,
   type DiagramChoice,
+  SECTION_EDIT_KINDS,
   type Edit,
   type EventFacts,
   type EventRef,
@@ -128,11 +129,14 @@ interface Read {
 
 async function readEvents(graph: Graph, ids: readonly number[]): Promise<Read> {
   // in chunks, so the book's thousands of events are never one query (research R2)
-  const [facts, refs, edits] = await Promise.all([
+  const [facts, refs, allEdits] = await Promise.all([
     inChunks(ids, (chunk) => eventFacts(graph, chunk)),
     inChunks(ids, (chunk) => literature(graph, chunk)),
     inChunks(ids, (chunk) => readEdits(graph, chunk)),
   ]);
+  // the edit query also reads `created` and `modified`, for the analysis report (spec 002
+  // research R2); spec 001's history and cover show only its own four kinds
+  const edits = sectionEdits(allEdits);
   const version = await readRelease(graph);
   const needChoice = [...facts.values()]
     .filter((f) => f.kind === 'pathway' && !f.hasDiagram)
@@ -303,4 +307,15 @@ async function inChunks<V>(
     for (const [k, v] of await read(ids.slice(i, i + size))) merged.set(k, v);
   }
   return merged;
+}
+
+/** Each event's edits of the kinds spec 001's PDFs show. */
+export function sectionEdits(edits: ReadonlyMap<number, readonly Edit[]>): Map<number, Edit[]> {
+  const kept = new Map<number, Edit[]>();
+  for (const [id, list] of edits)
+    kept.set(
+      id,
+      list.filter((e) => SECTION_EDIT_KINDS.includes(e.kind))
+    );
+  return kept;
 }

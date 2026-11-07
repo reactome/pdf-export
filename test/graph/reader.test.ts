@@ -191,6 +191,7 @@ describe('the graph reader', { skip }, () => {
     assert.ok(list);
     assert.deepEqual([...new Set(list.map((e) => e.kind))].sort(), [
       'authored',
+      'created',
       'edited',
       'reviewed',
       'revised',
@@ -201,6 +202,18 @@ describe('the graph reader', { skip }, () => {
     assert.deepEqual(
       first?.authors.map((a) => a.surname),
       ['Placeholder01', 'Placeholder02']
+    );
+  });
+
+  test("reads created and modified edits, the analysis report's, as the other kinds", async () => {
+    const list = (await edits(graph, [id(200)])).get(id(200));
+    assert.deepEqual(
+      list?.map((e) => [e.kind, e.dateTime, e.authors.map((a) => a.surname)]),
+      [
+        ['authored', '2026-01-02 10:00:00', ['Placeholder07']],
+        ['created', '2025-12-01 10:00:00', ['Placeholder11']],
+        ['modified', '2026-05-01 10:00:00', []],
+      ]
     );
   });
 

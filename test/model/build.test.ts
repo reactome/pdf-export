@@ -205,6 +205,10 @@ describe('the model', { skip }, () => {
       },
     ]);
     const alpha = fullOf(pdfs, 'R-HSA-90000200');
+    // its created and modified edits are the analysis report's, never spec 001's history
+    assert.deepEqual(alpha.edits, [
+      { date: '2026-01-02', kinds: ['authored'], authors: ['Placeholder07, P.'] },
+    ]);
     assert.doesNotMatch(alpha.summations.join(''), /script|onerror|javascript/);
     // every summation sanitised, as the layout's breaks (markupBreaks) rely on it
     for (const doc of pdfs)
