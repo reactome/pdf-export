@@ -258,6 +258,74 @@ failure while the PDF is made, which no request can cause: it is planted as a fa
 the private copy (an exporter made to throw), and the new service's answer is compared
 with that copy's.
 
+### The deployed build (T001, 7 Nov 2026)
+
+The deployed analysis service is built from `reactome/analysis-service` at `9b147e1`
+(branch `feature/batik-upgrade`, the website's pins; its classes match that commit's).
+Its report controller is the same file as on `main`: it **streams** the PDF into the
+answer as it is made. The buffering controller of the spec's Background is on another
+unmerged branch, `add-null-checks-and-throw-errors`, which no deployment runs. So, read
+from the deployed source:
+
+- the species is looked up before the token, and the number clamped to 1–50, before
+  anything is written;
+- a failure of the PDF library, an illegal state or an I/O error while the PDF is
+  written is caught and logged, and the answer ends with what was written: its status
+  already sent (200) once any of the PDF has left the server's buffer;
+- an exporter's own failure is raised again as an unchecked error, which the service's
+  catch-all answers 500 in its JSON form only while nothing has been sent; after that
+  the answer is cut off.
+
+**The failure while the PDF is made was not replayed:** no private build of the
+deployed commit exists yet (WebsiteAngular spec 010 T036 builds one). The answer above
+is read from the source; the replay (T020) says it was not run.
+
+### The replay set, as today's service answers it (T001, 7 Nov 2026)
+
+On the website's development host's own analysis service, on loopback, with a token of
+seven gene symbols and two made-up identifiers (an over-representation result holding
+`TOTAL`, `UNIPROT` and `ENSEMBL`), one request at a time with a pause between. The
+reports themselves are kept outside the repository; here, their status, headers and
+size only.
+
+| Case                                                               | Status | Answer                                                                                                                                                                       |
+| ------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The defaults (25 pathways)                                         | 200    | a PDF of 53 pages, 9.0 MB, in 33 s                                                                                                                                           |
+| `number=0`, `number=-1`                                            | 200    | as `number=1` (10 pages): clamped                                                                                                                                            |
+| `number=50`, `number=51`                                           | 200    | the same PDF, 100 pages, 19.6 MB, in 54–68 s: clamped                                                                                                                        |
+| `number=` (empty)                                                  | 200    | as the defaults: an empty value is the default                                                                                                                               |
+| `number=abc`, `number=1.5`                                         | 400    | the framework's default body (below)                                                                                                                                         |
+| `resource=UNIPROT` (held)                                          | 200    | a PDF for that resource (9 pages)                                                                                                                                            |
+| `resource=uniprot`, `resource=CHEBI` (not held), `resource=NOTONE` | 200    | as `TOTAL`: compared case and all, then the default                                                                                                                          |
+| `importableOnly=true`, `=false`, `=1`                              | 200    | a PDF; `1` read as true (the framework's boolean)                                                                                                                            |
+| `importableOnly=maybe`                                             | 400    | the framework's default body                                                                                                                                                 |
+| a colour profile, known or not                                     | 200    | a PDF; an unknown profile is not refused                                                                                                                                     |
+| species `Homo_sapiens`, `hOMO_SAPIENS`, `Homo%20sapiens`, `48887`  | 200    | as `9606`                                                                                                                                                                    |
+| species `Mus_musculus` (no result for it)                          | 200    | a PDF with no pathways (9 pages)                                                                                                                                             |
+| species unknown, the token good or unknown                         | 404    | `{"code":404,"reason":"Not Found","messages":[]}`                                                                                                                            |
+| `number=abc` with an unknown species                               | 400    | the framework's default body: parameters first                                                                                                                               |
+| token unknown (dated 2020, never issued)                           | 404    | `{"code":404,"reason":"Not Found","messages":[]}`                                                                                                                            |
+| token gone (dated today, no result)                                | 410    | `{"code":410,"reason":"Gone","messages":[]}`                                                                                                                                 |
+| token malformed (`notatoken`)                                      | 500    | the catch-all: `{"code":500,"reason":"Internal Server Error","messages":["Please get in touch with our help desk (help@reactome.org) for more details about this problem"]}` |
+| token malformed with an unknown species                            | 404    | the species' 404: the species first                                                                                                                                          |
+| token holding `%2F`                                                | 400    | the servlet container's HTML page                                                                                                                                            |
+| a file name other than `report`                                    | 200    | the same PDF                                                                                                                                                                 |
+
+**The bytes that matter for the replay:**
+
+- **A PDF:** `Content-Type: application/pdf;charset=UTF-8`,
+  `Content-Disposition: attachment; filename="report.pdf"`, sent in chunks.
+- **The service's JSON errors** (404, 410, 500): `Content-Type:
+application/json;charset=UTF-8`, no `Content-Disposition`, the body exactly as shown
+  followed by one newline. They carry no `url` or path.
+- **The framework's 400** (a number or flag that is not one): `Content-Type:
+application/json;charset=UTF-8`, `Content-Disposition: inline;filename=f.txt`,
+  `Connection: close`, and the body
+  `{"timestamp":"…","status":400,"error":"Bad Request","path":"…"}`: the time of the
+  request (ISO 8601, milliseconds, `+00:00`) and the request's path without its query,
+  as received. These two fields are the only ones that differ between requests.
+- Every answer carries `Access-Control-Allow-Origin: *`.
+
 ## R6. The address and its routing
 
 **Decision.** pdf-export's service (spec 001's `serve`) adds the route
@@ -318,3 +386,7 @@ task. Spec 001 also sends only the canonical token (R6): sent as given, one nest
 `%25` layers or holding `%2F` reaches the servlet container's HTML 400, and a decoded
 `/` reaches another route, whose 404 would pass on as the token's; and it names each
 call's `Accept`, as the CSV endpoint answers a 406 to the wrong one.
+
+**Measured (T001):** today's report answers a malformed token 500 with the catch-all's
+body, after the species (an unknown species is still its 404), and one holding `%2F`
+the servlet container's HTML 400 (R5's table). T012 decides from this.
