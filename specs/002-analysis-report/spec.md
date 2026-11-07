@@ -444,6 +444,9 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
     always empty and left out (an obvious bug: it compares their display names with the
     mappings' resources);
   - an edit with no date left out of the edit history, where today's report fails;
+  - a malformed token answered 404, where today's answers its catch-all 500 (and one
+    holding `%2F` the servlet container's HTML 400): a client's bad input, not a server
+    error (decided 8 Nov 2026, research R8);
   - a 503, where today's answers 500, when a service it needs cannot answer before the
     PDF is begun (after that, the Background's build-dependent answers);
   - the order of what a pathway was inferred from (today's in no set order), in the

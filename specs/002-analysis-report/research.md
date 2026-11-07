@@ -96,6 +96,20 @@ dataset. It repeats every identifier for each pathway holding it, top-level path
 included, so a result with tens of thousands of identifiers may return 10⁵ entries or
 more (an inference).
 
+**Measured (T002, 7 Nov 2026),** on the website's development host's own analysis
+service, on loopback, one call at a time:
+
+| Result                                                   | Pathways (call 2) | Call 2 | Call 4 | Call 4's size | Entity entries | Distinct identifiers |
+| -------------------------------------------------------- | ----------------- | ------ | ------ | ------------- | -------------- | -------------------- |
+| Expression, 205 identifiers, two columns                 | 1,367             | 0.1 s  | 0.2 s  | 0.7 MB        | 5,738          | 200                  |
+| Expression, 2,600 identifiers (2,580 found), two columns | 2,144             | 0.5 s  | 1.4 s  | 6.1 MB        | 65,584         | 2,580                |
+
+So call 4 grows with the identifiers found times the pathways holding each, about 25
+entries an identifier here. By that rate (an inference, not measured), 25,000 found
+identifiers give about 650,000 entries, 60 MB and some 15 s: well inside SC-203's
+minutes, and a size the service's memory holds while a report is made. Call 4 is kept;
+no alternative is needed. Its answer is parsed once and dropped once the model is built.
+
 **Alternatives considered.**
 
 - One `GET /token/{token}/found/all/{pathway}` per pathway: 1 + 2N calls; rejected for
@@ -240,6 +254,29 @@ that asks again; a finished report is kept for an hour.
   longer be answered with its error (FR-203).
 - _A new address for the finished report:_ changes what people's scripts call; the same
   address answering 202 then 200 does not.
+
+**Today's report, measured (T002, 7 Nov 2026):** SC-203's baseline, on the website's
+development host's own analysis service, on loopback, one report at a time with a pause
+between; the host's other traffic was not stopped, so these are one sample each, not a
+distribution. The tokens are of made-up or public example identifiers: over-representation
+(T001's token: 7 gene symbols and 2 made-up identifiers), expression (205 identifiers,
+two columns), with interactors (33 identifiers), species comparison (human against
+mouse), and the large expression token above.
+
+| Token                         | 25 pathways              | 50 pathways               |
+| ----------------------------- | ------------------------ | ------------------------- |
+| Over-representation           | 31 s, 9.5 MB, 53 pages   | 52 s, 20.5 MB, 100 pages  |
+| Expression                    | 64 s, 20.8 MB, 80 pages  | 126 s, 38.8 MB, 135 pages |
+| With interactors              | 21 s, 10.3 MB, 58 pages  | 32 s, 15.4 MB, 99 pages   |
+| Species comparison            | 90 s, 26.5 MB, 210 pages | 187 s, 48.4 MB, 296 pages |
+| Expression, 2,600 identifiers | 35 s, 18.2 MB, 161 pages | 79 s, 34.3 MB, 256 pages  |
+
+- **SC-203's targets, from these:** a 25-pathway report within 2 minutes (every one of
+  today's here is faster), and a 50-pathway one within 4 minutes; today's species
+  comparison at 50 takes 3 minutes.
+- **Today's is over the edge's 100 s** for an expression or species-comparison report at
+  50 pathways (126 s and 187 s): through the website such a report already fails today,
+  which the background job (above) ends.
 
 **What it costs.** The service keeps a finished report in its memory for an hour (FR-211,
 amended): the analysis's results, under its token, as the analysis service itself keeps
@@ -389,4 +426,10 @@ call's `Accept`, as the CSV endpoint answers a 406 to the wrong one.
 
 **Measured (T001):** today's report answers a malformed token 500 with the catch-all's
 body, after the species (an unknown species is still its 404), and one holding `%2F`
-the servlet container's HTML 400 (R5's table). T012 decides from this.
+the servlet container's HTML 400 (R5's table).
+
+**Decided (8 Nov 2026):** the report takes spec 001's form check: a malformed token,
+`%2F` included, is 404 in the service's form, after the species and before any call. Today's
+500 for a client's bad input is an obvious bug, so this is a listed difference (spec
+Assumptions), not a match. A number or flag that is not one keeps today's framework 400
+exactly (R5), since callers may parse it.
