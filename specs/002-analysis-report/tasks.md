@@ -73,7 +73,7 @@ before anything is built, so no comparison is fitted to the new code.
     path), not the service's form; a malformed token its catch-all 500 (research R8).
     The failure while the PDF is made was not replayed: no private build exists yet.
 
-- [ ] T002 [P] Today's report's time and size (SC-203's baseline) and R1's call 4, measured
+- [x] T002 [P] Today's report's time and size (SC-203's baseline) and R1's call 4, measured
       on the same private services, one request at a time with pauses between, never
       in parallel with other load on the host.
   - Today's report for a sample of tokens: over-representation, expression (two columns),
@@ -85,6 +85,12 @@ before anything is built, so no comparison is fitted to the new code.
     of entries (research R1, "To measure").
   - Recorded in research R1 and R4. If call 4 is too large or too slow for SC-203 at
     that scale, research R1 records the alternative chosen before T007 builds on it.
+  - **Done (#193):** research R4 records today's report for five tokens at 25 and 50
+    pathways (21 s to 187 s; 9 to 48 MB), and R1 call 4 for two expression results (2,580
+    distinct identifiers: 65,584 entries, 6.1 MB, 1.4 s). Call 4 is kept. Today's
+    expression and species-comparison reports at 50 pathways take longer than the edge's
+    100 s. The reports are kept outside the repository for T019. Also recorded here: the
+    decisions for T012 (8 Nov 2026), in T012, research R8 and spec Assumptions.
 
 ---
 
@@ -264,9 +270,15 @@ status and file name as recorded or a listed difference (SC-202).
   - `GET /AnalysisService/report/{token}/{species}/{filename}.pdf`: the species first
     (404), then the token's check (404, 410, 503), then the rest; the parameters as T006
     reads them, the profiles accepted and ignored, the file name ignored.
-  - A malformed token (research R8's open point): decided here from T001's record and
-    recorded in research R8: spec 001's form check (404 before any call), or the analysis
-    service's catch-all passed on as 503.
+  - A malformed token (research R8's open point, decided 8 Nov 2026): spec 001's form
+    check, answered 404 in the service's form before any call, after the species, where
+    today's answers its catch-all 500 (an obvious bug: a client's bad input is not a
+    server error); a token holding `%2F` is malformed too, where today's gets the servlet
+    container's HTML 400. A listed difference (spec Assumptions).
+  - A number or flag that is not one: today's framework 400 exactly (research R5): its
+    body's fields in order, the `timestamp` and the `path` written as today's, its
+    headers (`Content-Disposition: inline;filename=f.txt`), before the species. Every
+    other case of T001's set as today's, but where an obvious bug is fixed and listed.
   - Errors in the analysis service's JSON form, `{"code","reason","messages"}`, with no
     path, host, name or submitted identifier in a message; the PDF as
     `application/pdf`, `Content-Disposition: attachment; filename="report.pdf"`,
