@@ -524,8 +524,11 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
 
 ## Phase 7: Polish
 
-- [ ] T022 [P] `README.md` and `CLAUDE.md`: the report, `pdf-export report`,
+- [x] T022 [P] `README.md` and `CLAUDE.md`: the report, `pdf-export report`,
       `compare-report`, the route and its settings.
+  - **Done (#PR):** the README's section on the analysis report (the address, its
+    background making and settings, `report`, `compare-report`); CLAUDE.md's outputs, the
+    report's reference, and what a user submitted kept out of the repository.
 - [ ] T023 [WA] Later, not blocking T021: the render service takes `resource` (FR-204);
       then the report passes its resource for the pathways' figures and the default for
       the overview, and the listed difference is removed here and in the register.
