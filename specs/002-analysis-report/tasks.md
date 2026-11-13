@@ -446,7 +446,7 @@ The comparisons run on the development host's own services only.
       folder on a `tmpfs`, the port still bound to loopback. May be paired with T021;
       a separate PR only if T019 needs the image before the route.
 
-- [ ] T019 [US1] The comparison by meaning (FR-208, SC-201), `src/compare/report.ts` and
+- [x] T019 [US1] The comparison by meaning (FR-208, SC-201), `src/compare/report.ts` and
       `pdf-export compare-report <today's.pdf> <new.pdf>`, after T011 and T017.
   - Reads both PDFs' text (spec 001's `src/compare/read.ts`) and compares FR-208's list:
     the cover's title, name, release and link; the properties; the pathways in order
@@ -476,6 +476,15 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     as spec 001's were (its T040).
   - **The run waits** on T017 (the figures' overlay), the private analysis service on the
     development host, and today's reports for T002's tokens, kept outside the repository.
+  - **Done (#208, #212, #213, #214):** research R9. T002's tokens were not kept, so one
+    fresh over-representation token, as T001's (R5), at 25 and 50 pathways. The reader
+    taught today's form (#212); every part read on both sides, and every part agreed but
+    three: the order within a day (a bug, fixed in #213), Modified rows for a pathway with
+    two `modified` edits, and three references (R9). The grouping by day holds: one row in
+    both on the two pathways with two edits of one kind on one day at different times.
+  - **Left open:** the Modified rows and the book and web-page references, for a decision
+    (R9); the expression, interactors and species-comparison tokens, and each figure's
+    overlay check (quickstart §3), not run here.
 
 - [ ] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.
