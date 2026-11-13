@@ -419,7 +419,7 @@ status and file name as recorded or a listed difference (SC-202).
       `node ci/licences.ts` passes on the installed tree and is seen failing on a planted
       GPL-family package (a scratch install, not committed). Recorded here. May be paired
       with T015.
-  - **Done (#PR):** `package.json` and `package-lock.json` last changed in spec 001 T029,
+  - **Done (#207):** `package.json` and `package-lock.json` last changed in spec 001 T029,
     before spec 002's first task: this spec added no dependency. On the installed tree,
     `node ci/licences.ts` passes (168 packages, 0 offending). With a package planted in a
     scratch `node_modules` (`planted-gpl`, `GPL-3.0-only`), it fails, exit 1:
