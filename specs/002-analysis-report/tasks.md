@@ -123,7 +123,7 @@ layout. Blocks every later phase.
     The fixture's new edits alone (the old code) left all 59 graph and model tests
     passing. An edit's row now refuses a kind outside the six (`deleted`).
 
-- [ ] T004 [P] The analysis stub, extended (research R8), `test/stubs/analysis.ts`: R1's
+- [x] T004 [P] The analysis stub, extended (research R8), `test/stubs/analysis.ts`: R1's
       five calls (contracts/analysis-api.md) for made-up tokens on the fixture graph's
       pathways, with made-up identifiers:
   - an over-representation result with two resources; an expression result with two
@@ -142,6 +142,16 @@ layout. Blocks every later phase.
     with a figure naming its species, and refuses a `resource` with 400 as the service
     does.
   - Tests: each answer as recorded, each refusal seen.
+  - **Done (#195):** `REPORT_TOKENS`: over-representation through UniProt and KEGG
+    COMPOUND, expression with two columns, interactors through UniProt and NCBI Protein, a
+    species comparison with mouse (nothing found for mouse), and KEGG COMPOUND alone
+    (importable-only finds no pathway, so call 4 has nothing to post), dated within the 7
+    days; spec 001's gone, unknown and malformed tokens beside them. The five calls as the
+    service's code answers them; call 4's 415 and empty-body 400 are the framework's, read
+    from the source, not measured. A resource the result lacks is the stub's 400 (the
+    service answers empty statistics). Each request is recorded with its method, content
+    type and body. The render stub answers the overview and refuses `resource`. 15 tests,
+    seen failing on 32 planted faults.
 
 - [ ] T005 [US1] The report's analysis client, `src/analysis/report.ts` (research R1,
       contracts/analysis-api.md), after T004.

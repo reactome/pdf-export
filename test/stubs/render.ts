@@ -9,19 +9,41 @@
 // silence the stub (every request held unanswered, `/health`'s too). Its `/health` answers as
 // the service's does, its `build` and `files` settable, also from a hook run as each figure
 // request is answered (T046), so a test can change the deployment between a figure's render
-// and the read after it.
+// and the read after it. It also answers the genome-wide overview (spec 002 T004,
+// contracts/render.md): `/render/genome-wide.svg?species={taxId}&token={token}`, a figure
+// naming its species, and, as the service does, a 400 for `species` with a pathway and for
+// a `resource`, which the service does not take.
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 const FIGURES = new URL('../../ci/fixture/figures/', import.meta.url);
 
-/** The parameters contracts/render.md names, and the values each may take. */
+/** The parameters contracts/render.md names for an event, and the values each may take. */
 const PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
   highlight: (value) => value.split(',').every((id) => /^R-[A-Z]{3}-\d+$/.test(id)),
   layout: (value) => value === 'reaction',
   token: (value) => value.length > 0,
 };
+/** The genome-wide overview's: whose overview, by taxId, as the service checks it, and the token. */
+const OVERVIEW_PARAMETERS: Readonly<Record<string, (value: string) => boolean>> = {
+  species: (value) => /^[1-9]\d*$/.test(value),
+  token: (value) => value.length > 0,
+};
+/** The render service's own species when a request names none. */
+const SITE_SPECIES = '9606';
+/** The overview's name in the path, and the key to refuse or label it by. */
+export const GENOME_WIDE = 'genome-wide';
+
+/** The genome-wide overview: a small drawing that names its species, by taxId. */
+function overview(species: string): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" data-species="${species}" width="400" height="300" viewBox="0 0 400 300">` +
+    `<rect id="overview-${species}" x="0" y="0" width="400" height="300" fill="#e8eef4"/>` +
+    `<text x="20" y="40" style="font: normal 600 12px Roboto">Genome-wide overview, species ${species}</text>` +
+    '</svg>'
+  );
+}
 
 /**
  * How to refuse: a status, no answer at all, an answer whose body stops part way, or an
@@ -42,7 +64,7 @@ export interface RenderStub {
   requests: string[];
   /** When each request came, by `Date.now()`, beside `requests`. */
   times: number[];
-  /** Refuse requests for a stable id, `times` times (every time without it). */
+  /** Refuse requests for a stable id, or `GENOME_WIDE`, `times` times (every time without it). */
   refuse(stId: string, how: Refusal, times?: number): void;
   /** Refuse requests for every figure, `times` times in all (every time without it). */
   refuseAll(how: Refusal, times?: number): void;
@@ -77,10 +99,14 @@ function figure(
   query: URLSearchParams,
   label: string | undefined
 ): string | undefined {
-  const name = query.get('layout') === 'reaction' ? `${stId}.reaction.svg` : `${stId}.svg`;
-  const file = new URL(name, FIGURES);
-  if (!existsSync(file)) return undefined;
-  let svg = readFileSync(file, 'utf8');
+  let svg: string;
+  if (stId === GENOME_WIDE) svg = overview(query.get('species') ?? SITE_SPECIES);
+  else {
+    const name = query.get('layout') === 'reaction' ? `${stId}.reaction.svg` : `${stId}.svg`;
+    const file = new URL(name, FIGURES);
+    if (!existsSync(file)) return undefined;
+    svg = readFileSync(file, 'utf8');
+  }
   const highlight = query.get('highlight');
   const token = query.get('token');
   const marks = [
@@ -124,7 +150,7 @@ export async function startRenderStub(): Promise<RenderStub> {
         .end(JSON.stringify(health));
       return;
     }
-    const match = /^\/render\/(R-[A-Z]{3}-\d+)\.([a-z]+)$/.exec(url.pathname);
+    const match = /^\/render\/(R-[A-Z]{3}-\d+|genome-wide)\.([a-z]+)$/.exec(url.pathname);
     if (!match?.[1]) {
       error(404, 'Not a render request');
       return;
@@ -141,7 +167,7 @@ export async function startRenderStub(): Promise<RenderStub> {
         return;
       }
       seen.add(name);
-      const valid = PARAMETERS[name];
+      const valid = (stId === GENOME_WIDE ? OVERVIEW_PARAMETERS : PARAMETERS)[name];
       if (!valid?.(value)) {
         error(400, `Unknown parameter, or a bad value: ${name}`);
         return;

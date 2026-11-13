@@ -239,8 +239,20 @@ describe('the analysis stub', () => {
     await get(`/token/${TOKENS.stored}?${SUMMARY}`);
     await bare(`/token/${TOKENS.stored}`);
     assert.deepEqual(stub.requests, [
-      { path: `/AnalysisService/token/${TOKENS.stored}?${SUMMARY}`, accept: 'application/json' },
-      { path: `/AnalysisService/token/${TOKENS.stored}`, accept: undefined },
+      {
+        method: 'GET',
+        path: `/AnalysisService/token/${TOKENS.stored}?${SUMMARY}`,
+        accept: 'application/json',
+        contentType: undefined,
+        body: '',
+      },
+      {
+        method: 'GET',
+        path: `/AnalysisService/token/${TOKENS.stored}`,
+        accept: undefined,
+        contentType: undefined,
+        body: '',
+      },
     ]);
     stub.reset();
     assert.deepEqual(stub.requests, []);
