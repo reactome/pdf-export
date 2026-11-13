@@ -11,9 +11,12 @@ pdf-export is to write Reactome's pathway PDFs from the Neo4j graph, in place of
 
 - **the release's book,** `TheReactomeBook`, a folder of pathway PDFs made during
   the release;
-- **the website's PDF of one pathway or reaction,** made on request.
+- **the website's PDF of one pathway or reaction,** made on request;
+- **the analysis report** (spec 002), in place of `reactome/analysis-report`: today's
+  address, `/AnalysisService/report/…`, made in the background by `serve`, and once by
+  `pdf-export report`; `pdf-export compare-report` compares it with today's.
 
-Both from one implementation, under loose licences only, with diagrams in the
+All from one implementation, under loose licences only, with diagrams in the
 website's pathway browser's look. How is spec 001's to decide.
 
 ## Specs first: use Spec Kit
@@ -80,6 +83,9 @@ The compiler is as strict as WebsiteAngular's (`tsconfig.json`): `strict`,
   book, from the release's download directory: fetched one file at a time, only
   when a comparison needs it, and kept out of the repository, since it holds
   people's names. No other Reactome production service is used.
+- **The analysis report's reference** is today's report from a private copy of the
+  analysis service, for tokens of made-up identifiers, kept outside the repository; the
+  tests use the analysis and render stubs (`test/stubs/`), never a real service.
 - **Compare by meaning**, not bytes: a PDF's text and structure, not its bytes,
   which carry dates and ids.
 - **Run against a private copy of the release's graph**, not a shared database.
@@ -92,7 +98,10 @@ descriptions:
 - no host names or server paths;
 - no credentials;
 - no internal release-process detail;
-- no people's names from exported data.
+- no people's names from exported data;
+- nothing a user submitted to an analysis: its identifiers, its sample's or file's name,
+  or its token. The report's log line holds a hash of the token keyed for the service's
+  run, and its working pages live in `--work`, emptied as the service starts (FR-211).
 
 ## Before pushing
 
