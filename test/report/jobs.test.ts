@@ -305,6 +305,7 @@ describe('the report in the background, at its address', { skip }, () => {
       render: render.url,
       analysis: analysis.url,
       site: 'https://site.invalid',
+      work: null,
       concurrency: 2,
     };
     service = await startService(settings, {
@@ -392,6 +393,7 @@ describe('the report in the background, at its address', { skip }, () => {
         render: render.url,
         analysis: analysis.url,
         site: 'https://site.invalid',
+        work: null,
         concurrency: 2,
       },
       {

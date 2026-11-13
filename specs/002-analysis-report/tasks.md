@@ -399,7 +399,7 @@ status and file name as recorded or a listed difference (SC-202).
 
 ## Phase 5: User Stories 4 and 3 — what users submitted stays theirs; licences (P2, P1)
 
-- [ ] T015 [US4] The log line and the working page (FR-211, research R7), `src/serve.ts`,
+- [x] T015 [US4] The log line and the working page (FR-211, research R7), `src/serve.ts`,
       `src/print/temporary.ts`, after T013.
   - One log line per report made, not per request: a hash of the token, the species,
     the number, the time per stage, the size, the code points FR-207 replaced; no
@@ -409,6 +409,11 @@ status and file name as recorded or a listed difference (SC-202).
   - Tests, each seen failing: after reports for the stub's tokens, the log and the folder
     hold none of the stub's identifiers; a folder left with a file (a killed print) is
     emptied at start.
+  - **Done (#206):** `makeChecked` logs the one line, the token as a hash keyed for the
+    process (a plain hash of a date and a counter can be guessed back), the code points
+    FR-207 replaced gathered into it; `serve --work` (or `PDF_EXPORT_WORK`) is the
+    printer's folder, made private (0700) and emptied at start. Seen failing on 10 planted
+    faults.
 
 - [ ] T016 [US3] The licences (FR-212, SC-206): no dependency added by this spec;
       `node ci/licences.ts` passes on the installed tree and is seen failing on a planted
@@ -484,6 +489,10 @@ The comparisons run on the development host's own services only.
     `clientOf`, overwriting what a client sent; answers 503 in the analysis service's
     JSON form when pdf-export cannot be reached. The analysis service still answers
     everything else.
+  - nginx sets `X-Reactome-Client` itself, from the client's address, overwriting any
+    value a request sent: pdf-export's share of the waiting per client (T014) trusts the
+    header, so one a client could choose would dodge it (reviewed 13 Nov 2026). The test
+    shows a request that sends its own `X-Reactome-Client` still counted by its address.
   - pdf-export's errors byte-identical to the analysis service's for the same request
     (status, `Content-Type`, body; its JSON carries no `url`), compared on the
     development host for T001's error cases.

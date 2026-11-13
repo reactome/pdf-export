@@ -41,6 +41,7 @@ import { buildSingle } from './model/build.ts';
 import type { Document, Figure, Section } from './model/types.ts';
 import { readSummary, SUMMARY, type Summary } from './preflight/files.ts';
 import { Printer } from './print/print.ts';
+import { emptiedWorkFolder } from './print/temporary.ts';
 import { Slots } from './report/figures.ts';
 import { reportParameters } from './report/model.ts';
 import { Jobs } from './report/jobs.ts';
@@ -82,6 +83,11 @@ export interface ServeSettings {
   site: string;
   /** PDFs made at once; a request beyond them is answered 503 at once. */
   concurrency: number;
+  /**
+   * The printer's working folder (spec 002 T015): private to the service, on memory-backed
+   * storage in the image, emptied as the service starts; null for one in TMPDIR.
+   */
+  work: string | null;
 }
 
 /** What the service waits for, and how long: the defaults suit the website. */
@@ -176,6 +182,7 @@ export function serveSettings(
     '--analysis',
     '--site',
     '--concurrency',
+    '--work',
   ];
   const flags = new Map<string, string>();
   for (let i = 0; i < args.length; i++) {
@@ -218,6 +225,7 @@ export function serveSettings(
     graph,
     files: required('--files'),
     figures: setting('--figures') ?? null,
+    work: setting('--work', 'PDF_EXPORT_WORK') ?? null,
     render: required('--render', 'RENDER_SERVICE'),
     analysis: required('--analysis', 'ANALYSIS_SERVICE'),
     site: required('--site', 'REACTOME_SITE'),
@@ -316,7 +324,11 @@ export async function startService(
       connectionTimeoutMs: CONNECTION_TIMEOUT_MS,
     });
   const ownGraph = options.graph === undefined;
-  const startPrinter = options.startPrinter ?? (() => Printer.start());
+  // the working folder emptied before any print: a page a killed print left holds what was submitted
+  const work = settings.work;
+  if (work !== null) emptiedWorkFolder(work);
+  const startPrinter =
+    options.startPrinter ?? (() => (work === null ? Printer.start() : Printer.start(work)));
   const styles = pageStyles();
   // the render service's slots, shared by every report being made (spec 002 T010)
   const reportSlots = new Slots(FIGURES_AT_ONCE);

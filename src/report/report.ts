@@ -5,6 +5,8 @@
 // report, or on a part's pages that part; every page but the cover is numbered. Every
 // internal link is checked: its anchor on the page before the print, and its landing on a
 // page of the PDF after.
+import { createHmac, randomBytes } from 'node:crypto';
+
 import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { AnalysisError, type AnalysisFailure } from '../analysis/error.ts';
@@ -157,6 +159,14 @@ export async function makeChecked(
   const going = (): void => {
     signal?.throwIfAborted();
   };
+  // each stage's time, for the report's one log line (FR-211, research R7)
+  const stages: [string, number][] = [];
+  let mark = performance.now();
+  const stage = (stageName: string): void => {
+    const now = performance.now();
+    stages.push([stageName, Math.round(now - mark)]);
+    mark = now;
+  };
   const analysis = await analysing(() =>
     readReportAnalysis(
       services.analysis,
@@ -175,13 +185,19 @@ export async function makeChecked(
   const comparedWith =
     compared === undefined ? null : await reading(() => speciesByDbId(graph, compared));
   const model = buildReport(analysis, species, request.number, comparedWith);
+  stage('analysis');
   const [release, details] = await Promise.all([
     reading(() => readRelease(graph)),
     reading(() => readDetails(graph, model.pathways, services.illustrated)),
   ]);
   going();
-  // the token names whose results these are: the log says only that the report had one
-  const characters = new CharacterLog(`report ${species.taxId} with-token`, log);
+  stage('graph');
+  // the code points no font draws, gathered for the report's one line: each line the log
+  // would write names one, and nothing else of the text
+  const replaced: string[] = [];
+  const characters = new CharacterLog('report', (line) => {
+    replaced.push(line.split(' ')[1] ?? '');
+  });
   const figures = await drawReportFigures(
     { species: species.taxId, token: model.token, figures: pathwayFigures(details.values()) },
     {
@@ -195,6 +211,7 @@ export async function makeChecked(
     }
   );
   going();
+  stage('figures');
   const printed = onRequestReport(model, details, characters);
   const html = reportPage(printed.model, printed.details, {
     site: services.site,
@@ -211,6 +228,7 @@ export async function makeChecked(
       `${String(missing.length)} of the report's links have no target`
     );
   }
+  stage('layout');
   let pdf: Uint8Array;
   try {
     pdf = await services.printer.single(html, signal);
@@ -222,6 +240,20 @@ export async function makeChecked(
   if (broken > 0) {
     throw new ReportError('failed', `${String(broken)} of the report's links land nowhere`);
   }
+  stage('print');
+  // one line a report made, never a request's: no submitted identifier, nothing about the
+  // client, and the token only as a keyed hash, which cannot be guessed back from the log
+  log(
+    [
+      `report ${tokenHash(check.token)}`,
+      `species=${species.taxId}`,
+      `number=${String(request.number)}`,
+      `pathways=${String(model.pathways.length)}`,
+      ...stages.map(([stageName, ms]) => `${stageName}=${String(ms)}ms`),
+      `size=${String(pdf.byteLength)}`,
+      `replaced=${replaced.length > 0 ? replaced.join(',') : 'none'}`,
+    ].join(' ')
+  );
   return { pdf, model };
 }
 
@@ -367,6 +399,14 @@ async function analysing<T>(read: () => Promise<T>): Promise<T> {
     if (error instanceof AnalysisError) throw new ReportError(error.reason, error.message);
     throw error;
   }
+}
+
+/** This process's key for the tokens' hashes: a token is a date and a counter, which a plain hash would give back. */
+const TOKEN_KEY = randomBytes(32);
+
+/** A token as the log names it: a keyed hash, the same for one token while the process runs. */
+export function tokenHash(token: string): string {
+  return createHmac('sha256', TOKEN_KEY).update(token).digest('hex').slice(0, 16);
 }
 
 function name(error: unknown): string {

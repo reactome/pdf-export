@@ -26,12 +26,16 @@ export class Printer {
     this.#onExit = onExit;
   }
 
-  static async start(): Promise<Printer> {
-    const folder = mkdtempSync(join(tmpdir(), 'pdf-export-'));
-    // its folder removed as the process exits if it is not closed first (a run stopped by a
-    // signal), from before the browser is launched
+  /**
+   * A printer, its pages written to `work` when given (a folder the caller keeps private and
+   * empties: the service's, spec 002 T015), else to a folder of its own in TMPDIR.
+   */
+  static async start(work?: string): Promise<Printer> {
+    const folder = work ?? mkdtempSync(join(tmpdir(), 'pdf-export-'));
+    // its own folder removed as the process exits if it is not closed first (a run stopped
+    // by a signal), from before the browser is launched; a given one is the caller's
     const onExit = (): void => {
-      rmSync(folder, { recursive: true, force: true });
+      if (work === undefined) rmSync(folder, { recursive: true, force: true });
     };
     process.once('exit', onExit);
     try {
@@ -130,7 +134,7 @@ export class Printer {
     try {
       await this.#browser.close();
     } finally {
-      rmSync(this.#folder, { recursive: true, force: true });
+      this.#onExit();
       process.off('exit', this.#onExit);
     }
   }
