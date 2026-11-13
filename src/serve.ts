@@ -43,13 +43,15 @@ import { readSummary, SUMMARY, type Summary } from './preflight/files.ts';
 import { Printer } from './print/print.ts';
 import { Slots } from './report/figures.ts';
 import { reportParameters } from './report/model.ts';
-import { ReportError, makeReport, type ReportServices } from './report/report.ts';
+import { Jobs } from './report/jobs.ts';
+import { ReportError, checkReport, makeChecked, type ReportServices } from './report/report.ts';
 import {
   FAILURE_STATUS,
   frameworkBadRequest,
   reportAddress,
   reportPdf,
   serviceError,
+  wantsPage,
   type ReportAddress,
 } from './report/route.ts';
 import { causeCode, errorCode, isRecord } from './unknown.ts';
@@ -112,6 +114,14 @@ export interface ServeLimits {
    * again, the folder's checks run in full when either has changed.
    */
   folderPollMs: number;
+  /** How long a report request waits for its report before it is answered 202 (FR-210). */
+  reportWaitMs: number;
+  /** A report's time from when it starts being made (FR-210). */
+  reportBudgetMs: number;
+  /** How long a finished report is kept, or a failed one nobody has asked about. */
+  reportKeepMs: number;
+  /** Reports made at once. */
+  reportsMaking: number;
 }
 
 export const LIMITS: ServeLimits = {
@@ -124,6 +134,10 @@ export const LIMITS: ServeLimits = {
   graceMs: 5_000,
   provenAfterMs: 30_000,
   folderPollMs: 60_000,
+  reportWaitMs: 30_000,
+  reportBudgetMs: 5 * 60_000,
+  reportKeepMs: 60 * 60_000,
+  reportsMaking: 2,
 };
 
 /** Figures asked of the render service at once: its own default concurrency. */
@@ -295,6 +309,13 @@ export async function startService(
   const styles = pageStyles();
   // the render service's slots, shared by every report being made (spec 002 T010)
   const reportSlots = new Slots(FIGURES_AT_ONCE);
+  // the reports in the background, made or kept for every request that asks for one
+  const reportJobs = new Jobs<Uint8Array>({
+    making: limits.reportsMaking,
+    budgetMs: limits.reportBudgetMs,
+    keepMs: limits.reportKeepMs,
+    budgetError: () => new Refusal('unavailable', 'the report passed its time budget'),
+  });
   let active = 0;
   /** Requests whose graph reads were still unsettled past their deadline and grace. */
   let stuck = 0;
@@ -621,49 +642,14 @@ export async function startService(
     return { deadline: ending.signal, endsAt };
   }
 
-  /**
-   * The analysis report (spec 002 T012): its parameters, today's framework 400 for one that
-   * is not one; the species; the limit and a browser; then `makeReport`, whose species
-   * comes before its token. Made in this one request, within its deadline (T013 puts it in
-   * the background).
-   */
-  async function answerReport(
-    req: IncomingMessage,
-    res: ServerResponse,
-    path: string,
-    address: ReportAddress
-  ): Promise<void> {
-    const now = new Date();
-    const parameters = reportParameters(new URL(req.url ?? '/', 'http://service').searchParams);
-    if ('invalid' in parameters) {
-      frameworkBadRequest(res, path, now);
-      return;
-    }
-    if (address.species === null) {
-      serviceError(res, 404);
-      return;
-    }
-    const { deadline, endsAt } = requestEnd(res);
-    // the subject of its log lines: never the token, nor anything submitted
-    const subject = 'report';
-    if (active >= settings.concurrency) {
-      log(`unavailable ${subject}: ${String(active)} PDFs already being made`);
-      serviceError(res, 503);
-      return;
-    }
-    if (!printer?.connected) {
-      log(`unavailable ${subject}: no browser is up`);
-      if (!closing()) void launch().catch(() => undefined);
-      serviceError(res, 503);
-      return;
-    }
-    const { reads, release } = takeSlot(subject, endsAt);
-    const services: ReportServices = {
-      graph: graphFor(deadline, endsAt, reads),
+  /** The services a report is made with, its graph read within `signal`'s end. */
+  function reportServices(signal: AbortSignal, endsAt: number): ReportServices {
+    return {
+      graph: graphFor(signal, endsAt, new Set()),
       printer: {
-        single: async (html, signal) => {
-          const printing = await within(currentPrinter(), deadline);
-          const pdf = await printing.single(html, signal);
+        single: async (html, printSignal) => {
+          const printing = await within(currentPrinter(), signal);
+          const pdf = await printing.single(html, printSignal);
           if (printing === printer) prove();
           return pdf;
         },
@@ -679,36 +665,98 @@ export async function startService(
       figureTimeoutMs: limits.figureTimeoutMs,
       retryPauseMs: limits.retryPauseMs,
     };
-    const work = makeReport(
-      { token: address.token, species: address.species, ...parameters },
-      services,
-      deadline
-    );
-    void work.catch(() => undefined).finally(release);
-    try {
-      const { pdf } = await within(work, deadline);
-      reportPdf(res, pdf);
-    } catch (error) {
-      if (error instanceof ClientGone) {
-        log(`client-gone ${subject}`);
-        return;
-      }
-      if (error instanceof ReportError) {
-        if (error.reason === 'unavailable' || error.reason === 'failed') {
-          log(`${error.reason} ${subject}: ${error.message}`);
-        }
-        serviceError(res, FAILURE_STATUS[error.reason]);
-        return;
-      }
-      if (error instanceof Refusal) {
-        log(`unavailable ${subject}: ${error.message}`);
-        serviceError(res, 503);
-        return;
-      }
-      // a fault of the report's own making: its kind alone, as a message may quote the data
-      log(`failed ${subject}: ${error instanceof Error ? error.name : 'error'}`);
-      serviceError(res, 500);
+  }
+
+  /** A report's failure answered: its status, and a log line that names no token. */
+  function answerFailure(res: ServerResponse, error: unknown, asPage: boolean): void {
+    const subject = 'report';
+    if (error instanceof ClientGone) {
+      log(`client-gone ${subject}`);
+      return;
     }
+    if (error instanceof ReportError) {
+      if (error.reason === 'unavailable' || error.reason === 'failed') {
+        log(`${error.reason} ${subject}: ${error.message}`);
+      }
+      serviceError(res, FAILURE_STATUS[error.reason], asPage);
+      return;
+    }
+    if (error instanceof Refusal) {
+      log(`unavailable ${subject}: ${error.message}`);
+      serviceError(res, 503, asPage);
+      return;
+    }
+    // a fault of the report's own making: its kind alone, as a message may quote the data
+    log(`failed ${subject}: ${error instanceof Error ? error.name : 'error'}`);
+    serviceError(res, 500, asPage);
+  }
+
+  /**
+   * The analysis report (spec 002 T012, T013): its parameters, today's framework 400 for
+   * one that is not one; a browser up; the species and the token's check, on every request;
+   * then the report its key names, started or joined (src/report/jobs.ts), waited for up to
+   * `reportWaitMs`: the PDF once it is ready, 202 while it is being made, or the error
+   * that ended it. A request abandoned ends its own wait, never the report.
+   */
+  async function answerReport(
+    req: IncomingMessage,
+    res: ServerResponse,
+    path: string,
+    address: ReportAddress
+  ): Promise<void> {
+    const now = new Date();
+    const asPage = wantsPage(req.headers.accept);
+    const parameters = reportParameters(new URL(req.url ?? '/', 'http://service').searchParams);
+    if ('invalid' in parameters) {
+      frameworkBadRequest(res, path, now);
+      return;
+    }
+    if (address.species === null) {
+      serviceError(res, 404);
+      return;
+    }
+    if (!printer?.connected) {
+      log('unavailable report: no browser is up');
+      if (!closing()) void launch().catch(() => undefined);
+      serviceError(res, 503, asPage);
+      return;
+    }
+    const { deadline, endsAt } = requestEnd(res);
+    let job;
+    try {
+      const checked = await within(
+        checkReport(
+          { token: address.token, species: address.species, ...parameters },
+          reportServices(deadline, endsAt),
+          deadline
+        ),
+        deadline
+      );
+      job = reportJobs.join(checked.key, (budget) =>
+        makeChecked(
+          checked,
+          reportServices(budget, Date.now() + limits.reportBudgetMs),
+          budget
+        ).then((made) => made.pdf)
+      );
+    } catch (error) {
+      answerFailure(res, error, asPage);
+      return;
+    }
+    await reportJobs.wait(job, limits.reportWaitMs, deadline);
+    if (deadline.aborted) {
+      answerFailure(res, deadline.reason, asPage);
+      return;
+    }
+    if (job.state === 'ready' && job.result) {
+      reportPdf(res, job.result);
+      return;
+    }
+    if (job.state === 'failed') {
+      answerFailure(res, job.error, asPage);
+      return;
+    }
+    serviceError(res, 202, asPage);
   }
 
   async function answerPdf(
@@ -905,6 +953,7 @@ export async function startService(
     url: `http://${host}:${String(port)}`,
     async close() {
       state.closing = true;
+      reportJobs.clear();
       if (polls) clearInterval(polls);
       folder?.stop();
       server.closeAllConnections();

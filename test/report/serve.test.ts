@@ -193,10 +193,15 @@ describe("the report's address", { skip }, () => {
       reason: string;
       messages: string[];
     };
-    assert.deepEqual([json.code, json.reason], [503, 'Service Unavailable']);
+    assert.deepEqual(json, {
+      code: 503,
+      reason: 'Service Unavailable',
+      messages: ['The report service is busy; try again in 10 seconds'],
+    });
     analysis.reset();
     printing.fails = true;
-    const failed = await get(address(OR, '9606', '?number=1'));
+    // a key no earlier test asked for: a report made before is kept, and answered whole
+    const failed = await get(address(OR, '9606', '?number=4'));
     assert.equal(failed.status, 500);
     assert.equal(await failed.text(), body(500, 'Internal Server Error'));
   });

@@ -8,9 +8,19 @@
 import { getDocument, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { AnalysisError, type AnalysisFailure } from '../analysis/error.ts';
-import { checkToken, readReportAnalysis } from '../analysis/report.ts';
+import {
+  checkToken,
+  readReportAnalysis,
+  reportResource,
+  type TokenCheck,
+} from '../analysis/report.ts';
 import type { Graph } from '../graph/connection.ts';
-import { release as readRelease, speciesByDbId, speciesByIdentifier } from '../graph/queries.ts';
+import {
+  release as readRelease,
+  speciesByDbId,
+  speciesByIdentifier,
+  type SpeciesRef,
+} from '../graph/queries.ts';
 import { CharacterLog } from '../layout/characters.ts';
 import { htmlPage, marginBoxes, pageStyles, type Styles } from '../layout/document.ts';
 import { Links } from '../layout/html.ts';
@@ -93,28 +103,68 @@ export async function makeReport(
   services: ReportServices,
   signal?: AbortSignal
 ): Promise<MadeReport> {
+  return makeChecked(await checkReport(request, services, signal), services, signal);
+}
+
+/**
+ * A request, checked as every request is (contracts/service.md): the species from the
+ * graph, then the token's form and its check (call 1). The key names the report it asks
+ * for: the token, the species' database id, the number, the resource as decided from the
+ * check, and importable-only where it acts (with `TOTAL`).
+ */
+export interface CheckedRequest {
+  request: ReportRequest;
+  species: SpeciesRef;
+  check: TokenCheck;
+  key: string;
+}
+
+export async function checkReport(
+  request: ReportRequest,
+  services: Pick<ReportServices, 'graph' | 'analysis'>,
+  signal?: AbortSignal
+): Promise<CheckedRequest> {
+  const species = await reading(() => speciesByIdentifier(services.graph, request.species));
+  if (species === null) throw new ReportError('no-species', 'The graph holds no such species');
+  signal?.throwIfAborted();
+  const check = await analysing(() =>
+    checkToken(services.analysis, request.token, signal ? { signal } : {})
+  );
+  const resource = reportResource(request.resource, check.resources);
+  const importableOnly = resource === 'TOTAL' && request.importableOnly;
+  const key = [
+    check.token,
+    String(species.dbId),
+    String(request.number),
+    resource,
+    String(importableOnly),
+  ].join(' ');
+  return { request, species, check, key };
+}
+
+/** The report a checked request asks for: calls 2 to 5, and the rest. */
+export async function makeChecked(
+  { request, species, check }: CheckedRequest,
+  services: ReportServices,
+  signal?: AbortSignal
+): Promise<MadeReport> {
   const { graph, log } = services;
   const going = (): void => {
     signal?.throwIfAborted();
   };
-  const species = await reading(() => speciesByIdentifier(graph, request.species));
-  if (species === null) throw new ReportError('no-species', 'The graph holds no such species');
-  going();
-  const analysis = await analysing(async () => {
-    const options = {
-      ...(services.analysisTimeoutMs === undefined
-        ? {}
-        : { timeoutMs: services.analysisTimeoutMs }),
-      ...(signal === undefined ? {} : { signal }),
-    };
-    const check = await checkToken(services.analysis, request.token, signal ? { signal } : {});
-    return readReportAnalysis(
+  const analysis = await analysing(() =>
+    readReportAnalysis(
       services.analysis,
       check,
       { resource: request.resource, importableOnly: request.importableOnly },
-      options
-    );
-  });
+      {
+        ...(services.analysisTimeoutMs === undefined
+          ? {}
+          : { timeoutMs: services.analysisTimeoutMs }),
+        ...(signal === undefined ? {} : { signal }),
+      }
+    )
+  );
   going();
   const compared = analysis.result.summary.species;
   const comparedWith =
