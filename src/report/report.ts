@@ -115,6 +115,8 @@ export async function makeReport(
 export interface CheckedRequest {
   request: ReportRequest;
   species: SpeciesRef;
+  /** The graph's release, read with the species: a change drops every kept report. */
+  release: number;
   check: TokenCheck;
   key: string;
 }
@@ -124,7 +126,10 @@ export async function checkReport(
   services: Pick<ReportServices, 'graph' | 'analysis'>,
   signal?: AbortSignal
 ): Promise<CheckedRequest> {
-  const species = await reading(() => speciesByIdentifier(services.graph, request.species));
+  const [species, release] = await Promise.all([
+    reading(() => speciesByIdentifier(services.graph, request.species)),
+    reading(() => readRelease(services.graph)),
+  ]);
   if (species === null) throw new ReportError('no-species', 'The graph holds no such species');
   signal?.throwIfAborted();
   const check = await analysing(() =>
@@ -139,7 +144,7 @@ export async function checkReport(
     resource,
     String(importableOnly),
   ].join(' ');
-  return { request, species, check, key };
+  return { request, species, release, check, key };
 }
 
 /** The report a checked request asks for: calls 2 to 5, and the rest. */

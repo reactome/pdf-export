@@ -734,6 +734,8 @@ describe('the service', { skip: skipWithoutGraph }, () => {
       printer: true,
       making: 0,
       stuck: 0,
+      // the analysis reports (spec 002 T014): being made, waiting and kept
+      reports: { making: 0, waiting: 0, kept: 0 },
       figures: { state: 'none' },
     });
     analysis.refuse();

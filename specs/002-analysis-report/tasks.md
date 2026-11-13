@@ -375,7 +375,7 @@ status and file name as recorded or a listed difference (SC-202).
     `reportBudgetMs`, `reportKeepMs` and `reportsMaking`. Seen failing on 15 planted
     faults.
 
-- [ ] T014 [US2] Limits and keeping, `src/report/jobs.ts` (FR-210, FR-211), after T013.
+- [x] T014 [US2] Limits and keeping, `src/report/jobs.ts` (FR-210, FR-211), after T013.
   - Two made at once and eight waiting by default (each a setting), 503 with
     `Retry-After` beyond; a joining request never counted; at most two of the waiting
     from one client, named by `X-Reactome-Client`, a request without it counted as
@@ -388,6 +388,12 @@ status and file name as recorded or a listed difference (SC-202).
     while another's is taken; a kept report dropped after the hour (a clock the test
     moves) and on the stub's 410; the total cap dropping the oldest; a release change
     dropping all.
+  - **Done (#205):** `Jobs` refuses a new report past the waiting places (`full`) or the
+    client's share (`share`), answered 503; a report past its budget is answered at once
+    but holds its place among those being made until its work stops (reviewed 13 Nov
+    2026: the limit bounds the memory of prints); kept reports expire by the service's
+    clock, within `reportKeepBytes`; `checkReport` reads the release with the species;
+    `/health` gives `reports`. Seen failing on 15 planted faults.
 
 ---
 

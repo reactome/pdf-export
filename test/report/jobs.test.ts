@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, describe, test } from 'node:test';
 
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
-import { Jobs, type JobSettings } from '../../src/report/jobs.ts';
+import { Jobs, type Job, type JobSettings } from '../../src/report/jobs.ts';
 import { startService, type ServeSettings, type Service } from '../../src/serve.ts';
 import { REPORT_TOKENS, startAnalysisStub, type AnalysisStub } from '../stubs/analysis.ts';
 import { startRenderStub, type RenderStub } from '../stubs/render.ts';
@@ -45,19 +45,35 @@ function controlled(): Controlled {
   return state;
 }
 
-const SETTINGS: JobSettings = {
+const SETTINGS: JobSettings<string> = {
   making: 2,
+  waiting: 8,
+  perClient: 2,
   budgetMs: 10_000,
   keepMs: 10_000,
+  keepBytes: 1_000,
+  size: (result) => result.length,
   budgetError: () => new Error('budget'),
 };
+
+/** A job taken, never refused. */
+function take<T>(
+  jobs: Jobs<T>,
+  key: string,
+  make: (signal: AbortSignal) => Promise<T>,
+  client = 'c'
+): Job<T> {
+  const job = jobs.join(key, client, make);
+  if (job === 'full' || job === 'share') throw new Error(`refused: ${job}`);
+  return job;
+}
 
 describe('the jobs', () => {
   test('a second request for one key joins the report; another key starts its own', async () => {
     const jobs = new Jobs<string>(SETTINGS);
     const a = controlled();
-    const first = jobs.join('k', a.make);
-    const second = jobs.join('k', a.make);
+    const first = take(jobs, 'k', a.make);
+    const second = take(jobs, 'k', a.make);
     assert.equal(a.started, 1);
     assert.equal(await jobs.wait(first, 20), 'waiting');
     a.end('pdf');
@@ -65,12 +81,12 @@ describe('the jobs', () => {
     assert.equal(second.state, 'ready');
     assert.equal(second.result, 'pdf');
     // kept: a later request is answered at once, nothing made again
-    const later = jobs.join('k', a.make);
+    const later = take(jobs, 'k', a.make);
     assert.equal(await jobs.wait(later, 0), 'done');
     assert.equal(later.result, 'pdf');
     assert.equal(a.started, 1);
     const b = controlled();
-    jobs.join('other', b.make);
+    take(jobs, 'other', b.make);
     assert.equal(b.started, 1);
     jobs.clear();
   });
@@ -78,15 +94,15 @@ describe('the jobs', () => {
   test('an error goes to every request waiting and to the next, then a fresh start', async () => {
     const jobs = new Jobs<string>(SETTINGS);
     const a = controlled();
-    const waiting = [jobs.join('k', a.make), jobs.join('k', a.make)];
+    const waiting = [take(jobs, 'k', a.make), take(jobs, 'k', a.make)];
     const waits = waiting.map((job) => jobs.wait(job, 1_000));
     a.fail(new Error('the print failed'));
     assert.deepEqual(await Promise.all(waits), ['done', 'done']);
     assert.ok(waiting.every((job) => job.state === 'failed'));
-    const next = jobs.join('k', a.make);
+    const next = take(jobs, 'k', a.make);
     assert.equal(next.state, 'failed', 'the next request is given the error');
     assert.equal(a.started, 1);
-    const fresh = jobs.join('k', a.make);
+    const fresh = take(jobs, 'k', a.make);
     assert.equal(fresh.state, 'making', 'then it is forgotten, and started again');
     assert.equal(a.started, 2);
     jobs.clear();
@@ -96,27 +112,51 @@ describe('the jobs', () => {
     const jobs = new Jobs<string>({ ...SETTINGS, making: 1, budgetMs: 80 });
     const a = controlled();
     const b = controlled();
-    const first = jobs.join('a', a.make);
-    const queued = jobs.join('b', b.make);
+    const first = take(jobs, 'a', a.make);
+    const queued = take(jobs, 'b', b.make);
     assert.equal(queued.state, 'queued');
     await jobs.wait(first, 1_000);
     assert.equal(first.state, 'failed');
     assert.equal((first.error as Error).message, 'budget');
     assert.equal(a.signal?.aborted, true, "the report's work told to stop");
-    // the queued one's budget began only when it started: 40 ms into it, it is still being made
+    // its work stops: then the queued one starts, its own budget from then
+    a.fail(new Error('stopped'));
+    await pause(0);
     assert.equal(queued.state, 'making');
     await pause(40);
-    assert.equal(queued.state, 'making');
+    assert.equal(queued.state, 'making', '40 ms into its budget, it is still being made');
     b.end('pdf');
     await jobs.wait(queued, 1_000);
     assert.equal(queued.state, 'ready');
     jobs.clear();
   });
 
+  test('a report past its budget keeps its place until its work stops: the next waits', async () => {
+    const jobs = new Jobs<string>({ ...SETTINGS, making: 2, budgetMs: 50 });
+    const late = controlled();
+    const other = controlled();
+    const third = controlled();
+    const timedOut = take(jobs, 'late', late.make);
+    take(jobs, 'other', other.make);
+    const queued = take(jobs, 'third', third.make);
+    await jobs.wait(timedOut, 1_000);
+    assert.equal(timedOut.state, 'failed', 'answered at once');
+    await pause(20);
+    assert.equal(queued.state, 'queued', 'the timed-out work still holds its place');
+    assert.equal(third.started, 0);
+    assert.equal(jobs.counts.making, 2);
+    // its print, say, ends: only then does the third start
+    late.fail(new Error('stopped'));
+    await pause(0);
+    assert.equal(queued.state, 'making');
+    assert.equal(third.started, 1);
+    jobs.clear();
+  });
+
   test('a request that ends its wait leaves the report to finish', async () => {
     const jobs = new Jobs<string>(SETTINGS);
     const a = controlled();
-    const job = jobs.join('k', a.make);
+    const job = take(jobs, 'k', a.make);
     const gone = new AbortController();
     const waited = jobs.wait(job, 10_000, gone.signal);
     gone.abort();
@@ -124,35 +164,106 @@ describe('the jobs', () => {
     assert.equal(a.signal?.aborted, false);
     a.end('pdf');
     await pause(0);
-    assert.equal(jobs.join('k', a.make).result, 'pdf');
+    assert.equal(take(jobs, 'k', a.make).result, 'pdf');
     jobs.clear();
   });
 
-  test('no more made at once than the setting; the rest wait their turn in order', async () => {
-    const jobs = new Jobs<string>({ ...SETTINGS, making: 1 });
+  test('two made at once and eight waiting: the ninth waiting refused, a join never counted', () => {
+    const jobs = new Jobs<string>(SETTINGS);
+    const make = controlled().make;
+    for (let i = 0; i < 2 + 8; i++) take(jobs, `k${String(i)}`, make, `client ${String(i)}`);
+    assert.deepEqual(jobs.counts, { making: 2, waiting: 8, kept: 0 });
+    assert.equal(jobs.join('ninth', 'someone else', make), 'full');
+    // joining one queued, or one being made, takes no place
+    assert.notEqual(jobs.join('k9', 'someone else', make), 'full');
+    assert.notEqual(jobs.join('k0', 'someone else', make), 'full');
+    jobs.clear();
+  });
+
+  test("a third waiting from one client refused while another client's is taken", () => {
+    const jobs = new Jobs<string>(SETTINGS);
+    const make = controlled().make;
+    take(jobs, 'm1', make, 'x');
+    take(jobs, 'm2', make, 'y');
+    take(jobs, 'a1', make, 'a');
+    take(jobs, 'a2', make, 'a');
+    assert.equal(jobs.join('a3', 'a', make), 'share');
+    assert.notEqual(jobs.join('b1', 'b', make), 'share');
+    // a report being made is not waiting: it is not counted in the share
+    assert.notEqual(jobs.join('a2', 'a', make), 'share');
+    jobs.clear();
+  });
+
+  test('a kept report is dropped after the hour, by the clock', async () => {
+    let now = 0;
+    const jobs = new Jobs<string>({ ...SETTINGS, keepMs: 3_600_000, now: () => now });
     const a = controlled();
-    const b = controlled();
-    jobs.join('a', a.make);
-    const second = jobs.join('b', b.make);
-    assert.deepEqual([a.started, b.started], [1, 0]);
-    assert.deepEqual(jobs.counts, { queued: 1, making: 1, ready: 0, failed: 0 });
+    take(jobs, 'k', a.make);
     a.end('pdf');
     await pause(0);
-    assert.equal(b.started, 1);
-    assert.equal(second.state, 'making');
+    now = 3_599_999;
+    assert.equal(take(jobs, 'k', a.make).result, 'pdf');
+    now = 3_600_000;
+    assert.equal(jobs.counts.kept, 0);
+    take(jobs, 'k', a.make);
+    assert.equal(a.started, 2, 'made again');
+    jobs.clear();
+  });
+
+  test('the kept reports together within the total, the oldest dropped first', async () => {
+    let now = 0;
+    const jobs = new Jobs<string>({ ...SETTINGS, keepBytes: 10, now: () => now });
+    const made = (key: string, pdf: string): Promise<void> => {
+      const c = controlled();
+      const job = take(jobs, key, c.make);
+      c.end(pdf);
+      now += 1;
+      return jobs.wait(job, 1_000).then(() => undefined);
+    };
+    await made('old', 'aaaa');
+    await made('mid', 'bbbb');
+    assert.equal(jobs.counts.kept, 2);
+    await made('new', 'cccc');
+    // 12 bytes would pass 10: the oldest goes
+    assert.equal(jobs.counts.kept, 2);
+    const again = controlled();
+    take(jobs, 'old', again.make);
+    assert.equal(again.started, 1, 'the oldest was dropped');
+    assert.equal(take(jobs, 'mid', again.make).result, 'bbbb');
+    jobs.clear();
+  });
+
+  test("a token's kept reports are dropped; a release change drops every kept report", async () => {
+    const jobs = new Jobs<string>(SETTINGS);
+    const kept = async (key: string): Promise<void> => {
+      const c = controlled();
+      const job = take(jobs, key, c.make);
+      c.end('pdf');
+      await jobs.wait(job, 1_000);
+    };
+    jobs.release(98);
+    await kept('T1 9606 25 TOTAL false');
+    await kept('T1 9606 10 TOTAL false');
+    await kept('T2 9606 25 TOTAL false');
+    jobs.dropToken('T1');
+    assert.equal(jobs.counts.kept, 1);
+    jobs.release(98);
+    assert.equal(jobs.counts.kept, 1, 'the same release keeps them');
+    jobs.release(99);
+    assert.equal(jobs.counts.kept, 0);
     jobs.clear();
   });
 
   test('a finished report is forgotten after the keeping time', async () => {
     const jobs = new Jobs<string>({ ...SETTINGS, keepMs: 40 });
     const a = controlled();
-    jobs.join('k', a.make);
+    take(jobs, 'k', a.make);
     a.end('pdf');
     await pause(0);
-    assert.equal(jobs.counts.ready, 1);
+    assert.equal(jobs.counts.kept, 1);
     await pause(80);
-    assert.equal(jobs.counts.ready, 0);
-    jobs.join('k', a.make);
+    assert.equal(jobs.counts.kept, 0);
+    take(jobs, 'k', a.make);
     assert.equal(a.started, 2);
     jobs.clear();
   });
@@ -163,12 +274,26 @@ const FILES = fileURLToPath(new URL('../../ci/fixture/files/', import.meta.url))
 
 describe('the report in the background, at its address', { skip }, () => {
   let graph: Graph;
+  /** The graph as the service reads it: its release moved by `shift`, as a new release's. */
+  const release = { shift: 0 };
+  let shifted: Graph;
   let analysis: AnalysisStub;
   let render: RenderStub;
   let service: Service;
 
   before(async () => {
     graph = openGraph(graphSettings(process.env));
+    shifted = {
+      read: async (query, params, options) => {
+        const rows = await graph.read(query, params, options);
+        if (!query.includes('DBInfo')) return rows;
+        return rows.map((row) => {
+          const value = row['release'];
+          return typeof value === 'number' ? { ...row, release: value + release.shift } : row;
+        });
+      },
+      close: () => graph.close(),
+    };
     analysis = await startAnalysisStub();
     render = await startRenderStub();
     const settings: ServeSettings = {
@@ -183,7 +308,7 @@ describe('the report in the background, at its address', { skip }, () => {
       concurrency: 2,
     };
     service = await startService(settings, {
-      graph,
+      graph: shifted,
       log: () => undefined,
       limits: {
         retryPauseMs: 20,
@@ -197,6 +322,7 @@ describe('the report in the background, at its address', { skip }, () => {
   afterEach(() => {
     analysis.reset();
     render.reset();
+    release.shift = 0;
   });
   after(async () => {
     await service.close();
@@ -288,6 +414,71 @@ describe('the report in the background, at its address', { skip }, () => {
       render.reset();
       await tight.close();
     }
+  });
+
+  /** Asks until the report is ready: its last answer's status. */
+  const ready = async (url: string): Promise<number> => {
+    let answer = await fetch(url);
+    for (let i = 0; answer.status === 202 && i < 60; i++) {
+      await answer.body?.cancel();
+      await pause(150);
+      answer = await fetch(url);
+    }
+    await answer.body?.cancel();
+    return answer.status;
+  };
+
+  test("a kept report is dropped on the token's 410, and on a release change", async () => {
+    assert.equal(await ready(address(6)), 200);
+    render.slow(400);
+    // kept: answered at once
+    const kept = await fetch(address(6));
+    assert.equal(kept.status, 200);
+    await kept.body?.cancel();
+    analysis.forget(REPORT_TOKENS.expression);
+    const gone = await fetch(address(6));
+    assert.equal(gone.status, 410);
+    await gone.body?.cancel();
+    analysis.reset();
+    render.slow(400);
+    const again = await fetch(address(6));
+    assert.equal(again.status, 202, 'made again, not kept');
+    await again.body?.cancel();
+    render.reset();
+    assert.equal(await ready(address(6)), 200);
+    render.slow(400);
+    release.shift = 1;
+    const newRelease = await fetch(address(6));
+    assert.equal(newRelease.status, 202, 'a new release: made again');
+    await newRelease.body?.cancel();
+    render.reset();
+    assert.equal(await ready(address(6)), 200);
+  });
+
+  test("a client's third waiting is refused while another's is taken; /health counts them", async () => {
+    render.slow(3_000);
+    const ask = async (number: number, client: string): Promise<number> => {
+      const res = await fetch(address(number), { headers: { 'X-Reactome-Client': client } });
+      await res.body?.cancel();
+      return res.status;
+    };
+    // two being made, then two of client a's waiting
+    assert.deepEqual(
+      [await ask(11, 'x'), await ask(12, 'x'), await ask(13, 'a'), await ask(14, 'a')],
+      [202, 202, 202, 202]
+    );
+    const third = await fetch(address(15), { headers: { 'X-Reactome-Client': 'a' } });
+    assert.equal(third.status, 503);
+    assert.equal(third.headers.get('retry-after'), '10');
+    await third.body?.cancel();
+    assert.equal(await ask(16, 'b'), 202, "another client's is taken");
+    assert.equal(await ask(13, 'a'), 202, 'a joining request is never refused');
+    const health = (await (await fetch(`${service.url}/health`)).json()) as {
+      reports: { making: number; waiting: number; kept: number };
+    };
+    assert.equal(health.reports.making, 2);
+    assert.equal(health.reports.waiting, 3);
+    render.reset();
   });
 
   test('a browser waiting is given a page that asks again', async () => {

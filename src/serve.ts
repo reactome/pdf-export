@@ -122,6 +122,12 @@ export interface ServeLimits {
   reportKeepMs: number;
   /** Reports made at once. */
   reportsMaking: number;
+  /** Reports waiting their turn; a new one beyond them is answered 503 (FR-210). */
+  reportsWaiting: number;
+  /** Of those waiting, at most this many from one client (`X-Reactome-Client`). */
+  reportsPerClient: number;
+  /** The most the kept reports may hold together, in bytes (FR-211). */
+  reportKeepBytes: number;
 }
 
 export const LIMITS: ServeLimits = {
@@ -138,6 +144,9 @@ export const LIMITS: ServeLimits = {
   reportBudgetMs: 5 * 60_000,
   reportKeepMs: 60 * 60_000,
   reportsMaking: 2,
+  reportsWaiting: 8,
+  reportsPerClient: 2,
+  reportKeepBytes: 512 * 1024 * 1024,
 };
 
 /** Figures asked of the render service at once: its own default concurrency. */
@@ -239,6 +248,8 @@ export interface ServiceOptions {
   /** Where log lines go: standard error by default. */
   log?: (line: string) => void;
   limits?: Partial<ServeLimits>;
+  /** The clock a kept report's hour is measured by (tests move it). */
+  now?: () => number;
 }
 
 /** The package's version, for the health answer. */
@@ -312,9 +323,14 @@ export async function startService(
   // the reports in the background, made or kept for every request that asks for one
   const reportJobs = new Jobs<Uint8Array>({
     making: limits.reportsMaking,
+    waiting: limits.reportsWaiting,
+    perClient: limits.reportsPerClient,
     budgetMs: limits.reportBudgetMs,
     keepMs: limits.reportKeepMs,
+    keepBytes: limits.reportKeepBytes,
+    size: (pdf) => pdf.byteLength,
     budgetError: () => new Refusal('unavailable', 'the report passed its time budget'),
+    ...(options.now === undefined ? {} : { now: options.now }),
   });
   let active = 0;
   /** Requests whose graph reads were still unsettled past their deadline and grace. */
@@ -667,6 +683,15 @@ export async function startService(
     };
   }
 
+  /** Drops the kept reports of a token as given, in its canonical form. */
+  function dropKept(token: string): void {
+    try {
+      reportJobs.dropToken(canonicalToken(token));
+    } catch {
+      // a malformed token names no report
+    }
+  }
+
   /** A report's failure answered: its status, and a log line that names no token. */
   function answerFailure(res: ServerResponse, error: unknown, asPage: boolean): void {
     const subject = 'report';
@@ -722,6 +747,10 @@ export async function startService(
       return;
     }
     const { deadline, endsAt } = requestEnd(res);
+    // the client the gateway names, whose share of the waiting is bounded; one it does not
+    // name is another internal caller
+    const named = req.headers['x-reactome-client'];
+    const client = typeof named === 'string' && named !== '' ? named : 'internal';
     let job;
     try {
       const checked = await within(
@@ -732,7 +761,8 @@ export async function startService(
         ),
         deadline
       );
-      job = reportJobs.join(checked.key, (budget) =>
+      reportJobs.release(checked.release);
+      job = reportJobs.join(checked.key, client, (budget) =>
         makeChecked(
           checked,
           reportServices(budget, Date.now() + limits.reportBudgetMs),
@@ -740,7 +770,21 @@ export async function startService(
         ).then((made) => made.pdf)
       );
     } catch (error) {
+      // a token its check no longer finds: its kept reports go
+      if (
+        error instanceof ReportError &&
+        (error.reason === 'unknown-token' || error.reason === 'gone-token')
+      ) {
+        dropKept(address.token);
+      }
       answerFailure(res, error, asPage);
+      return;
+    }
+    if (job === 'full' || job === 'share') {
+      log(
+        `unavailable report: ${job === 'full' ? 'every waiting place taken' : "the client's share of the waiting taken"}`
+      );
+      serviceError(res, 503, asPage);
       return;
     }
     await reportJobs.wait(job, limits.reportWaitMs, deadline);
@@ -903,6 +947,7 @@ export async function startService(
       printer: printer?.connected === true,
       making: active,
       stuck,
+      reports: reportJobs.counts,
       figures: folder?.state ?? { state: 'none' },
     });
   }
