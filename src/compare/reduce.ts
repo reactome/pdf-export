@@ -190,7 +190,7 @@ const STABLE_ID = /R-[A-Z]{3}-\d+/;
 const STABLE_ID_AT_END = /R-[A-Z]{3}-\d+$/;
 
 /** A heading is set at least this much larger than its body text (as check-book reads it). */
-const HEADING_RATIO = 11.25 / 10.5;
+export const HEADING_RATIO = 11.25 / 10.5;
 
 /**
  * How far below where a link lands its target's first line may be: Chromium's own
@@ -203,7 +203,7 @@ export const LANDING_PT = 100;
 const before = (a: Spot, b: Spot): boolean => a.page < b.page || (a.page === b.page && a.y > b.y);
 
 /** The size most of the text is set at. */
-function bodySize(lines: readonly Line[]): number {
+export function bodySize(lines: readonly Line[]): number {
   const counts = new Map<number, number>();
   for (const line of lines) {
     const size = Math.round(line.size * 100) / 100;
@@ -234,8 +234,19 @@ function byPage<T>(items: readonly T[], page: (item: T) => number): (p: number) 
   return (p) => pages.get(p) ?? [];
 }
 
+/** How the analysis report's comparison (spec 002 T019) reads what spec 001's does not. */
+export interface ReduceOptions {
+  /**
+   * The edit history's rows as the report compares them (FR-208): each a date, an action
+   * and its names as a set (a count and a hash), or past five names, "et al." alone.
+   */
+  editRows?: 'report';
+  /** Headings that end a section's region: the report's parts after its details. */
+  stops?: RegExp;
+}
+
 /** A layout reduced to FR-012's parts. */
-export function reduce(layout: Layout): Reduced {
+export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   const { lines, figures } = layout;
   const linksOn = byPage(layout.links, (link) => link.box.page);
   const figuresOn = byPage(figures, (box) => box.page);
@@ -289,7 +300,12 @@ export function reduce(layout: Layout): Reduced {
       front.set(name, i);
     }
   });
-  const boundaries = [...new Set([...starts, ...front.values(), lines.length])].sort(
+  // the report's parts after its details end the last section's region
+  const stops = options.stops;
+  const stopped = stops
+    ? lines.flatMap((line, i) => (heading(line) && stops.test(plain(line.text).trim()) ? [i] : []))
+    : [];
+  const boundaries = [...new Set([...starts, ...front.values(), ...stopped, lines.length])].sort(
     (a, b) => a - b
   );
   /** The first boundary after a line: the next section or front part, or the end. */
@@ -397,7 +413,13 @@ export function reduce(layout: Layout): Reduced {
     }
     return {
       stId,
-      parts: parts.map(({ part, texts }) => ({ part, items: items(part, texts) })),
+      parts: parts.map(({ part, texts }) => ({
+        part,
+        items:
+          part === 'edits' && options.editRows === 'report'
+            ? reportEditRows(texts)
+            : items(part, texts),
+      })),
       figure: figureKind(
         own,
         parts.some((p) => p.part === 'type')
@@ -445,6 +467,33 @@ export function reduce(layout: Layout): Reduced {
       : null,
     shortEntries,
   };
+}
+
+/** The actions an edit history's row may name, as the report writes them. */
+const ACTIONS = /^(modified|revised|edited|created|authored|reviewed)\b/i;
+
+/**
+ * The report's edit history (FR-208): a row a date and an action, its names compared as a
+ * set, a count and a hash, never as text; a row ending "et al." compared by that alone, as
+ * which five of more names are shown differs. A row's lines run to the next date; the
+ * table's header comes before the first.
+ */
+export function reportEditRows(texts: readonly string[]): string[] {
+  const rows: string[] = [];
+  for (const text of texts) {
+    const read = plain(text).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(read)) rows.push(read);
+    else if (rows.length > 0) rows[rows.length - 1] = `${rows.at(-1) ?? ''} ${read}`;
+  }
+  return rows.map((row) => {
+    const date = row.slice(0, 10);
+    const rest = row.slice(10).trim();
+    const action = ACTIONS.exec(rest)?.[1]?.toLowerCase() ?? 'unread';
+    const names = rest.replace(ACTIONS, '').trim();
+    if (/et al\.?$/i.test(names)) return `${date} ${action} et-al`;
+    const { count, hash: digest } = hashNames(names === '' ? [] : names.split(/;/));
+    return `${date} ${action} ${String(count)}:${digest}`;
+  });
 }
 
 /** A part's items from its lines' texts, folded; hashed where they name people. */
