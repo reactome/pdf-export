@@ -327,7 +327,7 @@ acceptance scenarios).
 **Independent test:** the replay of T001's set against the service on the stubs, every
 status and file name as recorded or a listed difference (SC-202).
 
-- [ ] T012 [US2] The route, `src/serve.ts`, after T011 (contracts/service.md).
+- [x] T012 [US2] The route, `src/serve.ts`, after T011 (contracts/service.md).
   - `GET /AnalysisService/report/{token}/{species}/{filename}.pdf`: the species first
     (404), then the token's check (404, 410, 503), then the rest; the parameters as T006
     reads them, the profiles accepted and ignored, the file name ignored.
@@ -348,6 +348,11 @@ status and file name as recorded or a listed difference (SC-202).
     in the background.
   - Tests in `test/report/serve.test.ts` against the stubs, each status seen failing; an
     unknown species with an unknown token is the species' 404; a profile changes nothing.
+  - **Done (#203):** `answerReport` in `src/serve.ts`, its forms in `src/report/route.ts`;
+    a 503 asks for `Retry-After: 10`; every answer carries `Access-Control-Allow-Origin:
+*`. Spec 001's limit is checked after the parameters, before the species, as spec
+    001 checks it before any read. Spec 001's slot and deadline logic is shared
+    (`takeSlot`, `requestEnd`). Seen failing on 16 planted faults.
 
 - [ ] T013 [US2] The report in the background, `src/report/jobs.ts` and `src/serve.ts`
       (FR-210, data-model Job), after T012.
