@@ -153,7 +153,7 @@ layout. Blocks every later phase.
     type and body. The render stub answers the overview and refuses `resource`. 15 tests,
     seen failing on 32 planted faults.
 
-- [ ] T005 [US1] The report's analysis client, `src/analysis/report.ts` (research R1,
+- [x] T005 [US1] The report's analysis client, `src/analysis/report.ts` (research R1,
       contracts/analysis-api.md), after T004.
   - **The check:** call 1 with a 5 s timeout; 404 `unknown-token`, 410 `gone-token`, any
     other failure or none `unavailable` (`src/analysis/error.ts`'s reasons).
@@ -170,6 +170,12 @@ layout. Blocks every later phase.
     with one; call 4 made with no pathway; call 4 with another content type (the stub's
     415); a resource the result lacks sent as it was given; a 410 from any call after the
     check is `gone-token`, not none found.
+  - **Done (#196):** `checkToken` (the token's form, then call 1 within 5 s), `reportResource`
+    and `readReportAnalysis` (calls 2 to 5, call 3 and call 4 only when needed), each answer
+    checked into its type; after the check a 404 is `unknown-token` and a 410
+    `gone-token` from any call. Seen failing on 15 planted faults, the task's seven among
+    them; the 410 test checks which call failed, as a call 4 swallowing its 410 otherwise
+    passed when call 5 failed after it.
 
 - [ ] T006 [US1] The report model, `src/report/model.ts` (data-model.md), from T005's
       answers, after T005.
@@ -405,6 +411,9 @@ The comparisons run on the development host's own services only.
     submitted identifiers (none).
   - SC-207: the report opened in spec 001's three readers, its bookmarks and links
     followed.
+  - Call 4's answers to another content type (415) and to an empty body (400) are the
+    framework's bodies in T004's stub, read from the analysis service's source, not
+    measured: the replay checks them against the private service.
   - Recorded in research.
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
