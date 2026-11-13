@@ -350,7 +350,7 @@ status and file name as recorded or a listed difference (SC-202).
     unknown species with an unknown token is the species' 404; a profile changes nothing.
   - **Done (#203):** `answerReport` in `src/serve.ts`, its forms in `src/report/route.ts`;
     a 503 asks for `Retry-After: 10`; every answer carries `Access-Control-Allow-Origin:
-    *`. Spec 001's limit is checked after the parameters, before the species, as spec
+*`. Spec 001's limit is checked after the parameters, before the species, as spec
     001 checks it before any read. Spec 001's slot and deadline logic is shared
     (`takeSlot`, `requestEnd`). Seen failing on 16 planted faults.
 
