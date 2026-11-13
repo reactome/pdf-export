@@ -463,6 +463,17 @@ The comparisons run on the development host's own services only.
     service, ours from `pdf-export report` against the same services. Every difference
     is a listed one or recorded with its reason in research (a new item, R9) and spec
     Assumptions.
+  - **The code (#PR, the task left open):** `src/compare/report.ts` and `pdf-export
+compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with spec
+    001's reader: the cover, the properties and the details' sections (spec 001's
+    `reduce`, its edit history's rows read as FR-208 compares them), the pathways' table,
+    the identifiers found and not found; printed through spec 001's `Output`, counts and
+    salted hashes, never a name or a submitted identifier. Seen failing on 14 planted
+    faults, on reports printed here from the stub's answers and made-up details. The parts
+    are found by pdf-export's headings; today's are added from its real files on the run,
+    as spec 001's were (its T040).
+  - **The run waits** on T017 (the figures' overlay), the private analysis service on the
+    development host, and today's reports for T002's tokens, kept outside the repository.
 
 - [ ] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.

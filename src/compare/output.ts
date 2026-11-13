@@ -146,6 +146,10 @@ export const PARTS = [
   'figure',
   'contents',
   'short-entries',
+  // the analysis report's (spec 002 T019)
+  'pathways',
+  'found',
+  'not-found',
 ] as const;
 export const KINDS = [
   'value',
@@ -178,6 +182,12 @@ const VALUES: Readonly<Record<string, Shape>> = {
   'analysis pathways': 'count',
   'analysis resource': { oneOf: RESOURCES },
   'short-entries ': 'count',
+  // the analysis report's (spec 002 T019)
+  'cover release': 'release',
+  'cover link': 'yesno',
+  'pathways rows': 'count',
+  'found entities-resources': 'count',
+  'found interactors-resources': 'count',
 };
 
 /** The fields a difference may name: the analysis's properties and a section's parts too. */
@@ -200,6 +210,13 @@ const FIELDS = new Set([
   'edits',
   'entities',
   'interactors',
+  // the analysis report's (spec 002 T019)
+  'title',
+  'link',
+  'rows',
+  'statistics',
+  'entities-counts',
+  'interactors-counts',
 ]);
 
 /** A difference as the comparison makes it, before it is printed. */

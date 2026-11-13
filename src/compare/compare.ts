@@ -41,7 +41,7 @@ export interface Recorded {
 }
 
 /** How a list differs: in its items, or only in their order. */
-function listKind(a: readonly string[], b: readonly string[]): 'text' | 'order' | null {
+export function listKind(a: readonly string[], b: readonly string[]): 'text' | 'order' | null {
   if (a.length === b.length && a.every((item, i) => item === b[i])) return null;
   const sorted = (list: readonly string[]): string => [...list].sort().join('\n');
   return sorted(a) === sorted(b) ? 'order' : 'text';

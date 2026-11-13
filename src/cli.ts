@@ -15,6 +15,7 @@ Commands:
   book         write the release's book (spec 001, User Story 1)
   check-book   check a book for FR-011's faults
   compare      compare with event-pdf's output, by meaning (FR-012)
+  compare-report  compare an analysis report with today's, by meaning (spec 002)
   figures      draw the book's figures into a folder, before the book (SC-010)
   preflight    check the book's inputs, as book does before printing
   report       one analysis report, to a file (spec 002)
@@ -100,6 +101,12 @@ if (import.meta.main) {
   } else if (args[0] === 'compare') {
     const { compareCommand } = await import('./compare/compare.ts');
     process.exitCode = await compareCommand(args.slice(1), {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
+  } else if (args[0] === 'compare-report') {
+    const { compareReportCommand } = await import('./compare/report.ts');
+    process.exitCode = await compareReportCommand(args.slice(1), {
       out: (text) => process.stdout.write(text),
       err: (text) => process.stderr.write(text),
     });
