@@ -192,6 +192,16 @@ WebsiteAngular task that gates the report, done before the figures are timed (pl
 Order of work, step 0), with a test there that fails when the page is ready before its overlay;
 the report's checks also look for each figure's overlay (quickstart §3). Once settled, the overview is as today's, and a pathway's figure
 differs where the report's resource is not the result's default.
+**Settled (13 Nov 2026, T017).** The race above is closed in WebsiteAngular. Its render page has
+waited for the overlay since reactome/WebsiteAngular#771 (2 Nov, after this was written): ready only
+once the analysis has settled on the result's default resource and the view shows it (a
+diagram coloured for that token and resource, an illustration coloured with the current
+result, the overview showing the tree for that token and resource; the reaction layout is
+never coloured), and a token that cannot be read ends in the page's error. Its cache key
+was bumped with it, and every figure cached since was drawn with the wait.
+reactome/WebsiteAngular#958 added the same tests for a page held between figures (its spec
+018), each seen failing on a mutant.
+
 Adding `resource` is a WebsiteAngular task; until it ships, that is a listed difference
 (spec, FR-204).
 
