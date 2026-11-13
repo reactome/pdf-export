@@ -211,7 +211,7 @@ layout. Blocks every later phase.
     measured). Java's digits and whitespace are read as ASCII digits and JavaScript's `\s`:
     Java also takes other Unicode digits and spaces, which nobody sends.
 
-- [ ] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
+- [x] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
       `src/report/edits.ts` (research R2), after T003 and T006.
   - Each reported pathway's spec 001 Section (figure choice, compartments, diseases
     without the generic one, inferred-from, summations, first five references), read with
@@ -223,6 +223,12 @@ layout. Blocks every later phase.
   - Tests on the fixture (placeholder people only), each seen failing: the within-date
     order; six names becoming five and "et al."; the authorless row kept; the undated
     edit left out rather than failing; two edits of one kind on one date one row.
+  - **Done (#198):** `readDetails` builds each section with spec 001's `sectionOf` (moved
+    out of `assemble`, unchanged) from one read of each query for all the pathways, its
+    `edits` empty; `editHistory` writes the report's rows, a row's date the day (an
+    inference from R2, for T019 to confirm). The fixture gains, on `beta pathway`, a
+    `created` edit with six authors and a `modified` with none on its `authored` edit's
+    date; spec 001 reads neither. Seen failing on 13 planted faults.
 
 ---
 
