@@ -463,7 +463,7 @@ The comparisons run on the development host's own services only.
     service, ours from `pdf-export report` against the same services. Every difference
     is a listed one or recorded with its reason in research (a new item, R9) and spec
     Assumptions.
-  - **The code (#PR, the task left open):** `src/compare/report.ts` and `pdf-export
+  - **The code (#208, the task left open):** `src/compare/report.ts` and `pdf-export
 compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with spec
     001's reader: the cover, the properties and the details' sections (spec 001's
     `reduce`, its edit history's rows read as FR-208 compares them), the pathways' table,
