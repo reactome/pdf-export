@@ -13,7 +13,7 @@
 // on the other's every move. Writes on libuv's thread pool begun before the exit (a launch's
 // `mkdtemp` of the browser's profile, say) go on while the exit handlers run, and can land in
 // the folder as it is removed: a removal that meets one is tried again.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -90,4 +90,17 @@ export function privateTemporary(purpose: string): PrivateTemporary {
       }
     },
   };
+}
+
+/**
+ * A working folder kept private (spec 002 T015, FR-211): made if missing, readable by this
+ * user alone, and emptied, as a print the service was killed during leaves its page there,
+ * which holds submitted identifiers. Called as the service starts, never while it prints.
+ */
+export function emptiedWorkFolder(folder: string): void {
+  mkdirSync(folder, { recursive: true, mode: 0o700 });
+  chmodSync(folder, 0o700);
+  for (const name of readdirSync(folder)) {
+    rmSync(join(folder, name), { recursive: true, force: true });
+  }
 }

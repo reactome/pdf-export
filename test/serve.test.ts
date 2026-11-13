@@ -446,6 +446,7 @@ describe('the service', { skip: skipWithoutGraph }, () => {
     render: render.url,
     analysis: analysis.url,
     site: 'https://site.invalid',
+    work: null,
     concurrency: 1,
   });
 
@@ -922,6 +923,7 @@ describe("the figures' folder", { skip: skipWithoutGraph }, () => {
         render: render.url,
         analysis: analysis.url,
         site: 'https://site.invalid',
+        work: null,
         concurrency: 2,
       },
       { graph, log: (line) => lines.push(line), limits: { folderPollMs: 100, ...limits } }
@@ -1262,6 +1264,7 @@ describe(
           render: render.url,
           analysis: analysis.url,
           site: 'https://site.invalid',
+          work: null,
           concurrency: 1,
         },
         {
@@ -1469,6 +1472,7 @@ describe('a browser that cannot be started again', { skip: skipWithoutGraph }, (
     render: render.url,
     analysis: analysis.url,
     site: 'https://site.invalid',
+    work: null,
     concurrency: 1,
   });
 

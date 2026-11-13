@@ -484,6 +484,10 @@ The comparisons run on the development host's own services only.
     `clientOf`, overwriting what a client sent; answers 503 in the analysis service's
     JSON form when pdf-export cannot be reached. The analysis service still answers
     everything else.
+  - nginx sets `X-Reactome-Client` itself, from the client's address, overwriting any
+    value a request sent: pdf-export's share of the waiting per client (T014) trusts the
+    header, so one a client could choose would dodge it (reviewed 13 Nov 2026). The test
+    shows a request that sends its own `X-Reactome-Client` still counted by its address.
   - pdf-export's errors byte-identical to the analysis service's for the same request
     (status, `Content-Type`, body; its JSON carries no `url`), compared on the
     development host for T001's error cases.

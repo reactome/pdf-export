@@ -60,6 +60,7 @@ describe("the report's address", { skip }, () => {
       render: render.url,
       analysis: analysis.url,
       site: 'https://site.invalid',
+      work: null,
       concurrency: 2,
     };
     service = await startService(settings, {

@@ -239,7 +239,10 @@ describe('making a report', { skip }, () => {
       assert.equal(code, 0, said.join(''));
       assert.ok(existsSync(out));
       assert.equal(readFileSync(out).subarray(0, 5).toString(), '%PDF-');
-      assert.deepEqual(said, [`${out}: 2 pathways\n`]);
+      // the report's one log line, then where it was written
+      assert.equal(said.length, 2, said.join(''));
+      assert.match(said[0] ?? '', /^report [0-9a-f]{16} species=9606 number=2 /);
+      assert.equal(said[1], `${out}: 2 pathways\n`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
