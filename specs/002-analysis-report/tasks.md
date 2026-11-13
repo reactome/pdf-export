@@ -308,8 +308,9 @@ acceptance scenarios).
     service, for the comparison (T019) and for checks by hand; the service (T012) calls
     the same function.
   - Tests on the fixture with the stubs, each seen failing: the outline's entries in
-    order; every link's target inside the PDF or on `--site`; a 50-pathway report of
-    the stub's largest token printed whole.
+    order; every link's target inside the PDF or on `--site`; a request for `number=50`
+    against the stub's largest token, returning all of its pathways (the fixture holds
+    fewer than 50; a report of real size is timed by T020, reworded 13 Nov 2026).
 
 ---
 

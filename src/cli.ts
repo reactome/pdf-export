@@ -3,7 +3,8 @@
 // serve (T022) runs the single-event service; preflight (T024) runs the book's preflight
 // alone; figures (T046) draws the book's figures into a folder; book (T029) writes the
 // book; check-book (T030) checks a written book for FR-011's faults; compare (T035)
-// compares with event-pdf's output by FR-012.
+// compares with event-pdf's output by FR-012; report (spec 002 T011) makes one analysis
+// report.
 import { constants as osConstants } from 'node:os';
 
 import { privateTemporary } from './print/temporary.ts';
@@ -16,6 +17,7 @@ Commands:
   compare      compare with event-pdf's output, by meaning (FR-012)
   figures      draw the book's figures into a folder, before the book (SC-010)
   preflight    check the book's inputs, as book does before printing
+  report       one analysis report, to a file (spec 002)
   serve        the website's single-event PDF service (User Story 2)
 `;
 
@@ -98,6 +100,12 @@ if (import.meta.main) {
   } else if (args[0] === 'compare') {
     const { compareCommand } = await import('./compare/compare.ts');
     process.exitCode = await compareCommand(args.slice(1), {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
+  } else if (args[0] === 'report') {
+    const { reportCommand } = await import('./report/command.ts');
+    process.exitCode = await reportCommand(args.slice(1), process.env, {
       out: (text) => process.stdout.write(text),
       err: (text) => process.stderr.write(text),
     });

@@ -137,7 +137,7 @@ describe("the report's details and identifier lists", () => {
         const details = await readDetails(graph, m.pathways, new Set(['R-HSA-90000300']));
         const out = body(m, details);
         const alpha =
-          /<section class="event"[^>]*>\s*<h1 id="s-R-HSA-90000200"[\s\S]*?<\/section>/.exec(
+          /<section class="event"[^>]*>\s*<h2 id="s-R-HSA-90000200"[\s\S]*?<\/section>/.exec(
             out
           )?.[0] ?? '';
         assert.ok(
