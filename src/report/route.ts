@@ -36,6 +36,7 @@ export function reportAddress(path: string): ReportAddress | null {
 const CORS = { 'Access-Control-Allow-Origin': '*' };
 
 const REASONS: Readonly<Record<number, string>> = {
+  202: 'Accepted',
   404: 'Not Found',
   410: 'Gone',
   500: 'Internal Server Error',
@@ -54,26 +55,63 @@ export const FAILURE_STATUS: Readonly<Record<ReportFailure, number>> = {
 /** The pause a 503 asks for before the next request. */
 export const RETRY_AFTER_S = 10;
 
-/** A message for a status: never a path, a host, a name or a submitted identifier. */
-const MESSAGES: Readonly<Record<number, string[]>> = {
-  404: [],
-  410: [],
-  500: [],
-  503: ['The report cannot be made now. Please try again later.'],
-};
+/**
+ * A status's message: never a path, a host, a name or a submitted identifier. A 503's as
+ * the website's analysis gateway words its own (WebsiteAngular's
+ * tools/analysis-gateway/gateway.ts), from the pause it asks for.
+ */
+function messages(status: number, retryAfter: number): string[] {
+  if (status === 202)
+    return [`The report is being made; ask again in ${String(retryAfter)} seconds`];
+  if (status === 503) {
+    return [`The report service is busy; try again in ${String(retryAfter)} seconds`];
+  }
+  return [];
+}
 
-/** The analysis service's error answer: its JSON and a newline, as today's writes it. */
-export function serviceError(res: ServerResponse, status: number): void {
+/** Whether a request is a browser's, which is given a page that asks again. */
+export function wantsPage(accept: string | undefined): boolean {
+  return (accept ?? '').split(',').some((part) => part.split(';')[0]?.trim() === 'text/html');
+}
+
+/** The page a browser is given while it waits, which asks the same address again. */
+function page(status: number, retryAfter: number): string {
+  const [message = ''] = messages(status, retryAfter);
+  const title = status === 202 ? 'Making your report' : 'Report service busy';
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="${String(retryAfter)}">
+<title>${title}</title>
+</head>
+<body>
+<h1>${title}</h1>
+<p>${message}. This page asks again by itself.</p>
+</body>
+</html>
+`;
+}
+
+/**
+ * The analysis service's answer: its JSON and a newline, as today's writes it. A 202 or
+ * 503 asks for `Retry-After` and is never kept by a cache; for a browser (`page`) it is a
+ * page that asks again after that pause.
+ */
+export function serviceError(res: ServerResponse, status: number, asPage = false): void {
   if (res.writableEnded || res.destroyed) return;
-  const body = `${JSON.stringify({ code: status, reason: REASONS[status] ?? 'Error', messages: MESSAGES[status] ?? [] })}\n`;
+  const waiting = status === 202 || status === 503;
+  const body =
+    waiting && asPage
+      ? page(status, RETRY_AFTER_S)
+      : `${JSON.stringify({ code: status, reason: REASONS[status] ?? 'Error', messages: messages(status, RETRY_AFTER_S) })}\n`;
   res
     .writeHead(status, {
       ...CORS,
-      'Content-Type': 'application/json;charset=UTF-8',
+      'Content-Type':
+        waiting && asPage ? 'text/html;charset=UTF-8' : 'application/json;charset=UTF-8',
       'Content-Length': String(Buffer.byteLength(body)),
-      ...(status === 503
-        ? { 'Retry-After': String(RETRY_AFTER_S), 'Cache-Control': 'no-store' }
-        : {}),
+      ...(waiting ? { 'Retry-After': String(RETRY_AFTER_S), 'Cache-Control': 'no-store' } : {}),
     })
     .end(body);
 }
