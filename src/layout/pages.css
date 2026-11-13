@@ -226,6 +226,10 @@ td {
 tr {
   break-inside: avoid;
 }
+/* a table broken across pages repeats its header on each */
+thead {
+  display: table-header-group;
+}
 /* an edit's date whole, as a hyphen is a place a line may break */
 table.edits td:first-child {
   white-space: nowrap;

@@ -4,11 +4,23 @@
 // and the table, each row linked to its pathway's detail. In the Background's order.
 import { anchorOf } from '../model/build.ts';
 import type { ContentsEntry } from '../model/types.ts';
-import { figureHtml } from '../layout/figure.ts';
+import { CharacterLog, onRequestStrings } from '../layout/characters.ts';
+import { figureHtml, type FigureSvgs } from '../layout/figure.ts';
 import { contentsHtml, formatDate, logoHtml, ownReferencesHtml } from '../layout/front.ts';
 import { Links, attribute, text } from '../layout/html.ts';
 import { ABOUT_REACTOME, ANALYSIS, RELEASE_LINE, fill } from '../layout/text.ts';
-import type { ReportModel } from './model.ts';
+import type { PathwayDetail } from './details.ts';
+import type {
+  FoundIdentifiers,
+  FoundInteractors,
+  FoundRow,
+  InteractorRow,
+  ReportModel,
+  ReportedPathway,
+  ResourceTable,
+} from './model.ts';
+import type { Report } from '../layout/section.ts';
+import { sectionHtml } from '../layout/section.ts';
 import {
   KEPT,
   OVERVIEW_CAPTION,
@@ -121,12 +133,7 @@ export function reportContents(model: ReportModel): ContentsEntry[] {
       ...model.pathways.map((p) => ({ title: p.name, target: anchorOf(p.stId), depth: 1 }))
     );
   }
-  if (
-    model.found.some((f) => f.rows.length > 0) ||
-    model.foundInteractors.some((f) => f.rows.length > 0)
-  ) {
-    entries.push(entry('found'));
-  }
+  if (holdsFound(model)) entries.push(entry('found'));
   if (model.notFound.length > 0) entries.push(entry('notFound'));
   return entries;
 }
@@ -262,4 +269,225 @@ export function pathwaysHtml(model: ReportModel, links: Links): string {
 <p>${text(ANALYSIS.entitiesFound)} ${text(ANALYSIS.pValue)} ${text(ANALYSIS.fdr)}</p>`,
     links
   );
+}
+
+// The pathways' details and the identifier lists (spec 002 T009).
+
+/** A resource's name as the website shows it; its code where it has no other. */
+const RESOURCE_NAMES: Readonly<Record<string, string>> = {
+  UNIPROT: 'UniProt',
+  ENSEMBL: 'Ensembl',
+  CHEBI: 'ChEBI',
+  COMPOUND: 'KEGG Compound',
+  MIRBASE: 'miRBase',
+  NCBI_PROTEIN: 'NCBI Protein',
+  NCBI_NUCLEOTIDE: 'NCBI Nucleotide',
+  IUPHAR: 'IUPHAR',
+  EMBL: 'EMBL',
+  PUBCHEM_COMPOUND: 'PubChem Compound',
+};
+
+export function resourceName(resource: string): string {
+  return RESOURCE_NAMES[resource] ?? resource;
+}
+
+/** The expression columns' headers and a row's values in them. */
+function valueHeads(columns: readonly string[]): string {
+  return columns.map((c) => `<th>${text(c)}</th>`).join('');
+}
+
+function valueCells(exp: readonly number[], columns: readonly string[]): string {
+  return columns.map((_c, i) => `<td>${text(String(exp[i] ?? ''))}</td>`).join('');
+}
+
+function table(heads: string, rows: string): string {
+  return `<table class="found"><thead><tr>${heads}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function entityTable(rows: readonly FoundRow[], columns: readonly string[]): string {
+  return table(
+    `<th>Identifier</th><th>Maps to</th>${valueHeads(columns)}`,
+    rows
+      .map(
+        (r) =>
+          `<tr><td class="id">${text(r.id)}</td><td class="id">${text(r.mapsTo.join(', '))}</td>${valueCells(r.exp, columns)}</tr>`
+      )
+      .join('')
+  );
+}
+
+function interactorTable(rows: readonly InteractorRow[], columns: readonly string[]): string {
+  return table(
+    `<th>Identifier</th><th>Interactor</th><th>Interacts with</th>${valueHeads(columns)}`,
+    rows
+      .map(
+        (r) =>
+          `<tr><td class="id">${text(r.id)}</td><td class="id">${text(r.mapsTo.join(', '))}</td><td class="id">${text(r.interactsWith.join(', '))}</td>${valueCells(r.exp, columns)}</tr>`
+      )
+      .join('')
+  );
+}
+
+/** A pathway's tables per resource, each left out when empty. */
+function perResource<R>(
+  title: string,
+  tables: readonly ResourceTable<R>[],
+  write: (rows: readonly R[]) => string
+): string {
+  return tables
+    .filter((t) => t.rows.length > 0)
+    .map(
+      (t) => `<p class="part">${text(`${title}: ${resourceName(t.resource)}`)}</p>${write(t.rows)}`
+    )
+    .join('\n');
+}
+
+/** The report's edit history (T007), in spec 001's table. */
+function historyHtml(detail: PathwayDetail | undefined): string {
+  const rows = detail?.history ?? [];
+  if (rows.length === 0) return '';
+  const body = rows
+    .map((row) => {
+      const names = row.names.map((name) => name ?? '').join('; ');
+      return `<tr><td>${text(row.date)}</td><td>${text(row.action)}</td><td>${text(row.etAl ? `${names} et al.` : names)}</td></tr>`;
+    })
+    .join('');
+  return `<p class="part">Edit history</p><table class="edits"><thead><tr><th>Date</th><th>Action</th><th>Names</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+export interface DetailsInput {
+  links: Links;
+  figures: FigureSvgs;
+  /** What the figures' layout reports: those missing, below the floor or unmeasured. */
+  report: Report;
+}
+
+/**
+ * One pathway's detail: spec 001's section for it, with the report's edit history in place
+ * of spec 001's and its stable identifier linked to its page, then its entities found per
+ * resource and, with interactors, its interactors. A pathway the graph does not hold has its
+ * name, identifier and tables alone.
+ */
+export function detailHtml(
+  model: ReportModel,
+  pathway: ReportedPathway,
+  detail: PathwayDetail | undefined,
+  input: DetailsInput
+): string {
+  const tail = [
+    historyHtml(detail),
+    perResource('Entities found', pathway.entities, (rows) => entityTable(rows, model.columns)),
+    perResource('Interactors found', pathway.interactors, (rows) =>
+      interactorTable(rows, model.columns)
+    ),
+  ]
+    .filter((part) => part !== '')
+    .join('\n');
+  if (detail) {
+    return sectionHtml(detail.section, {
+      links: input.links,
+      figures: input.figures,
+      found: null,
+      report: input.report,
+      analysisReport: { tail, linkStId: true },
+    });
+  }
+  const anchor = anchorOf(pathway.stId);
+  return `<section class="event" style="--depth: 0">
+<h1 id="${attribute(anchor)}" class="name">${input.links.probe(anchor)}${Links.a(input.links.event(pathway.stId), pathway.name)}</h1>
+<dl class="facts"><dt>Stable identifier</dt><dd><a href="${attribute(input.links.event(pathway.stId))}"><span class="id">${text(pathway.stId)}</span></a></dd></dl>
+${tail}
+</section>`;
+}
+
+/** The details part: a heading, then each reported pathway's detail; none without pathways. */
+export function detailsHtml(
+  model: ReportModel,
+  details: ReadonlyMap<number, PathwayDetail>,
+  input: DetailsInput
+): string {
+  if (model.pathways.length === 0) return '';
+  return `<section class="front" data-part="${PARTS.details}">
+${heading('details', input.links)}
+</section>
+<div class="sections">${model.pathways
+    .map((p) => detailHtml(model, p, details.get(p.dbId), input))
+    .join('\n')}</div>`;
+}
+
+/** Whether the report holds any identifier found, an entity's or an interactor's. */
+export function holdsFound(model: ReportModel): boolean {
+  return (
+    model.found.some((f) => f.rows.length > 0) ||
+    model.foundInteractors.some((f) => f.rows.length > 0)
+  );
+}
+
+/**
+ * The identifiers found: per resource, what each maps to with its values, the heading
+ * counting the Reactome entities they map to; then the interactors apart. Left out when
+ * there are none.
+ */
+export function foundHtml(model: ReportModel, links: Links): string {
+  if (!holdsFound(model)) return '';
+  const entities = model.found
+    .filter((f) => f.rows.length > 0)
+    .map(
+      (f: FoundIdentifiers) =>
+        `<p class="part">${text(`${resourceName(f.resource)}: ${String(f.rows.length)} identifiers mapping to ${String(f.entities)} Reactome entities`)}</p>${entityTable(f.rows, model.columns)}`
+    );
+  const interactors = model.foundInteractors
+    .filter((f) => f.rows.length > 0)
+    .map(
+      (f: FoundInteractors) =>
+        `<p class="part">${text(`Interactors through ${resourceName(f.resource)}: ${String(f.rows.length)}`)}</p>${interactorTable(f.rows, model.columns)}`
+    );
+  return section('found', [...entities, ...interactors].join('\n'), links);
+}
+
+/** The identifiers not found, sorted, each once, with their values; left out when none. */
+export function notFoundHtml(model: ReportModel, links: Links): string {
+  if (model.notFound.length === 0) return '';
+  const rows = model.notFound
+    .map((n) => `<tr><td class="id">${text(n.id)}</td>${valueCells(n.exp, model.columns)}</tr>`)
+    .join('');
+  return section('notFound', table(`<th>Identifier</th>${valueHeads(model.columns)}`, rows), links);
+}
+
+/**
+ * The model and the details as a report made on request prints them (FR-207, spec 001
+ * FR-017): every string's characters no font draws printed as U+FFFD and logged once, in
+ * the log the figures' labels share.
+ */
+export function onRequestReport(
+  model: ReportModel,
+  details: ReadonlyMap<number, PathwayDetail>,
+  log: CharacterLog
+): { model: ReportModel; details: Map<number, PathwayDetail> } {
+  return {
+    model: onRequestStrings(model, log),
+    details: onRequestStrings(new Map(details), log),
+  };
+}
+
+export interface BodyOptions extends FrontOptions {
+  figures: FigureSvgs;
+  report: Report;
+}
+
+/** The whole report's body, every part in the Background's order. */
+export function reportBodyHtml(
+  model: ReportModel,
+  details: ReadonlyMap<number, PathwayDetail>,
+  options: BodyOptions
+): string {
+  const { links } = options;
+  return [
+    reportFrontHtml(model, options),
+    detailsHtml(model, details, options),
+    foundHtml(model, links),
+    notFoundHtml(model, links),
+  ]
+    .filter((part) => part !== '')
+    .join('\n');
 }
