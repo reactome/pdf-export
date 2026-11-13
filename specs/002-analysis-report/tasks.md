@@ -241,7 +241,7 @@ order, in spec 001's look.
 for each stub token, whose text and outline hold each part in order (User Story 1's
 acceptance scenarios).
 
-- [ ] T008 [US1] The report's front parts and table, `src/report/layout.ts`, in spec
+- [x] T008 [US1] The report's front parts and table, `src/report/layout.ts`, in spec
       001's theme (FR-205), after T006.
   - The cover (logo, title, the analysis's name, release, date, the link to the result
     in the pathway browser on `--site`, how long results are kept); the contents list
@@ -255,6 +255,11 @@ acceptance scenarios).
   - Tests on the HTML, each seen failing: the parts in order; projection and interactors
     left out when unset; a row linked to its detail's anchor; the ReactomeGSA guide for a
     GSA type.
+  - **Done (#199):** `reportFrontHtml` writes the parts in order with spec 001's markup and
+    theme; the contents list leaves out the details, the identifiers found and the not
+    found when the report has none; the wording is in `src/report/text.ts`, the title
+    kept as today's for FR-208. The result's link is the website's own form,
+    `/PathwayBrowser?analysis={token}`. Seen failing on 17 planted faults.
 
 - [ ] T009 [US1] The details and identifier lists, `src/report/layout.ts`, after T007 and
       T008.
