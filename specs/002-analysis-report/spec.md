@@ -444,6 +444,9 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
     always empty and left out (an obvious bug: it compares their display names with the
     mappings' resources);
   - an edit with no date left out of the edit history, where today's report fails;
+  - an `importableOnly` of spaces alone read as the default (false), where today's framework
+    reads it as no value and today's report then most likely fails with a 500 (read from its
+    source, not measured): a bug fixed here (decided 13 Nov 2026, T006);
   - a malformed token answered 404, where today's answers its catch-all 500 (and one
     holding `%2F` the servlet container's HTML 400): a client's bad input, not a server
     error (decided 8 Nov 2026, research R8);

@@ -208,9 +208,10 @@ layout. Blocks every later phase.
     Seen failing on 24 planted faults. An `importableOnly` of spaces alone is false here
     (today's, by its source, fails); a parameter given twice reads its first value, a
     resource given twice its values joined by commas, as the framework converts them (not
-    measured).
+    measured). Java's digits and whitespace are read as ASCII digits and JavaScript's `\s`:
+    Java also takes other Unicode digits and spaces, which nobody sends.
 
-- [ ] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
+- [x] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
       `src/report/edits.ts` (research R2), after T003 and T006.
   - Each reported pathway's spec 001 Section (figure choice, compartments, diseases
     without the generic one, inferred-from, summations, first five references), read with
@@ -222,6 +223,12 @@ layout. Blocks every later phase.
   - Tests on the fixture (placeholder people only), each seen failing: the within-date
     order; six names becoming five and "et al."; the authorless row kept; the undated
     edit left out rather than failing; two edits of one kind on one date one row.
+  - **Done (#198):** `readDetails` builds each section with spec 001's `sectionOf` (moved
+    out of `assemble`, unchanged) from one read of each query for all the pathways, its
+    `edits` empty; `editHistory` writes the report's rows, a row's date the day (an
+    inference from R2, for T019 to confirm). The fixture gains, on `beta pathway`, a
+    `created` edit with six authors and a `modified` with none on its `authored` edit's
+    date; spec 001 reads neither. Seen failing on 13 planted faults.
 
 ---
 
@@ -408,7 +415,11 @@ The comparisons run on the development host's own services only.
 - [ ] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.
   - T001's set replayed against `pdf-export serve` on the development host's services:
-    each status and file name as today's or a listed difference.
+    each status and file name as today's or a listed difference. The set gains a
+    parameter given twice (T006, read from the framework's source, not measured):
+    `number=7&number=abc` (the first value read), `importableOnly=true&importableOnly=maybe`,
+    and `resource=UNIPROT&resource=ENSEMBL` (the values joined by commas, so not held: the
+    default); and `importableOnly=%20`, a listed difference.
   - SC-203: cold (the render cache empty) and warm, stage by stage, from the first request
     to the PDF, one report alone, against T002's baseline and the 2- and 4-minute
     targets.
