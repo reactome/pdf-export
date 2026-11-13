@@ -181,6 +181,55 @@ export async function topLevelPathways(graph: Graph, species: string): Promise<E
   return rows.map(eventRef);
 }
 
+/** A species, as the report names it and picks the analysis's pathways by it. */
+export interface SpeciesRef {
+  dbId: number;
+  taxId: string;
+  name: string;
+}
+
+/**
+ * A species as the report's address names it (spec 002 T006), resolved as graph-core's
+ * `SpeciesService.getSpecies` resolves it for today's report: digits are a taxonomy id,
+ * else a database id; anything else a name, lower-cased with each run of `_` and spaces one
+ * space and its first letter capitalised, matched against the species' names. Null for
+ * none. Digits beyond a Java `long` are no species here, where today's fails.
+ */
+export async function speciesByIdentifier(
+  graph: Graph,
+  identifier: string
+): Promise<SpeciesRef | null> {
+  if (identifier === '') return null;
+  if (/^[0-9]+$/.test(identifier)) {
+    const [byTaxId] = await graph.read(`MATCH (n:Species {taxId: $taxId}) ${SPECIES} LIMIT 1`, {
+      taxId: identifier,
+    });
+    if (byTaxId) return speciesRef(byTaxId);
+    const id = BigInt(identifier);
+    if (id > 9_223_372_036_854_775_807n) return null;
+    return speciesByDbId(graph, Number(id));
+  }
+  const lower = identifier.toLowerCase().replace(/[_ ]+/g, ' ');
+  const name = lower.charAt(0).toUpperCase() + lower.slice(1);
+  const [row] = await graph.read(`MATCH (n:Species) WHERE $name IN n.name ${SPECIES} LIMIT 1`, {
+    name,
+  });
+  return row ? speciesRef(row) : null;
+}
+
+/** A species by its database id: the one an analysis compares with, say. Null for none. */
+export async function speciesByDbId(graph: Graph, dbId: number): Promise<SpeciesRef | null> {
+  if (!Number.isSafeInteger(dbId)) return null;
+  const [row] = await graph.read(`MATCH (n:Species {dbId: $dbId}) ${SPECIES} LIMIT 1`, { dbId });
+  return row ? speciesRef(row) : null;
+}
+
+const SPECIES = 'RETURN n.dbId AS dbId, n.taxId AS taxId, n.displayName AS name';
+
+function speciesRef(row: Row): SpeciesRef {
+  return { dbId: whole(row, 'dbId'), taxId: text(row, 'taxId'), name: text(row, 'name') };
+}
+
 /** What an identifier names: an event, something that is not one, or nothing. */
 export type Identified = { event: Child } | { notAnEvent: true } | null;
 
