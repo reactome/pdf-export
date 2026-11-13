@@ -217,8 +217,8 @@ layout. Blocks every later phase.
     without the generic one, inferred-from, summations, first five references), read with
     spec 001's queries in one batch for all reported pathways, not one read per pathway.
   - **The edit history,** today's rule: a row per date and action over all six kinds,
-    sorted by date; within a date, Modified, Revised, Edited, Created, Authored,
-    Reviewed; a row's names in the edits' authors' order without repeats, five and then
+    sorted by date; within a date, Modified, Revised, Edited, Reviewed, Authored,
+    Created (corrected by T019's run); a row's names in the edits' authors' order without repeats, five and then
     "et al."; an authorless edit kept as a row with no names; an undated one left out.
   - Tests on the fixture (placeholder people only), each seen failing: the within-date
     order; six names becoming five and "et al."; the authorless row kept; the undated

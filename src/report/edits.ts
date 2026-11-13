@@ -18,14 +18,19 @@ const ACTIONS: Readonly<Record<EditKind, EditAction>> = {
   reviewed: 'Reviewed',
 };
 
-/** The actions within a date in today's order: a hash map's over its six fixed keys. */
+/**
+ * The actions within a date in today's order: a hash map's over its six fixed keys, filled
+ * by `computeIfAbsent`, which puts a new key at the head of its bucket. Created, Authored
+ * and Reviewed share one, and are added in that order, so they come out reversed (spec 002
+ * T019, research R2; read from today's reports and the deployed library).
+ */
 export const ACTION_ORDER: readonly EditAction[] = [
   'Modified',
   'Revised',
   'Edited',
-  'Created',
-  'Authored',
   'Reviewed',
+  'Authored',
+  'Created',
 ];
 
 /** The names a row shows before "et al.". */
