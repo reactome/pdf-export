@@ -11,11 +11,20 @@
 import { setTimeout as pause } from 'node:timers/promises';
 import { causeCode } from '../unknown.ts';
 
-/** What to draw (data-model.md's Figure). */
+/**
+ * What to draw (data-model.md's Figure), and the analysis report's genome-wide overview
+ * of a species, by its taxonomy id (spec 002 contracts/render.md).
+ */
 export type FigureRequest =
   | { kind: 'diagram' | 'ehld'; stId: string; token?: string }
   | { kind: 'ancestor'; stId: string; highlight: readonly string[]; token?: string }
-  | { kind: 'reaction'; stId: string; token?: string };
+  | { kind: 'reaction'; stId: string; token?: string }
+  | { kind: 'genome-wide'; species: string; token?: string };
+
+/** What a request's messages name it by: its stable id, or the overview. */
+export function requestName(request: FigureRequest): string {
+  return request.kind === 'genome-wide' ? 'genome-wide' : request.stId;
+}
 
 /** Why a figure is missing (contracts/figures.md). */
 export type MissingCause = 'unanswered' | 'failed' | 'refused' | 'invalid';
@@ -40,9 +49,10 @@ export interface ClientOptions {
  */
 export function figureUrl(base: string, request: FigureRequest): URL {
   const url = new URL(
-    `render/${encodeURIComponent(request.stId)}.svg`,
+    `render/${encodeURIComponent(requestName(request))}.svg`,
     base.endsWith('/') ? base : `${base}/`
   );
+  if (request.kind === 'genome-wide') url.searchParams.set('species', request.species);
   if (request.kind === 'ancestor') url.searchParams.set('highlight', request.highlight.join(','));
   if (request.kind === 'reaction') url.searchParams.set('layout', 'reaction');
   if (request.token !== undefined) url.searchParams.set('token', request.token);
@@ -69,7 +79,7 @@ export async function fetchFigure(
   };
   for (let attempt = 1; ; attempt++) {
     stopped();
-    const answer = await once(url, request.stId, timeoutMs, signal, stopped);
+    const answer = await once(url, requestName(request), timeoutMs, signal, stopped);
     if (!('retry' in answer)) return answer;
     if (attempt > 1 || !(answer.retry === 503 || retryUnanswered)) return answer.missing;
     // the pause ends with the caller's end too
