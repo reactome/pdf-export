@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, test } from 'node:test';
 
-import { startRenderStub, type RenderStub } from './render.ts';
+import { GENOME_WIDE, startRenderStub, type RenderStub } from './render.ts';
 
 const ALPHA = 'R-HSA-90000200';
 const BETA = 'R-HSA-90000100';
@@ -133,6 +133,37 @@ describe('the render stub', () => {
       ((await (await get('/health')).json()) as { build: string }).build,
       '000000000000'
     );
+  });
+
+  test("answers the genome-wide overview naming its species, the service's own by default", async () => {
+    const token = 'MjAyNi0xMC0yOQ%3D%3D';
+    const res = await get(`/render/genome-wide.svg?species=10090&token=${token}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /^image\/svg\+xml(;|$)/);
+    const svg = await res.text();
+    assert.match(svg, /data-species="10090"/);
+    assert.match(svg, /<text[^>]*>Genome-wide overview, species 10090</);
+    assert.match(svg, new RegExp(`data-token="${token}"`));
+    assert.match(await (await get('/render/genome-wide.svg')).text(), /data-species="9606"/);
+    stub.refuse(GENOME_WIDE, 503, 1);
+    assert.equal((await get('/render/genome-wide.svg?species=9606')).status, 503);
+    assert.equal((await get('/render/genome-wide.svg?species=9606')).status, 200);
+  });
+
+  test('refuses a resource, as the service takes none, and a species it cannot take', async () => {
+    for (const path of [
+      '/render/genome-wide.svg?species=9606&token=abc&resource=TOTAL',
+      `/render/${ALPHA}.svg?token=abc&resource=UNIPROT`,
+      '/render/genome-wide.svg?species=Homo_sapiens',
+      '/render/genome-wide.svg?species=9606&species=9606',
+      `/render/genome-wide.svg?highlight=${REACTION}`,
+      `/render/${ALPHA}.svg?species=9606`,
+      '/render/genome-wide.png?species=9606',
+    ]) {
+      const res = await get(path);
+      assert.equal(res.status, 400, path);
+      assert.ok(((await res.json()) as { error?: string }).error, path);
+    }
   });
 
   test('silenced, it answers nothing, its health included; slowed, it answers late', async () => {
