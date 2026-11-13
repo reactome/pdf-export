@@ -261,7 +261,7 @@ acceptance scenarios).
     kept as today's for FR-208. The result's link is the website's own form,
     `/PathwayBrowser?analysis={token}`. Seen failing on 17 planted faults.
 
-- [ ] T009 [US1] The details and identifier lists, `src/report/layout.ts`, after T007 and
+- [x] T009 [US1] The details and identifier lists, `src/report/layout.ts`, after T007 and
       T008.
   - Each pathway's detail: spec 001's `sectionHtml` for its Section, with T007's edit
     history in place of spec 001's, its stable identifier linked to its page on `--site`,
@@ -274,6 +274,11 @@ acceptance scenarios).
   - Tests, each seen failing: the not-found part and its contents entry absent when
     empty; a planted undrawable character in a submitted identifier printed as U+FFFD
     and logged once, the report still made; the expression columns' values in place.
+  - **Done (#200):** `detailHtml` through spec 001's `sectionHtml` (its new
+    `analysisReport` input: the report's tail and the linked identifier); `foundHtml`
+    and `notFoundHtml`, each left out when empty; `onRequestReport` with one
+    `CharacterLog`; `reportBodyHtml` for T011. Resources by the website's names. Seen
+    failing on 12 planted faults.
 
 - [ ] T010 [US1] The report's figures, `src/report/figures.ts` and
       `src/figures/client.ts`, after T006.
