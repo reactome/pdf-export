@@ -54,6 +54,12 @@ export interface Line extends Spot {
   size: number;
   /** Its pieces' text, joined as pdf.js gives them. */
   text: string;
+  /**
+   * Its pieces' texts, left to right, blank ones left out: a table's cells where each is a
+   * piece, as in today's analysis report. readLayout always sets it; a line made by hand
+   * may leave it out, read as its text alone.
+   */
+  cells?: string[];
 }
 
 export interface Link {
@@ -123,9 +129,14 @@ const IMAGES = new Set<number>([
   OPS.paintSolidColorImageMask,
 ]);
 
+/** A shape a page paints, as its box: an image, or a painted path. */
+export interface Shape extends Box {
+  image?: boolean;
+}
+
 /** The shapes a page paints: images, and painted paths, each as its box. */
-function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page: number): Box[] {
-  const boxes: Box[] = [];
+function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page: number): Shape[] {
+  const boxes: Shape[] = [];
   let ctm: Matrix = IDENTITY;
   const stack: Matrix[] = [];
   for (let i = 0; i < fnArray.length; i++) {
@@ -148,7 +159,7 @@ function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page:
       const rect = numbersOf(minMax);
       if (rect?.length === 4 && rect.every(Number.isFinite)) boxes.push(through(rect, ctm, page));
     } else if (fn !== undefined && IMAGES.has(fn)) {
-      boxes.push(through([0, 0, 1, 1], ctm, page));
+      boxes.push({ ...through([0, 0, 1, 1], ctm, page), image: true });
     }
   }
   return boxes;
@@ -217,11 +228,12 @@ const TOUCH_PT = 1;
  *   a table's hairline borders touching only its one shaded header, a rule beside a figure,
  *   or a rule ending at a mark.
  *
- * A cluster at least FIGURE_MIN_PT each way is a figure. A table whose borders touch two
- * shaded cells, or whose shaded rows lie within FIGURE_GAP_PT of each other, can still be
- * read as one (for T040 to check on `event-pdf`'s tables).
+ * A cluster at least FIGURE_MIN_PT each way is a figure, unless its shapes are a table's
+ * shaded cells in rows (`banded`): today's analysis report shades its tables'
+ * cells so (spec 002 T019), and its rows would otherwise be read as a figure and their text
+ * left out. A table shaded otherwise can still be read as one.
  */
-export function figureBoxes(boxes: readonly Box[], width: number, height: number): Box[] {
+export function figureBoxes(boxes: readonly Shape[], width: number, height: number): Box[] {
   const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
   const node = (b: Box): boolean => b.x2 - b.x1 >= NODE_PT && b.y2 - b.y1 >= NODE_PT;
   let clusters = clustered(kept.filter(node), FIGURE_GAP_PT);
@@ -251,7 +263,40 @@ export function figureBoxes(boxes: readonly Box[], width: number, height: number
     clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
   }
   clusters = clustered(clusters, FIGURE_GAP_PT);
-  return clusters.filter((c) => c.x2 - c.x1 >= FIGURE_MIN_PT && c.y2 - c.y1 >= FIGURE_MIN_PT);
+  const nodes = kept.filter(node);
+  return clusters.filter(
+    (c) =>
+      c.x2 - c.x1 >= FIGURE_MIN_PT &&
+      c.y2 - c.y1 >= FIGURE_MIN_PT &&
+      !banded(nodes.filter((b) => inside(b.x1, b.y1, c) && inside(b.x2, b.y2, c)))
+  );
+}
+
+/** A cell of a table's shading is no taller than this: a row of two or three lines. */
+export const CELL_MAX_PT = 40;
+
+/** A table's cells share their edges within this. */
+export const CELL_ALIGN_PT = 1.5;
+
+/**
+ * A cluster's shapes are a table's shaded cells: two or more painted paths and no image,
+ * each no taller than CELL_MAX_PT; those sharing a row (the same top and foot) side by side,
+ * not overlapping; and at least four in five of them sharing their row with another. See
+ * figureBoxes.
+ */
+function banded(members: readonly Shape[]): boolean {
+  if (members.length < 2 || members.some((b) => b.image === true)) return false;
+  const same = (a: number, b: number): boolean => Math.abs(a - b) <= CELL_ALIGN_PT;
+  if (members.some((b) => b.y2 - b.y1 > CELL_MAX_PT)) return false;
+  const sameRow = (a: Shape, b: Shape): boolean => same(a.y1, b.y1) && same(a.y2, b.y2);
+  const overlapping = members.some((a, i) =>
+    members.some(
+      (b, j) => j > i && sameRow(a, b) && a.x1 < b.x2 - CELL_ALIGN_PT && b.x1 < a.x2 - CELL_ALIGN_PT
+    )
+  );
+  if (overlapping) return false;
+  const inRow = members.filter((a) => members.some((b) => b !== a && sameRow(a, b))).length;
+  return inRow * 5 >= members.length * 4;
 }
 
 export const inside = (x: number, y: number, box: Box): boolean =>
@@ -307,6 +352,7 @@ function linesOf(pieces: Piece[], page: number): Line[] {
       x: Math.min(...row.map((p) => p.x)),
       size: Math.max(...row.map((p) => p.size)),
       text: row.map((p) => p.str).join(''),
+      cells: row.map((p) => p.str).filter((str) => str.trim() !== ''),
     });
     current = [];
   };

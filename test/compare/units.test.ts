@@ -29,6 +29,7 @@ import {
   figureBoxes,
   readLayout,
   type Box,
+  type Shape,
   type Layout,
   type Line,
   type Link,
@@ -741,6 +742,33 @@ describe('figures and tables', () => {
     const mark: Box = { page: 0, x1: 500, y1: 133.5, x2: 503, y2: 136.5 };
     const [figure] = figureBoxes([square(100, 100), rule, mark], 595, 842);
     assert.equal(figure?.x2, 170);
+  });
+
+  test("a table's cells each shaded, in rows, are not a figure; a figure of such shapes and an image is", () => {
+    // today's analysis report: every cell its own rectangle, 1 pt apart, rows 20 pt tall
+    const cells: Shape[] = [];
+    for (let row = 0; row < 8; row++) {
+      const y = 600 - row * 21;
+      for (const [x1, x2] of [
+        [90, 238],
+        [239, 300],
+        [301, 380],
+        [381, 484],
+        [485, 534],
+      ] as const) {
+        cells.push({ page: 0, x1, y1: y, x2, y2: y + 20 });
+      }
+    }
+    assert.equal(figureBoxes(cells, 595, 842).length, 0);
+    // the same with an image among them: a figure
+    const image: Shape = { page: 0, x1: 300, y1: 450, x2: 400, y2: 520, image: true };
+    assert.equal(figureBoxes([...cells, image], 595, 842).length, 1);
+    // shapes in rows but taller than a table's row: a figure
+    const tall = cells.map((c) => ({ ...c, y2: c.y1 + 45 }));
+    assert.equal(figureBoxes(tall, 595, 842).length, 1);
+    // shapes overlapping in a row, as a diagram's node and its label's box: a figure
+    const overlapping = [...cells, { page: 0, x1: 200, y1: 600, x2: 260, y2: 620 }];
+    assert.equal(figureBoxes(overlapping, 595, 842).length, 1);
   });
 
   test("a table's shaded header and hairline borders are not a figure", () => {
