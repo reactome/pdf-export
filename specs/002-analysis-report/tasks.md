@@ -280,7 +280,7 @@ acceptance scenarios).
     `CharacterLog`; `reportBodyHtml` for T011. Resources by the website's names. Seen
     failing on 12 planted faults.
 
-- [ ] T010 [US1] The report's figures, `src/report/figures.ts` and
+- [x] T010 [US1] The report's figures, `src/report/figures.ts` and
       `src/figures/client.ts`, after T006.
   - A `genome-wide` figure request (contracts/render.md): the species' taxonomy id and
     the token; each pathway's figure as spec 001 chooses it, with the token.
@@ -292,6 +292,10 @@ acceptance scenarios).
   - Tests against the render stub, each seen failing: never more than the cap at once
     across two reports (the stub counts its concurrency); the overview asked for with the
     report's species, not the analysis's; a refused figure leaving its place empty.
+  - **Done (#201):** `drawReportFigures` through `Slots` shared by every report (a caller
+    that ends leaves the queue); the figures client's `genome-wide` request; the render
+    stub's `peak`. A missing figure is logged without the token. T011 and T012 create the
+    slots from a setting. Seen failing on 12 planted faults.
 
 - [ ] T011 [US1] Printing the report and `pdf-export report`, `src/report/report.ts` and
       `src/cli.ts`, after T009 and T010.
