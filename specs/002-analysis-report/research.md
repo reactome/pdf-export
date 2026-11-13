@@ -452,3 +452,59 @@ the servlet container's HTML 400 (R5's table).
 500 for a client's bad input is an obvious bug, so this is a listed difference (spec
 Assumptions), not a match. A number or flag that is not one keeps today's framework 400
 exactly (R5), since callers may parse it.
+
+## R9. The comparison with today's report (T019, 13 Nov 2026)
+
+**The run.** T001's and T002's tokens could not be found again (they were not kept with
+their reports), so one fresh token was made as T001 made its own (R5): an
+over-representation analysis of seven gene symbols and two made-up identifiers, posted
+to the development host's own analysis service on loopback, whose data are release 98.
+Today's report came from that service at 25 and 50 pathways, one request at a time (31 s,
+11.0 MB; 63 s, 25.9 MB); pdf-export's from `pdf-export report` with the same settings,
+against the same analysis service, the render service and a private copy of the release
+98 graph. Both are kept outside the repository, and removed after the run. Each pair was
+compared by `pdf-export compare-report`.
+
+**What the reader learned from today's files** (#212), each with a test on a report
+printed here in today's form, seen failing without it:
+
+- its parts numbered (`4. Most significant pathways`), "Pathways details", and a contents
+  list naming them at a size between the body's and the parts' headings;
+- its properties as sentences, set at a heading's size;
+- its tables' cells each shaded on its own, which the reader had taken for a figure, so
+  their text was left out;
+- the pathways' table: `10 / 536`, thousands with commas, ratios to three places, powers
+  with two-digit exponents, a name's lines centred beside its statistics; a statistic
+  agrees where the values the two prints could be rounded from overlap;
+- each detail at `1.Name (R-HSA-1)`, over two lines when long; "Cellular compartments:"
+  and facts ending in a full stop; words broken at a line's end by a hyphen; "References"
+  over an empty list; references hanging, their authors in another form, so each is
+  compared from its year in brackets on; the edit history's header repeated on each
+  page, and its names `Surname I, …`, so a row's names are compared as their words;
+- the identifiers found and not found, several entries a row.
+- On pdf-export's side: a row's statistics read by their cells, as a name's last word
+  (`Interleukin-4`) can touch the first; the notes under the table end it; a figure's
+  stray labels, set under 0.6 of the body's size, left out.
+
+**Read on both sides** at 25 and at 50: the cover's title, name, release and link; all
+nine properties; every row of the table; every detail, its figure, name, summation,
+references, edit history, entities and, where there are some, compartments and
+diseases; the identifiers found by resource and not found. The interactors are read
+from pdf-export's headings only: this token has none, and today's form for them is
+not known.
+
+**Differences found** (the same at 25 and at 50):
+
+| Part                             | Sections (25 / 50)                    | Reason                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edit history, order within a day | 4 / 8 (and in some of the next row's) | **Bug, fixed (#213).** Today's groups a day's edits into a hash map with `computeIfAbsent`, which puts a new key at the head of its bucket; Created, Authored and Reviewed share one, so a day reads Modified, Revised, Edited, Reviewed, Authored, Created. R2 inferred the order of `put`. |
+| Edit history, Modified rows      | 11 / 20                               | **For a decision.** 20 of the 50 pathways have two `modified` edits in the release 98 graph (R2 said one). Today's prints none for them, and one where there is one; pdf-export prints a row for each.                                                                                       |
+| References                       | 1 / 2                                 | A Greek letter today's typeface lacks, written as U+0000 (an improvement). **For a decision:** a book's and a web page's reference printed in spec 001's form, where today's prints a web page's address and a book's publisher after a comma.                                               |
+
+Every other part agreed at both sizes. The edit history's grouping by day (T007) holds:
+on the two pathways with two edits of one kind on one day at different times, both
+reports print one row with both names.
+
+**Not run here:** the expression, interactors and species-comparison tokens (T002's
+sample), whose reports today's prints in forms not read yet (value columns, interactor
+tables); and the check of each figure for its overlay (quickstart §3).
