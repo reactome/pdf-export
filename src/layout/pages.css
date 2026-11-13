@@ -80,9 +80,16 @@ p {
   height: 90mm;
   margin: 8mm 0;
 }
+.cover .name {
+  font-size: var(--mat-sys-title-large-size);
+  line-height: var(--mat-sys-title-large-line-height);
+  margin-bottom: 8pt;
+}
 .cover .excerpt,
 .cover .names,
 .cover .licence,
+.cover .result,
+.cover .kept,
 .cover .date {
   font-size: var(--mat-sys-body-small-size);
   line-height: var(--mat-sys-body-small-line-height);
@@ -198,7 +205,8 @@ h6 {
 
 .summation table,
 table.edits,
-table.found {
+table.found,
+table.pathways {
   border-collapse: collapse;
   margin: 4pt 0 8pt;
   /* no wider than the column while its columns can narrow to their longest words */

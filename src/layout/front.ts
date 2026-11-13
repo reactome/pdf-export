@@ -48,9 +48,14 @@ const LOGO = prefixIds(readFileSync(new URL('logo.svg', import.meta.url), 'utf8'
   '<svg role="img" aria-label="Reactome"'
 );
 
+/** The cover's logo, in its box. */
+export function logoHtml(): string {
+  return `<div class="logo">${LOGO}</div>`;
+}
+
 export function coverHtml(doc: Document, links: Links, figures: FigureSvgs, date: Date): string {
   const { cover } = doc;
-  const parts = [`<div class="logo">${LOGO}</div>`, `<p class="title">${text(cover.title)}</p>`];
+  const parts = [logoHtml(), `<p class="title">${text(cover.title)}</p>`];
   if (cover.release !== null) {
     parts.push(`<p class="release">${text(fill(RELEASE_LINE, { release: cover.release }))}</p>`);
   }
@@ -73,7 +78,7 @@ export function coverHtml(doc: Document, links: Links, figures: FigureSvgs, date
 }
 
 /** The licence statement, its licences and the website's page linked. */
-function licence(links: Links): string {
+export function licence(links: Links): string {
   const linked: [string, string][] = [
     ['CC0 1.0', LICENCE.links.cc0],
     ['CC BY 4.0', LICENCE.links.ccBy],
@@ -94,8 +99,9 @@ export function formatDate(date: Date): string {
   });
 }
 
-export function introductionHtml(doc: Document, links: Links): string {
-  const references = ownReferences()
+/** Reactome's own papers, as the introduction lists them. */
+export function ownReferencesHtml(): string {
+  return ownReferences()
     .map((r) => {
       const authors =
         r.authors.length > 0
@@ -104,6 +110,10 @@ export function introductionHtml(doc: Document, links: Links): string {
       return `<li>${authors}${Links.a(`https://doi.org/${r.doi}`, r.title)}. <i>${text(r.journal)}</i>.</li>`;
     })
     .join('');
+}
+
+export function introductionHtml(doc: Document, links: Links): string {
+  const references = ownReferencesHtml();
   return `<section class="front" data-part="introduction">
 <h1 id="${FRONT.introduction}">${links.probe(FRONT.introduction)}Introduction</h1>
 <p>${text(ABOUT_REACTOME)}</p>

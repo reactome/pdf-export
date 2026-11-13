@@ -403,6 +403,9 @@ The comparisons run on the development host's own services only.
     inferred-from, descriptions, references, edit-history rows (names as a set, compared
     by hash; with more than five, the "et al." alone), entities per resource and
     interactors; the identifiers found with their values; the not found.
+  - The edit history's rows are grouped by day (T007, accepted 13 Nov 2026): the
+    comparison checks it against today's report on a pathway with two edits of one kind
+    on one day at different times, one row in both or a recorded difference.
   - Prints counts and hashes, never names; seen failing on a planted difference in each
     part.
   - Each figure checked for its analysis overlay (quickstart §3), seen failing on one
