@@ -354,7 +354,7 @@ status and file name as recorded or a listed difference (SC-202).
     001 checks it before any read. Spec 001's slot and deadline logic is shared
     (`takeSlot`, `requestEnd`). Seen failing on 16 planted faults.
 
-- [ ] T013 [US2] The report in the background, `src/report/jobs.ts` and `src/serve.ts`
+- [x] T013 [US2] The report in the background, `src/report/jobs.ts` and `src/serve.ts`
       (FR-210, data-model Job), after T012.
   - A request starts the report, or joins the one queued, being made or kept for the same
     key (token, species' database id, clamped `number`, defaulted `resource`,
@@ -368,6 +368,12 @@ status and file name as recorded or a listed difference (SC-202).
     requests for one key make one report (the stubs' counts); the error given to the
     waiting and the next, then a fresh start; the budget ending a report as 503; an
     abandoned request leaving the report to finish.
+  - **Done (#204):** every request checks the species and the token (`checkReport`), then
+    joins or starts the job its key names (`Jobs`, `src/report/jobs.ts`); 202 is the
+    service's JSON, or for `Accept: text/html` a page that asks again; the 503's message
+    follows the analysis gateway's, from its `Retry-After`. The limits are `reportWaitMs`,
+    `reportBudgetMs`, `reportKeepMs` and `reportsMaking`. Seen failing on 15 planted
+    faults.
 
 - [ ] T014 [US2] Limits and keeping, `src/report/jobs.ts` (FR-210, FR-211), after T013.
   - Two made at once and eight waiting by default (each a setting), 503 with
