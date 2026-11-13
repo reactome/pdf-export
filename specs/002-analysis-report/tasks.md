@@ -177,7 +177,7 @@ layout. Blocks every later phase.
     them; the 410 test checks which call failed, as a call 4 swallowing its 410 otherwise
     passed when call 5 failed after it.
 
-- [ ] T006 [US1] The report model, `src/report/model.ts` (data-model.md), from T005's
+- [x] T006 [US1] The report model, `src/report/model.ts` (data-model.md), from T005's
       answers, after T005.
   - **The request:** `number` clamped to 1–50 (25 by default), and a number or flag that
     is not one answered as T001 recorded; `importableOnly` acting only with `TOTAL`.
@@ -201,6 +201,14 @@ layout. Blocks every later phase.
     (one resource besides `TOTAL`, and two); an identifier in two pathways taking the
     first's values; the count spanning resources; KEGG COMPOUND's table filled; the
     name's fallbacks in order; repeats in not-found removed.
+  - **Done (#197):** `reportParameters` (Spring's readings of an `Integer` and a `Boolean`,
+    read from its source), `speciesByIdentifier` and `speciesByDbId` (graph-core's lookup,
+    read from its compiled class), and `buildReport`. The identifiers found are sorted by
+    identifier, as today's sorted set is, each from the first pathway in call 2's order.
+    Seen failing on 24 planted faults. An `importableOnly` of spaces alone is false here
+    (today's, by its source, fails); a parameter given twice reads its first value, a
+    resource given twice its values joined by commas, as the framework converts them (not
+    measured).
 
 - [ ] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
       `src/report/edits.ts` (research R2), after T003 and T006.
