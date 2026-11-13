@@ -138,7 +138,7 @@ const RULES: readonly PartRule[] = [
   { part: 'type', labels: labelPattern(['reaction type', 'type']), fact: true },
   {
     part: 'compartments',
-    labels: labelPattern(['compartments', 'compartment']),
+    labels: labelPattern(['cellular compartments', 'compartments', 'compartment']),
     fact: true,
     split: /,/,
   },
@@ -164,7 +164,15 @@ const RULES: readonly PartRule[] = [
     names: true,
   },
   { part: 'edits', labels: labelPattern(['edit history']), split: 'dated', names: true },
-  { part: 'entities', labels: labelPattern(['entities found']), split: 'rows' },
+  {
+    part: 'entities',
+    // today's analysis report: "6 submitted entities found in this pathway, mapping to …"
+    labels: [
+      ...labelPattern(['entities found']),
+      /^\s*\d[\d,]*\s+submitted\s+entit(?:y|ies)\s+found\b/i,
+    ],
+    split: 'rows',
+  },
   { part: 'interactors', labels: labelPattern(['interactors found']), split: 'rows' },
 ];
 
@@ -243,7 +251,30 @@ export interface ReduceOptions {
   editRows?: 'report';
   /** Headings that end a section's region: the report's parts after its details. */
   stops?: RegExp;
+  /**
+   * The analysis report's reading (spec 002 T019), of pdf-export's report and today's:
+   *
+   * - **Sections** also at a heading ending in its stable identifier in brackets, numbered
+   *   (`1.Name (R-HSA-1)`, perhaps over two lines), as today's writes them, where no stable
+   *   identifier's label is found; the name read without its number and identifier.
+   * - **Text** compared with hyphens left out, as today's breaks words at a line's end; lines
+   *   set under REPORT_SMALL of the body's size (a figure's labels outside its shapes) left
+   *   out.
+   * - **References** each from a line at the part's left edge (the rest hang indented), read
+   *   from its year in brackets on: their authors are written in one form here and another
+   *   there.
+   * - **Entities and interactors** as rows of an identifier and its mappings, by resource
+   *   (`reportEntityRows`).
+   */
+  report?: boolean;
 }
+
+/** In the report's reading, a line set smaller than this share of the body's size is a figure's label. */
+export const REPORT_SMALL = 0.6;
+
+/** A section's heading in today's report: its number, its name, its stable identifier in brackets. */
+const NUMBERED = /^\s*\d+\.\s*/;
+const HEADING_ID = /\((R-[A-Z]{3}-\d+)\)$/;
 
 /** A layout reduced to FR-012's parts. */
 export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
@@ -269,7 +300,31 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   });
   const firstPage = lines.findIndex((line) => line.page > 0);
   const afterCover = firstPage < 0 ? lines.length : firstPage;
+  // the report's reading, where no label was found: a numbered heading, over up to three
+  // lines, ending in the stable identifier in brackets
+  const runs: { start: number; i: number; stId: string }[] = [];
+  if (options.report && anchors.length === 0) {
+    for (let k = afterCover; k < lines.length; k++) {
+      if (!headingAt(k) || !NUMBERED.test(plain(lines[k]?.text ?? ''))) continue;
+      for (let e = k; e < k + 3 && headingAt(e); e++) {
+        const text = fold(
+          lines
+            .slice(k, e + 1)
+            .map((line) => line.text)
+            .join(' ')
+        );
+        const stId = HEADING_ID.exec(text)?.[1];
+        if (stId === undefined) continue;
+        runs.push({ start: k, i: e + 1, stId });
+        k = e;
+        break;
+      }
+    }
+    anchors.push(...runs.map(({ i, stId }) => ({ i, stId })));
+  }
   const starts = anchors.map(({ i }, n) => {
+    const run = runs[n];
+    if (run) return run.start;
     // never back onto the cover, whose title is no section's heading
     const floor = n > 0 ? (anchors[n - 1]?.i ?? 0) + 1 : afterCover;
     let j = i - 1;
@@ -280,7 +335,14 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       }
     }
     let start = j + 1;
-    while (start - 1 >= floor && headingAt(start - 1)) start--;
+    // back over the heading's lines; never onto a part's heading the stops name
+    while (
+      start - 1 >= floor &&
+      headingAt(start - 1) &&
+      !options.stops?.test(plain(lines[start - 1]?.text ?? '').trim())
+    ) {
+      start--;
+    }
     return start;
   });
   const startSet = new Set(starts);
@@ -364,18 +426,19 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
         }
       }
     }
-    const parts: { part: PartName; texts: string[] }[] = [];
+    const parts: { part: PartName; texts: string[]; lines: Line[] }[] = [];
     const headingLines: Line[] = [];
     for (let k = start; k < i; k++) {
       const line = lines[k];
       if (!line || !heading(line)) break;
       headingLines.push(line);
     }
-    parts.push({ part: 'name', texts: headingLines.map((line) => line.text) });
-    let current: { part: PartName; texts: string[] } | null = null;
+    parts.push({ part: 'name', texts: headingLines.map((line) => line.text), lines: headingLines });
+    let current: { part: PartName; texts: string[]; lines: Line[] } | null = null;
     for (let k = start + headingLines.length; k < end; k++) {
       const line = lines[k];
       if (!line) continue;
+      if (options.report && line.size < body * REPORT_SMALL) continue;
       const order = current ? orderOf(current.part) : orderOf('name');
       let matched: { part: PartName; rest: string } | null = null;
       for (const rule of RULES) {
@@ -387,7 +450,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
         }
       }
       if (matched) {
-        current = { part: matched.part, texts: [matched.rest] };
+        current = { part: matched.part, texts: [matched.rest], lines: [line] };
         parts.push(current);
         continue;
       }
@@ -405,20 +468,23 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
         orderOf(current?.part ?? 'name') < orderOf('summation') &&
         (afterFigure || line.x <= left + 1)
       ) {
-        current = { part: 'summation', texts: [line.text] };
+        current = { part: 'summation', texts: [line.text], lines: [line] };
         parts.push(current);
         continue;
       }
       current?.texts.push(line.text);
+      current?.lines.push(line);
     }
     return {
       stId,
-      parts: parts.map(({ part, texts }) => ({
+      parts: parts.map(({ part, texts, lines: own }) => ({
         part,
         items:
           part === 'edits' && options.editRows === 'report'
             ? reportEditRows(texts)
-            : items(part, texts),
+            : options.report
+              ? reportItems(part, texts, own)
+              : items(part, texts),
       })),
       figure: figureKind(
         own,
@@ -482,6 +548,8 @@ export function reportEditRows(texts: readonly string[]): string[] {
   const rows: string[] = [];
   for (const text of texts) {
     const read = plain(text).trim();
+    // the table's header, repeated where the table runs onto another page
+    if (/^date\s*action\b/i.test(read)) continue;
     if (/^\d{4}-\d{2}-\d{2}/.test(read)) rows.push(read);
     else if (rows.length > 0) rows[rows.length - 1] = `${rows.at(-1) ?? ''} ${read}`;
   }
@@ -491,9 +559,118 @@ export function reportEditRows(texts: readonly string[]): string[] {
     const action = ACTIONS.exec(rest)?.[1]?.toLowerCase() ?? 'unread';
     const names = rest.replace(ACTIONS, '').trim();
     if (/et al\.?$/i.test(names)) return `${date} ${action} et-al`;
-    const { count, hash: digest } = hashNames(names === '' ? [] : names.split(/;/));
-    return `${date} ${action} ${String(count)}:${digest}`;
+    return `${date} ${action} ${editNames(names)}`;
   });
+}
+
+/**
+ * A row's names as a set, compared as their words: pdf-export writes "Surname, Initials; …"
+ * and today's report "Surname Initials, …", and a name with no initials leaves no way to
+ * count today's names apart. So the row holds the count of its words and one hash of them,
+ * sorted, their commas and semicolons left out; no name is held as text.
+ */
+export function editNames(names: string): string {
+  const words = plain(names)
+    .split(/[\s,;]+/)
+    .map(fold)
+    .filter((word) => word !== '')
+    .sort();
+  return `${String(words.length)}w:${hash(words.join(' '))}`;
+}
+
+/** The report's reading of a section's part (ReduceOptions.report), its items folded. */
+function reportItems(part: PartName, texts: readonly string[], own: readonly Line[]): string[] {
+  const unhyphened = (text: string): string => fold(text).replace(/[-\u00ad\u2010]/g, '');
+  if (part === 'name') {
+    const name = plain(texts.join(' '))
+      .replace(NUMBERED, '')
+      .replace(/\(R-[A-Z]{3}-[\d\s]+\)\s*$/, '');
+    return [unhyphened(name)].filter((item) => item !== '');
+  }
+  if (part === 'summation') return [unhyphened(texts.join(' '))].filter((item) => item !== '');
+  if (part === 'references') {
+    // each from a line at the part's left edge; read from its year in brackets on
+    const body = own.slice(1);
+    const left = Math.min(...body.map((line) => line.x));
+    const found: string[] = [];
+    for (const line of body) {
+      if (line.x <= left + 1 || found.length === 0) found.push(line.text);
+      else found[found.length - 1] = `${found.at(-1) ?? ''} ${line.text}`;
+    }
+    return found
+      .map((text) => {
+        const year = /\(\d{4}[a-z]?\)/.exec(text);
+        return unhyphened(year ? text.slice(year.index) : text);
+      })
+      .filter((item) => item !== '')
+      .map(hash);
+  }
+  if (part === 'entities' || part === 'interactors') return reportEntityRows(own);
+  // today's ends a fact with a full stop (`Cellular compartments: nucleoplasm.`)
+  return items(part, texts).map((item) => item.replace(/\.$/, ''));
+}
+
+/**
+ * A table of identifiers found, by resource, as rows of an identifier and its mappings (and
+ * any values), each `resource:hash`, sorted: a set, as how a page lays them out differs.
+ *
+ * - **pdf-export's:** a resource named by a line `Entities found: UniProt` or `UniProt: 7
+ *   identifiers mapping to …`, a header `Identifier …`, then a row a line, its identifier
+ *   first.
+ * - **Today's:** a header of `Input <Resource> Id` repeated across the page, each group of
+ *   the header's cells one entry of a row, and the row's cells, each a piece, taken in such
+ *   groups.
+ *
+ * A line before any resource or header is not a row. The identifiers are the analysis's
+ * user's, so a row is only ever held as its hash.
+ */
+export function reportEntityRows(own: readonly Line[]): string[] {
+  const rows: string[] = [];
+  let resource: string | null = null;
+  let group = 0;
+  const entry = (fields: readonly string[]): void => {
+    const [identifier = '', ...rest] = fields;
+    const mappings = rest
+      .join(' ')
+      .split(/[\s,]+/)
+      .map(fold)
+      .filter((field) => field !== '')
+      .sort();
+    rows.push(`${resource ?? ''}:${hash(`${fold(identifier)}>${mappings.join(',')}`)}`);
+  };
+  for (const line of own) {
+    const text = plain(line.text).trim();
+    const cells = (line.cells ?? [line.text]).map((cell) => plain(cell).trim());
+    const named =
+      /^entities\s+found:?\s*(.*)$/i.exec(text)?.[1] ??
+      /^(.+?):\s*\d[\d,]*\s+identifiers?\s+mapping\s+to\b/i.exec(text)?.[1];
+    if (named !== undefined) {
+      resource = fold(named).toLowerCase() || null;
+      group = 0;
+      continue;
+    }
+    if (cells[0] === 'Input') {
+      // today's header: Input, then the resource's column and any values', repeated
+      resource = fold(cells[1] ?? '')
+        .replace(/Id$/i, '')
+        .toLowerCase();
+      const inputs = cells.filter((cell) => cell === 'Input').length;
+      group = Math.max(1, Math.round(cells.length / inputs));
+      continue;
+    }
+    if (/^identifier\b/i.test(text)) {
+      group = 0;
+      continue;
+    }
+    if (/^\d[\d,]*\s+submitted\s+entit/i.test(text) || /^interactors\s+found/i.test(text)) continue;
+    if (resource === null || text === '') continue;
+    if (group > 0) {
+      for (let at = 0; at < cells.length; at += group) entry(cells.slice(at, at + group));
+    } else {
+      entry(text.split(/\s+/));
+    }
+  }
+  return rows.sort();
 }
 
 /** A part's items from its lines' texts, folded; hashed where they name people. */

@@ -14,11 +14,14 @@ import {
   compareReportCommand,
   compareReports,
   reduceReportPdf,
+  samePrinted,
   sameStatistic,
+  unitOf,
   type ReportReduced,
 } from '../../src/compare/report.ts';
+import { editNames, reportEditRows, reportEntityRows } from '../../src/compare/reduce.ts';
 import { Output } from '../../src/compare/output.ts';
-import type { SpeciesRef } from '../../src/graph/queries.ts';
+import type { Reference, SpeciesRef } from '../../src/graph/queries.ts';
 import { pageStyles } from '../../src/layout/document.ts';
 import { Printer } from '../../src/print/print.ts';
 import type { PathwayDetail } from '../../src/report/details.ts';
@@ -26,11 +29,30 @@ import type { HistoryRow } from '../../src/report/edits.ts';
 import { buildReport, type ReportModel } from '../../src/report/model.ts';
 import { reportPage } from '../../src/report/report.ts';
 import { REPORT_TOKENS, startAnalysisStub } from '../stubs/analysis.ts';
+import { todayReportHtml } from './today-form.ts';
+import type { Line } from '../../src/compare/read.ts';
 
 const HUMAN: SpeciesRef = { dbId: 90000002, taxId: '9606', name: 'Homo sapiens' };
 const SIX = ['Placeholder, A', 'Example, B', 'Sample, C', 'Dummy, D', 'Instance, E', 'Model, F'];
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#cde"/><text x="20" y="40" style="font: normal 600 12px Roboto">Placeholder label</text></svg>';
+
+const REFERENCE: Reference = {
+  dbId: 1,
+  kind: 'article',
+  title: 'A made-up title of a made-up study',
+  chapterTitle: null,
+  journal: 'Placeholder Journal',
+  volume: 4,
+  pages: '39-49',
+  year: 2003,
+  pubMedId: null,
+  isbn: null,
+  url: null,
+  publisher: null,
+  authors: ['Placeholder, A', 'Example, B'],
+  moreAuthors: false,
+};
 
 /** A made-up detail for a pathway: spec 001's section and an edit history. */
 function detail(
@@ -65,7 +87,7 @@ function detail(
       diseases: [],
       inferredFrom: [],
       summations: ['<p>A made-up summation.</p>'],
-      references: [],
+      references: [REFERENCE],
       edits: [],
       depth: 0,
     },
@@ -115,6 +137,18 @@ describe("the analysis report's comparison (FR-208)", { timeout: 600_000 }, () =
     writeFileSync(path, await printer.single(html));
     return { reduced: await reduceReportPdf(path), path };
   };
+  /** The same model and details in today's form, printed and read back. */
+  const today = async (
+    m: ReportModel,
+    d: ReadonlyMap<number, PathwayDetail>
+  ): Promise<ReportReduced> => {
+    const path = join(dir, `${String(++count)}.pdf`);
+    writeFileSync(
+      path,
+      await printer.single(todayReportHtml(m, d, { release: 98, site: 'https://site.example' }))
+    );
+    return reduceReportPdf(path);
+  };
   const differences = (ref: ReportReduced, neu: ReportReduced): string[] =>
     compareReports('report.pdf', ref, neu).map((d) =>
       `${d.part} ${d.field ?? ''} ${d.kind}`.replace('  ', ' ')
@@ -151,11 +185,130 @@ describe("the analysis report's comparison (FR-208)", { timeout: 600_000 }, () =
     assert.equal(baseline.reduced.sections.length, model.pathways.length);
     assert.deepEqual(
       baseline.found?.map((f) => f.counts),
-      [[3, 5]]
+      [[3]]
     );
-    assert.equal(baseline.notFound?.length, 2);
+    // each identifier not found and its values, a cell each
+    assert.equal(baseline.notFound?.length, 2 * (1 + model.columns.length));
     const again = (await printed(model, details(model))).reduced;
     assert.deepEqual(differences(baseline, again), []);
+  });
+
+  test("today's form: every part read, and the same content agrees with pdf-export's", async () => {
+    const t = await today(model, details(model));
+    assert.equal(t.cover.title, 'same');
+    assert.equal(t.cover.release, 98);
+    assert.equal(t.cover.link, true);
+    assert.deepEqual(Object.keys(t.properties ?? {}).sort(), [
+      'identifiersFound',
+      'identifiersTotal',
+      'interactors',
+      'pathways',
+      'projection',
+      'resource',
+      'species',
+      'token',
+      'type',
+    ]);
+    assert.equal(t.pathways?.length, model.pathways.length);
+    assert.equal(t.reduced.sections.length, model.pathways.length);
+    assert.ok((t.found?.[0]?.rows.length ?? 0) > 0, 'the identifiers found');
+    assert.equal(t.notFound?.length, baseline.notFound?.length);
+    assert.deepEqual(differences(t, baseline), []);
+    // no references: today's "References" over nothing is as pdf-export's none
+    const bare = new Map(
+      [...details(model)].map(([id, d]) => [
+        id,
+        { ...d, section: { ...d.section, references: [] } },
+      ])
+    );
+    assert.deepEqual(
+      differences(await today(model, bare), (await printed(model, bare)).reduced),
+      []
+    );
+  });
+
+  test("today's form: a planted difference in each part is found", async () => {
+    const [first, ...rest] = model.pathways;
+    const [resource] = model.found;
+    const [row, ...others] = resource?.rows ?? [];
+    assert.ok(first && resource && row);
+    const planted: [string, ReportModel, Map<number, PathwayDetail>, string[]][] = [];
+    const add = (
+      name: string,
+      m: ReportModel,
+      d: Map<number, PathwayDetail>,
+      want: string[]
+    ): void => {
+      planted.push([name, m, d, want]);
+    };
+    const hit = { ...model, pathwaysHit: model.pathwaysHit + 1 };
+    add('a property', hit, details(hit), ['analysis pathways value']);
+    const stat = {
+      ...model,
+      pathways: [
+        {
+          ...first,
+          statistics: { ...first.statistics, entities: { ...first.statistics.entities, fdr: 0.5 } },
+        },
+        ...rest,
+      ],
+    };
+    add('a statistic', stat, details(stat), ['pathways statistics value']);
+    add('compartments', model, details(model, HISTORY, ['nucleoplasm']), [
+      'section compartments text',
+    ]);
+    const renamed: HistoryRow[] = [
+      CREATED,
+      {
+        date: '2026-01-04',
+        action: 'Authored',
+        names: ['Placeholder, A', 'Sample, C'],
+        etAl: false,
+      },
+    ];
+    add("an edit's names", model, details(model, renamed), ['section edits text']);
+    const retitled = new Map(
+      [...details(model)].map(([id, d]) => [
+        id,
+        {
+          ...d,
+          section: { ...d.section, references: [{ ...REFERENCE, title: 'Another made-up title' }] },
+        },
+      ])
+    );
+    add('a reference', model, retitled, ['section references text']);
+    const mapped = {
+      ...model,
+      found: [{ ...resource, rows: [{ ...row, mapsTo: ['XQ9999'] }, ...others] }],
+    };
+    add('an identifier found', mapped, details(mapped), [
+      'found entities missing',
+      'found entities extra',
+    ]);
+    const fewer = { ...model, notFound: model.notFound.slice(1) };
+    // planted in today's, the reference: pdf-export's then has one more
+    add('an identifier not found', fewer, details(fewer), ['not-found rows extra']);
+    for (const [name, m, d, want] of planted) {
+      assert.deepEqual(differences(await today(m, d), baseline), want, name);
+    }
+  });
+
+  test("a pathway's name ending in a number, its cell touching the first statistic's", async () => {
+    const [first, ...rest] = model.pathways;
+    assert.ok(first);
+    const numbered = {
+      ...model,
+      pathways: [{ ...first, name: 'Placeholder-4 and placeholder-13 signalling' }, ...rest],
+    };
+    const d = details(numbered);
+    const { entities, reactions } = first.statistics;
+    const want = [entities.found, entities.total, reactions.found, reactions.total];
+    for (const reduced of [(await printed(numbered, d)).reduced, await today(numbered, d)]) {
+      const row = reduced.pathways?.[0];
+      assert.ok(row);
+      const s = row.statistics;
+      assert.deepEqual([s[0], s[1], s[5], s[6]], want);
+    }
   });
 
   test('the cover: the analysis named otherwise', async () => {
@@ -296,4 +449,62 @@ test('a statistic agrees where it prints the same at three significant figures',
   assert.ok(!sameStatistic(0.0012, 0.0013));
   assert.ok(!sameStatistic(1.25e-4, 1.26e-4));
   assert.ok(!sameStatistic(12, 13));
+});
+
+test("a printed statistic agrees within half of each one's last place", () => {
+  assert.equal(unitOf('0.033'), 1e-3);
+  assert.equal(unitOf('1,575'), 1);
+  assert.ok(Math.abs(unitOf('1.16e-09') - 1e-11) < 1e-25);
+  assert.ok(samePrinted(0.033, 1e-3, 0.0329, 1e-4));
+  assert.ok(samePrinted(0.006, 1e-3, 0.0055, 1e-4));
+  assert.ok(!samePrinted(0.033, 1e-3, 0.0319, 1e-4));
+  assert.ok(!samePrinted(536, 1, 537, 1));
+});
+
+test("an edit row's names: the same words in either form, another word not", () => {
+  assert.equal(editNames('Placeholder, A; Example, BC'), editNames('Example BC, Placeholder A'));
+  assert.equal(editNames('Placeholder, A'), editNames('Placeholder A'));
+  assert.notEqual(editNames('Placeholder, A'), editNames('Placeholder A, Example B'));
+});
+
+test("the identifiers found: today's three entries a row are pdf-export's rows", () => {
+  const line = (text: string, cells: string[]): Line => ({
+    page: 1,
+    y: 500,
+    x: 90,
+    size: 8,
+    text,
+    cells,
+  });
+  const ours = reportEntityRows([
+    line('Entities found: UniProt', ['Entities found: UniProt']),
+    line('Identifier Maps to', ['Identifier', 'Maps to']),
+    line('XR0001 XQ0001, XQ0002', ['XR0001', 'XQ0001, XQ0002']),
+    line('XR0002 XQ0003', ['XR0002', 'XQ0003']),
+  ]);
+  const todays = reportEntityRows([
+    line('3 submitted entities found in this pathway, mapping to 3 Reactome entities', []),
+    line('Input UniProt Id Input UniProt Id', ['Input', 'UniProt Id', 'Input', 'UniProt Id']),
+    line('XR0002 XQ0003 XR0001 XQ0002, XQ0001', ['XR0002', 'XQ0003', 'XR0001', 'XQ0002, XQ0001']),
+  ]);
+  assert.equal(ours.length, 2);
+  assert.deepEqual(todays, ours);
+  const other = reportEntityRows([
+    line('Input UniProt Id Input UniProt Id', ['Input', 'UniProt Id', 'Input', 'UniProt Id']),
+    line('XR0002 XQ0003 XR0001 XQ0002', ['XR0002', 'XQ0003', 'XR0001', 'XQ0002']),
+  ]);
+  assert.notDeepEqual(other, ours);
+});
+
+test("an edit history's header, repeated where the table runs onto another page, is no row's", () => {
+  const rows = [
+    'Date Action Author',
+    '2026-01-04 Created Placeholder A',
+    'Date Action Author',
+    '2026-01-05 Reviewed Example B',
+  ];
+  assert.deepEqual(reportEditRows(rows), [
+    `2026-01-04 created ${editNames('Placeholder A')}`,
+    `2026-01-05 reviewed ${editNames('Example B')}`,
+  ]);
 });
