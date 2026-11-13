@@ -24,6 +24,11 @@ export interface SectionInput {
   /** What an analysis found, by the event's stable identifier. */
   found: ReadonlyMap<string, Found> | null;
   report: Report;
+  /**
+   * The analysis report's own (spec 002 T009): markup in place of the edit history and what
+   * an analysis found, and the stable identifier linked to the event's page.
+   */
+  analysisReport?: { tail: string; linkStId: true };
 }
 
 /** An event's heading level: the PDF's own event or a chapter's is h1, h6 the deepest. */
@@ -55,7 +60,11 @@ export function sectionHtml(section: Section, input: SectionInput): string {
         .join(' <span class="sep">›</span> '),
     ]);
   }
-  facts.push(['Stable identifier', `<span class="id">${text(event.stId)}</span>`]);
+  const stId = `<span class="id">${text(event.stId)}</span>`;
+  facts.push([
+    'Stable identifier',
+    input.analysisReport ? `<a href="${attribute(links.event(event.stId))}">${stId}</a>` : stId,
+  ]);
   if (event.kind === 'reaction' && event.category) facts.push(['Type', text(event.category)]);
   if (event.compartments.length > 0) {
     facts.push(['Compartments', event.compartments.map((c) => text(c.name)).join(', ')]);
@@ -115,7 +124,9 @@ export function sectionHtml(section: Section, input: SectionInput): string {
     );
   }
 
-  if (section.edits.length > 0) {
+  if (input.analysisReport) {
+    parts.push(input.analysisReport.tail);
+  } else if (section.edits.length > 0) {
     const rows = section.edits
       .map(
         (row) =>
@@ -127,7 +138,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
     );
   }
 
-  const found = input.found?.get(event.stId);
+  const found = input.analysisReport ? undefined : input.found?.get(event.stId);
   if (found)
     parts.push(
       foundHtml('Entities found', found.entities),
