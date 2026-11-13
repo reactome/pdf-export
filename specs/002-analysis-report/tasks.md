@@ -433,11 +433,13 @@ status and file name as recorded or a listed difference (SC-202).
 **Purpose:** the report on real data, against today's, and the website routed to it.
 The comparisons run on the development host's own services only.
 
-- [ ] T017 [WA] The render page waits for its analysis overlay (plan, Order of work,
+- [x] T017 [WA] The render page waits for its analysis overlay (plan, Order of work,
       step 0; research R3; FR-204), in WebsiteAngular, under its render service's spec:
       readiness waits for the overlay for the result's default resource, with a test that
       fails when the page is ready before it; the render cache's key bumped, so figures
       cached without it are not served. Gates T019 and T020; link its PR here.
+  - **Done:** reactome/WebsiteAngular#771 (the wait and its cache key, 2 Nov) and
+    reactome/WebsiteAngular#958 (the same for held pages); research R3, "Settled".
 
 - [ ] T018 [WA] The pdf-export image's pin and settings for the report (WebsiteAngular's
       `deploy/pdf-export` and compose): the report's analysis setting and the working
