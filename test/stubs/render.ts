@@ -64,6 +64,8 @@ export interface RenderStub {
   requests: string[];
   /** When each request came, by `Date.now()`, beside `requests`. */
   times: number[];
+  /** The most figure requests it has held at once, since it started or was reset (spec 002 T010). */
+  readonly peak: number;
   /** Refuse requests for a stable id, or `GENOME_WIDE`, `times` times (every time without it). */
   refuse(stId: string, how: Refusal, times?: number): void;
   /** Refuse requests for every figure, `times` times in all (every time without it). */
@@ -130,6 +132,8 @@ export async function startRenderStub(): Promise<RenderStub> {
   let silent = false;
   let delayMs = 0;
   const delayed = new Map<NodeJS.Timeout, import('node:http').ServerResponse>();
+  let inFlight = 0;
+  let peak = 0;
 
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub');
@@ -156,6 +160,12 @@ export async function startRenderStub(): Promise<RenderStub> {
       return;
     }
     const stId = match[1];
+    // a figure request is held from its arrival until its answer ends or its connection closes
+    inFlight += 1;
+    peak = Math.max(peak, inFlight);
+    res.once('close', () => {
+      inFlight -= 1;
+    });
     if (match[2] !== 'svg') {
       error(400, `Not a format pdf-export asks for: ${String(match[2])}`);
       return;
@@ -250,6 +260,9 @@ export async function startRenderStub(): Promise<RenderStub> {
     url: `http://127.0.0.1:${String(port)}`,
     requests,
     times,
+    get peak() {
+      return peak;
+    },
     refuse(stId, how, times = -1) {
       refusals.set(stId, { how, left: times });
     },
@@ -280,6 +293,7 @@ export async function startRenderStub(): Promise<RenderStub> {
       Object.assign(health, { build: '000000000000', files: 'local' });
       requests.length = 0;
       times.length = 0;
+      peak = inFlight;
     },
     async close() {
       // A timed-out request's response is held open; close it with the connections, so the
