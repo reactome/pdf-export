@@ -145,6 +145,63 @@ async function readEvents(graph: Graph, ids: readonly number[]): Promise<Read> {
   return { facts, refs, edits, choices, version };
 }
 
+/** What an event's section is made of besides its facts, read for every event at once. */
+export interface SectionSources {
+  refs: ReadonlyMap<number, Reference[]>;
+  /** Each event's edits of the kinds its history shows. */
+  edits: ReadonlyMap<number, Edit[]>;
+  choices: ReadonlyMap<number, DiagramChoice>;
+}
+
+/**
+ * One event's full section (data-model.md), from its facts and what else was read: its
+ * figure chosen, its lists by their rules, its events before and after only those `held`
+ * (the Background, part 10). Spec 001's PDFs and the analysis report's details share it.
+ */
+export function sectionOf(
+  event: EventFacts,
+  read: SectionSources,
+  {
+    path,
+    depth,
+    held,
+    illustrated,
+  }: {
+    path: EventRef[];
+    depth: number;
+    held: ReadonlySet<number>;
+    illustrated: ReadonlySet<string>;
+  }
+): Section {
+  const {
+    summations: rawSummations,
+    diseases: rawDiseases,
+    inferredFrom: rawInferred,
+    before,
+    after,
+    ...facts
+  } = event;
+  return {
+    anchor: anchorOf(event.stId),
+    event: {
+      ...facts,
+      before: before.filter((e) => held.has(e.dbId)),
+      after: after.filter((e) => held.has(e.dbId)),
+    },
+    path,
+    figure: chooseFigure(event, read.choices.get(event.dbId), illustrated),
+    diseases: diseases(rawDiseases),
+    inferredFrom: inferredFrom(rawInferred),
+    // a summation with no text printed empty, as sanitize-html gives for null
+    summations: rawSummations.map((summation) =>
+      summation === null ? '' : sanitiseSummation(summation)
+    ),
+    references: read.refs.get(event.dbId) ?? [],
+    edits: editRows(read.edits.get(event.dbId) ?? []),
+    depth,
+  };
+}
+
 /**
  * One document's places and sections, and its cover's names, from what was read: what is
  * computed over a document (the events it holds, the names) is computed over this one.
@@ -169,34 +226,7 @@ function assemble(
     }
     const event = read.facts.get(child.dbId);
     if (!event) throw new Error(`${child.stId} was not read from the graph`);
-    const {
-      summations: rawSummations,
-      diseases: rawDiseases,
-      inferredFrom: rawInferred,
-      before,
-      after,
-      ...facts1
-    } = event;
-    const section: Section = {
-      anchor: anchorOf(event.stId),
-      // the events before and after, only those the PDF holds (the Background, part 10)
-      event: {
-        ...facts1,
-        before: before.filter((e) => held.has(e.dbId)),
-        after: after.filter((e) => held.has(e.dbId)),
-      },
-      path: path.map(ref),
-      figure: chooseFigure(event, read.choices.get(event.dbId), illustrated),
-      diseases: diseases(rawDiseases),
-      inferredFrom: inferredFrom(rawInferred),
-      // a summation with no text printed empty, as sanitize-html gives for null
-      summations: rawSummations.map((summation) =>
-        summation === null ? '' : sanitiseSummation(summation)
-      ),
-      references: read.refs.get(event.dbId) ?? [],
-      edits: editRows(read.edits.get(event.dbId) ?? []),
-      depth,
-    };
+    const section = sectionOf(event, read, { path: path.map(ref), depth, held, illustrated });
     sections.push(section);
     return { full: true, section };
   });

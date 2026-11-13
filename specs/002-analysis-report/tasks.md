@@ -208,7 +208,8 @@ layout. Blocks every later phase.
     Seen failing on 24 planted faults. An `importableOnly` of spaces alone is false here
     (today's, by its source, fails); a parameter given twice reads its first value, a
     resource given twice its values joined by commas, as the framework converts them (not
-    measured).
+    measured). Java's digits and whitespace are read as ASCII digits and JavaScript's `\s`:
+    Java also takes other Unicode digits and spaces, which nobody sends.
 
 - [ ] T007 [US1] The pathways' details and edit history, `src/report/details.ts` and
       `src/report/edits.ts` (research R2), after T003 and T006.
@@ -408,7 +409,11 @@ The comparisons run on the development host's own services only.
 - [ ] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.
   - T001's set replayed against `pdf-export serve` on the development host's services:
-    each status and file name as today's or a listed difference.
+    each status and file name as today's or a listed difference. The set gains a
+    parameter given twice (T006, read from the framework's source, not measured):
+    `number=7&number=abc` (the first value read), `importableOnly=true&importableOnly=maybe`,
+    and `resource=UNIPROT&resource=ENSEMBL` (the values joined by commas, so not held: the
+    default); and `importableOnly=%20`, a listed difference.
   - SC-203: cold (the render cache empty) and warm, stage by stage, from the first request
     to the PDF, one report alone, against T002's baseline and the 2- and 4-minute
     targets.
