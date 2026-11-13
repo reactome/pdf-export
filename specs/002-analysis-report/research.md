@@ -402,6 +402,12 @@ filesystem (the container's `tmpfs`), the file is removed in a `finally`, and th
 folder is emptied when the service starts, which a run killed while printing shows
 (SC-205). The log holds a hash of the token, not the token.
 
+**The hash is keyed (T015, accepted 13 Nov 2026):** HMAC-SHA-256 under a key made when the
+service starts. A token is a date and a counter, so a plain hash of it can be reversed by
+hashing the day's few thousand guesses; a keyed one cannot without the key, which never
+leaves the process. The cost: one token's lines match only within one run of the service,
+so T020's search of the logs (SC-205) runs within one service run.
+
 **A request the client abandons** (the connection closes before the answer): only its
 wait ends. The report goes on to its end or its time budget, for the next request to
 fetch: a reader who closes the waiting page and comes back finds it made.

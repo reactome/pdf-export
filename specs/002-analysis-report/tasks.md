@@ -415,10 +415,16 @@ status and file name as recorded or a listed difference (SC-202).
     printer's folder, made private (0700) and emptied at start. Seen failing on 10 planted
     faults.
 
-- [ ] T016 [US3] The licences (FR-212, SC-206): no dependency added by this spec;
+- [x] T016 [US3] The licences (FR-212, SC-206): no dependency added by this spec;
       `node ci/licences.ts` passes on the installed tree and is seen failing on a planted
       GPL-family package (a scratch install, not committed). Recorded here. May be paired
       with T015.
+  - **Done (#PR):** `package.json` and `package-lock.json` last changed in spec 001 T029,
+    before spec 002's first task: this spec added no dependency. On the installed tree,
+    `node ci/licences.ts` passes (168 packages, 0 offending). With a package planted in a
+    scratch `node_modules` (`planted-gpl`, `GPL-3.0-only`), it fails, exit 1:
+    `planted-gpl@1.0.0: GPL-3.0-only: not on the allowlist`, 169 checked, 1 offending;
+    the plant removed, it passes again. Nothing planted was committed.
 
 ---
 
@@ -473,7 +479,8 @@ The comparisons run on the development host's own services only.
     exists; until then, recorded as not run.
   - SC-205: after a sample of reports, some still kept, and one killed while printing and
     the service started again, the logs and the working folder searched for the
-    submitted identifiers (none).
+    submitted identifiers (none). A token's log lines match only within one run of the
+    service (the hash is keyed per run, research R7): a search by token runs within one.
   - SC-207: the report opened in spec 001's three readers, its bookmarks and links
     followed.
   - Call 4's answers to another content type (415) and to an empty body (400) are the
