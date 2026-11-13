@@ -144,8 +144,11 @@ no diagram of its own. Three additions:
   drops authorless ones, as `event-pdf` did, so the report has a rule of its own beside
   it (`src/report/`).
   - **Within a date**, today's rows come in a fixed order, a hash map's over six fixed
-    keys: Modified, Revised, Edited, Created, Authored, Reviewed. The new report keeps
-    that order, so FR-208 compares the rows themselves.
+    keys: Modified, Revised, Edited, Reviewed, Authored, Created. The new report keeps
+    that order, so FR-208 compares the rows themselves. (Corrected by T019: the map is
+    filled by `computeIfAbsent`, which puts a new key at the head of its bucket, and
+    Created, Authored and Reviewed share one; this said Created, Authored, Reviewed, the
+    order `put` gives. Today's reports print Authored above Created on one day.)
   - **A row's names** come from a hash set today, in no order a reader can rely on, and
     today's shows the first five of it. The new report lists them in the edits' authors'
     order, without repeats. FR-208 compares a row's names as a set when it has five or

@@ -79,7 +79,7 @@ describe("the reported pathways' details", { skip }, () => {
     assert.deepEqual(await readDetails(graph, [], new Set()), new Map());
   });
 
-  test('the edit history: within a date, Modified, Revised, Edited, Created, Authored, Reviewed', async () => {
+  test('the edit history: within a date, Modified, Revised, Edited, Reviewed, Authored, Created', async () => {
     const history = (await readDetails(graph, [{ dbId: BETA }], new Set())).get(BETA)?.history;
     // beta's created (six authors), modified (none) and authored edits share a date, at
     // other times of day, and are read in id order: created, modified, authored
@@ -87,8 +87,8 @@ describe("the reported pathways' details", { skip }, () => {
       history?.map((r) => [r.date, r.action]),
       [
         ['2026-01-04', 'Modified'],
-        ['2026-01-04', 'Created'],
         ['2026-01-04', 'Authored'],
+        ['2026-01-04', 'Created'],
       ]
     );
     const alpha = (await readDetails(graph, [{ dbId: ALPHA }], new Set())).get(ALPHA)?.history;
@@ -179,6 +179,17 @@ describe('the edit history rule', () => {
         etAl: false,
       },
     ]);
+  });
+
+  test("within a date, today's order: Modified, Revised, Edited, Reviewed, Authored, Created", () => {
+    const kinds = ['created', 'modified', 'authored', 'edited', 'reviewed', 'revised'] as const;
+    const rows = editHistory(
+      kinds.map((kind, i) => ({ dbId: i + 1, kind, dateTime: '2026-01-01', authors: [] }))
+    );
+    assert.deepEqual(
+      rows.map((r) => r.action),
+      ['Modified', 'Revised', 'Edited', 'Reviewed', 'Authored', 'Created']
+    );
   });
 
   test('a null name is kept, printed empty', () => {
