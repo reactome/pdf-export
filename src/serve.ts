@@ -12,6 +12,9 @@
 // between stages, its calls are stopped, nothing more is printed, and the answer is 503
 // `unavailable`. The browser that prints is started again if it goes. A reason never carries
 // a path, a host or a name: the content service writes WebsiteAngular's envelope from it.
+// It also answers the analysis report (spec 002 T012, contracts/service.md),
+// `GET /AnalysisService/report/{token}/{species}/{filename}.pdf`, in the analysis service's
+// own forms (src/report/route.ts), with the same limit and deadline.
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
@@ -38,6 +41,17 @@ import { buildSingle } from './model/build.ts';
 import type { Document, Figure, Section } from './model/types.ts';
 import { readSummary, SUMMARY, type Summary } from './preflight/files.ts';
 import { Printer } from './print/print.ts';
+import { Slots } from './report/figures.ts';
+import { reportParameters } from './report/model.ts';
+import { ReportError, makeReport, type ReportServices } from './report/report.ts';
+import {
+  FAILURE_STATUS,
+  frameworkBadRequest,
+  reportAddress,
+  reportPdf,
+  serviceError,
+  type ReportAddress,
+} from './report/route.ts';
 import { causeCode, errorCode, isRecord } from './unknown.ts';
 
 /** Why a PDF is not made (contracts/service.md). */
@@ -279,6 +293,8 @@ export async function startService(
   const ownGraph = options.graph === undefined;
   const startPrinter = options.startPrinter ?? (() => Printer.start());
   const styles = pageStyles();
+  // the render service's slots, shared by every report being made (spec 002 T010)
+  const reportSlots = new Slots(FIGURES_AT_ONCE);
   let active = 0;
   /** Requests whose graph reads were still unsettled past their deadline and grace. */
   let stuck = 0;
@@ -553,6 +569,148 @@ export async function startService(
     }
   }
 
+  /**
+   * One of the service's slots, taken: held until the request's work has ended and every
+   * read it began has settled, each bounded by its transaction timeout, not only until the
+   * answer; or until its deadline and a grace have passed, whichever comes first: a read on
+   * a silent connection never settles, and is then counted as stuck, which /health reports.
+   */
+  function takeSlot(
+    subject: string,
+    endsAt: number
+  ): {
+    reads: Set<Promise<unknown>>;
+    release: () => void;
+  } {
+    active += 1;
+    const reads = new Set<Promise<unknown>>();
+    let held = true;
+    const release = (): void => {
+      if (!held) return;
+      held = false;
+      const pending = [...reads];
+      const settled = Promise.allSettled(pending).then(() => true);
+      const grace = pause(Math.max(0, endsAt + limits.graceMs - Date.now()), false, {
+        ref: false,
+      });
+      void Promise.race([settled, grace]).then((allSettled) => {
+        active -= 1;
+        if (allSettled) return;
+        stuck += 1;
+        log(`stuck ${subject}: a graph read unsettled past its deadline`);
+        void settled.then(() => {
+          stuck -= 1;
+        });
+      });
+    };
+    return { reads, release };
+  }
+
+  /** The request's end: its deadline, or its client gone before it is answered. */
+  function requestEnd(res: ServerResponse): { deadline: AbortSignal; endsAt: number } {
+    const ending = new AbortController();
+    const endsAt = Date.now() + limits.deadlineMs;
+    const timer = setTimeout(() => {
+      ending.abort(new Refusal('unavailable', 'the deadline passed'));
+    }, limits.deadlineMs);
+    timer.unref();
+    res.once('close', () => {
+      clearTimeout(timer);
+      if (!res.writableFinished) ending.abort(new ClientGone());
+    });
+    return { deadline: ending.signal, endsAt };
+  }
+
+  /**
+   * The analysis report (spec 002 T012): its parameters, today's framework 400 for one that
+   * is not one; the species; the limit and a browser; then `makeReport`, whose species
+   * comes before its token. Made in this one request, within its deadline (T013 puts it in
+   * the background).
+   */
+  async function answerReport(
+    req: IncomingMessage,
+    res: ServerResponse,
+    path: string,
+    address: ReportAddress
+  ): Promise<void> {
+    const now = new Date();
+    const parameters = reportParameters(new URL(req.url ?? '/', 'http://service').searchParams);
+    if ('invalid' in parameters) {
+      frameworkBadRequest(res, path, now);
+      return;
+    }
+    if (address.species === null) {
+      serviceError(res, 404);
+      return;
+    }
+    const { deadline, endsAt } = requestEnd(res);
+    // the subject of its log lines: never the token, nor anything submitted
+    const subject = 'report';
+    if (active >= settings.concurrency) {
+      log(`unavailable ${subject}: ${String(active)} PDFs already being made`);
+      serviceError(res, 503);
+      return;
+    }
+    if (!printer?.connected) {
+      log(`unavailable ${subject}: no browser is up`);
+      if (!closing()) void launch().catch(() => undefined);
+      serviceError(res, 503);
+      return;
+    }
+    const { reads, release } = takeSlot(subject, endsAt);
+    const services: ReportServices = {
+      graph: graphFor(deadline, endsAt, reads),
+      printer: {
+        single: async (html, signal) => {
+          const printing = await within(currentPrinter(), deadline);
+          const pdf = await printing.single(html, signal);
+          if (printing === printer) prove();
+          return pdf;
+        },
+      },
+      analysis: settings.analysis,
+      render: settings.render,
+      site: settings.site,
+      illustrated,
+      slots: reportSlots,
+      log,
+      styles,
+      analysisTimeoutMs: limits.analysisTimeoutMs,
+      figureTimeoutMs: limits.figureTimeoutMs,
+      retryPauseMs: limits.retryPauseMs,
+    };
+    const work = makeReport(
+      { token: address.token, species: address.species, ...parameters },
+      services,
+      deadline
+    );
+    void work.catch(() => undefined).finally(release);
+    try {
+      const { pdf } = await within(work, deadline);
+      reportPdf(res, pdf);
+    } catch (error) {
+      if (error instanceof ClientGone) {
+        log(`client-gone ${subject}`);
+        return;
+      }
+      if (error instanceof ReportError) {
+        if (error.reason === 'unavailable' || error.reason === 'failed') {
+          log(`${error.reason} ${subject}: ${error.message}`);
+        }
+        serviceError(res, FAILURE_STATUS[error.reason]);
+        return;
+      }
+      if (error instanceof Refusal) {
+        log(`unavailable ${subject}: ${error.message}`);
+        serviceError(res, 503);
+        return;
+      }
+      // a fault of the report's own making: its kind alone, as a message may quote the data
+      log(`failed ${subject}: ${error instanceof Error ? error.name : 'error'}`);
+      serviceError(res, 500);
+    }
+  }
+
   async function answerPdf(
     req: IncomingMessage,
     res: ServerResponse,
@@ -603,31 +761,7 @@ export async function startService(
       refuse(res, 'unavailable');
       return;
     }
-    active += 1;
-    // the slot is held until the request's work has ended and every read it began has
-    // settled, each bounded by its transaction timeout, not only until the answer
-    const reads = new Set<Promise<unknown>>();
-    let held = true;
-    // ... or until its deadline and a grace have passed, whichever comes first: a read on a
-    // silent connection never settles, and is then counted as stuck, which /health reports
-    const release = (): void => {
-      if (!held) return;
-      held = false;
-      const pending = [...reads];
-      const settled = Promise.allSettled(pending).then(() => true);
-      const grace = pause(Math.max(0, endsAt + limits.graceMs - Date.now()), false, {
-        ref: false,
-      });
-      void Promise.race([settled, grace]).then((allSettled) => {
-        active -= 1;
-        if (allSettled) return;
-        stuck += 1;
-        log(`stuck ${identifier}: a graph read unsettled past its deadline`);
-        void settled.then(() => {
-          stuck -= 1;
-        });
-      });
-    };
+    const { reads, release } = takeSlot(identifier, endsAt);
     const reading = graphFor(deadline, endsAt, reads);
     let root: Child;
     try {
@@ -732,11 +866,14 @@ export async function startService(
       return;
     }
     const pdf = /^\/event\/([^/]+)\.pdf$/.exec(path);
+    const report = reportAddress(path);
     const handle = pdf?.[1]
       ? answerPdf(req, res, pdf[1])
-      : path === '/health'
-        ? answerHealth(res)
-        : Promise.resolve(void res.writeHead(404).end());
+      : report
+        ? answerReport(req, res, path, report)
+        : path === '/health'
+          ? answerHealth(res)
+          : Promise.resolve(void res.writeHead(404).end());
     handle.catch((error: unknown) => {
       log(`unavailable: ${describe(error)}`);
       if (!res.headersSent) refuse(res, 'unavailable');
