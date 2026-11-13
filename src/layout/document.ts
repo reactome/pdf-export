@@ -91,7 +91,7 @@ export function layoutSingle(doc: Document, options: LayoutOptions): Laid {
   ];
   const headers = runningHeaders(doc.cover.title);
   return {
-    html: page(doc.cover.title, 'single', body.join('\n'), options.styles, headers),
+    html: htmlPage(doc.cover.title, 'single', body.join('\n'), options.styles, headers),
     report,
   };
 }
@@ -105,7 +105,7 @@ export function layoutBookFront(doc: Document, options: LayoutOptions): Laid {
     doc.contents ? contentsHtml(doc.contents, links) : '',
   ];
   return {
-    html: page(doc.cover.title, 'book', body.join('\n'), options.styles, ''),
+    html: htmlPage(doc.cover.title, 'book', body.join('\n'), options.styles, ''),
     report: { belowFloor: [], missing: [], unmeasured: [] },
   };
 }
@@ -119,7 +119,7 @@ export function layoutBookPart(
   const links = new Links(true, options.site, held(doc, false));
   const report: Report = { belowFloor: [], missing: [], unmeasured: [] };
   const body = `<div class="sections">${sections(places, links, options, report)}</div>`;
-  return { html: page(doc.cover.title, 'book', body, options.styles, ''), report };
+  return { html: htmlPage(doc.cover.title, 'book', body, options.styles, ''), report };
 }
 
 function sections(
@@ -143,20 +143,32 @@ export const MARGIN_FAMILIES = ['Roboto', 'Noto Sans', 'Noto Sans Symbols 2', 'N
  * the theme's on-surface-variant colour, its type the theme's body-small.
  */
 function runningHeaders(event: string): string {
+  return marginBoxes(event, [
+    ['introduction', FRONT_NAMES.introduction],
+    ['analysis', FRONT_NAMES.analysis],
+    ['contents', FRONT_NAMES.contents],
+  ]);
+}
+
+/**
+ * Running headers and page numbers in @page margin boxes (FR-016): `title` on every page,
+ * each named page's own name on its pages, and no header or number on the cover. Spec
+ * 002's report names its own parts' pages.
+ */
+export function marginBoxes(title: string, named: readonly (readonly [string, string])[]): string {
   const families = MARGIN_FAMILIES.map((family) => cssString(family)).join(', ');
   const box = (content: string): string =>
     `content: ${content}; font-family: ${families}; font-size: var(--mat-sys-body-small-size); color: var(--mat-sys-on-surface-variant);`;
   const header = (name: string): string => `@top-center { ${box(cssString(name))} }`;
   return [
-    `@page { ${header(event)} @bottom-center { ${box('counter(page)')} } }`,
-    `@page introduction { ${header(FRONT_NAMES.introduction)} }`,
-    `@page analysis { ${header(FRONT_NAMES.analysis)} }`,
-    `@page contents { ${header(FRONT_NAMES.contents)} }`,
+    `@page { ${header(title)} @bottom-center { ${box('counter(page)')} } }`,
+    ...named.map(([page, name]) => `@page ${page} { ${header(name)} }`),
     '@page cover { @top-center { content: none; } @bottom-center { content: none; } }',
   ].join('\n');
 }
 
-function page(
+/** A whole page of HTML for Chromium to print: its styles, `extra` rules and body. */
+export function htmlPage(
   title: string,
   mode: 'book' | 'single',
   body: string,

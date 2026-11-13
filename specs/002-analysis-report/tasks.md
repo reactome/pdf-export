@@ -297,7 +297,7 @@ acceptance scenarios).
     stub's `peak`. A missing figure is logged without the token. T011 and T012 create the
     slots from a setting. Seen failing on 12 planted faults.
 
-- [ ] T011 [US1] Printing the report and `pdf-export report`, `src/report/report.ts` and
+- [x] T011 [US1] Printing the report and `pdf-export report`, `src/report/report.ts` and
       `src/cli.ts`, after T009 and T010.
   - Spec 001's printer and stamping: bookmarks for the parts and, under the details, each
     pathway (FR-206); the running header naming the report, or on a front part that
@@ -308,8 +308,15 @@ acceptance scenarios).
     service, for the comparison (T019) and for checks by hand; the service (T012) calls
     the same function.
   - Tests on the fixture with the stubs, each seen failing: the outline's entries in
-    order; every link's target inside the PDF or on `--site`; a 50-pathway report of
-    the stub's largest token printed whole.
+    order; every link's target inside the PDF or on `--site`; a request for `number=50`
+    against the stub's largest token, returning all of its pathways (the fixture holds
+    fewer than 50; a report of real size is timed by T020, reworded 13 Nov 2026).
+  - **Done (#202):** `makeReport` (species, token, analysis, model, details, figures,
+    layout, print) and its `ReportError`; bookmarks from the parts' headings, each
+    pathway's an `h2` beneath the details; the parts' named pages for the running
+    header; links checked before the print (`missingAnchors`: Chromium drops a link to a
+    missing anchor silently) and after (`brokenLinks`). `pdf-export report` in
+    `src/report/command.ts`. Seen failing on 15 planted faults.
 
 ---
 

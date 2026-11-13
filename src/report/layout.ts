@@ -384,17 +384,21 @@ export function detailHtml(
     .filter((part) => part !== '')
     .join('\n');
   if (detail) {
-    return sectionHtml(detail.section, {
-      links: input.links,
-      figures: input.figures,
-      found: null,
-      report: input.report,
-      analysisReport: { tail, linkStId: true },
-    });
+    // a level below the parts' headings, so the outline holds each pathway under the details
+    return sectionHtml(
+      { ...detail.section, depth: 1 },
+      {
+        links: input.links,
+        figures: input.figures,
+        found: null,
+        report: input.report,
+        analysisReport: { tail, linkStId: true },
+      }
+    );
   }
   const anchor = anchorOf(pathway.stId);
-  return `<section class="event" style="--depth: 0">
-<h1 id="${attribute(anchor)}" class="name">${input.links.probe(anchor)}${Links.a(input.links.event(pathway.stId), pathway.name)}</h1>
+  return `<section class="event" style="--depth: 1">
+<h2 id="${attribute(anchor)}" class="name">${input.links.probe(anchor)}${Links.a(input.links.event(pathway.stId), pathway.name)}</h2>
 <dl class="facts"><dt>Stable identifier</dt><dd><a href="${attribute(input.links.event(pathway.stId))}"><span class="id">${text(pathway.stId)}</span></a></dd></dl>
 ${tail}
 </section>`;
