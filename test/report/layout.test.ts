@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 
 import { checkToken, readReportAnalysis, type ReportFilter } from '../../src/analysis/report.ts';
-import type { SpeciesRef } from '../../src/graph/queries.ts';
+import type { Reference, SpeciesRef } from '../../src/graph/queries.ts';
 import { Links } from '../../src/layout/html.ts';
 import {
   PARTS,
   isGsa,
   reportContents,
   reportFrontHtml,
+  reportReference,
   reportTitle,
   statistic,
   type FrontOptions,
@@ -210,5 +211,37 @@ describe("the report's front parts and table", () => {
     assert.equal(statistic(0.0012), '0.0012');
     assert.equal(statistic(0.0001), '1.00e-4');
     assert.equal(statistic(3.14159e-12), '3.14e-12');
+  });
+});
+
+describe("an article's reference in the report (T028)", () => {
+  const article = (title: string): Reference => ({
+    dbId: 1,
+    kind: 'article',
+    title,
+    chapterTitle: null,
+    journal: 'Placeholder Journal',
+    volume: 4,
+    pages: '39-49',
+    year: 2003,
+    pubMedId: 1,
+    isbn: null,
+    url: null,
+    publisher: null,
+    authors: ['Placeholder, A'],
+    moreAuthors: false,
+  });
+  const plain = (markup: string): string => markup.replace(/<[^>]*>/g, '');
+
+  test("a title ending in a full stop has one, as today's ApaStyle trims it", () => {
+    const want = 'Placeholder, A (2003). A made-up title. Placeholder Journal, 4, 39-49.';
+    assert.equal(plain(reportReference(article('A made-up title.'))), want);
+    // white space, commas and full stops at either end, as today's trims them
+    assert.equal(plain(reportReference(article(' ,A made-up title,. '))), want);
+    // a full stop within the title kept
+    assert.equal(
+      plain(reportReference(article('A made-up title. Part 2'))),
+      'Placeholder, A (2003). A made-up title. Part 2. Placeholder Journal, 4, 39-49.'
+    );
   });
 });
