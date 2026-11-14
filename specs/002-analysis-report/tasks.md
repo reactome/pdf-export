@@ -526,7 +526,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     not counted as unrecorded. Seen failing without it; and a test that a Modified row
     missing or extra where pdf-export's has only one, or one of today's missing beside two
     of pdf-export's, is still caught, seen failing with the rule widened.
-  - **Done (#PR).**
+  - **Done (#217).**
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after
