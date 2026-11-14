@@ -441,10 +441,15 @@ The comparisons run on the development host's own services only.
   - **Done:** reactome/WebsiteAngular#771 (the wait and its cache key, 2 Nov) and
     reactome/WebsiteAngular#958 (the same for held pages); research R3, "Settled".
 
-- [ ] T018 [WA] The pdf-export image's pin and settings for the report (WebsiteAngular's
+- [x] T018 [WA] The pdf-export image's pin and settings for the report (WebsiteAngular's
       `deploy/pdf-export` and compose): the report's analysis setting and the working
       folder on a `tmpfs`, the port still bound to loopback. May be paired with T021;
       a separate PR only if T019 needs the image before the route.
+  - **Done (reactome/WebsiteAngular#960, paired with T021, as its spec 010 T066):** the pin
+    at `55cde47` (T020's replay, T026, T027); `PDF_EXPORT_WORK` a `tmpfs` of the service's
+    user alone, mode 0700, `noexec`; the analysis setting the analysis service directly
+    (contracts/analysis-api.md), unchanged; the port on loopback; the memory limit raised
+    to 3 GB for the reports kept. Deployed by the user.
 
 - [x] T019 [US1] The comparison by meaning (FR-208, SC-201), `src/compare/report.ts` and
       `pdf-export compare-report <today's.pdf> <new.pdf>`, after T011 and T017.
@@ -549,7 +554,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     decide later.
   - **Done (#218).**
 
-- [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
+- [x] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after
       T019 and T020. Last; deployed by the user.
   - The gateway sends `GET /AnalysisService/report/…` to pdf-export, a second upstream,
@@ -569,6 +574,19 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
   - WebsiteAngular's `documentation/declared-differences.md`, "Analysis report PDF
     (pdf-export spec 002)": its rows kept consistent with spec Assumptions and T019's
     recorded differences, its status moved from "Spec only".
+  - **Done (reactome/WebsiteAngular#960, its spec 010 T066; deployed by the user):** the
+    gateway's report path to pdf-export, unqueued, in the client's share, the client named
+    by the gateway alone, a 503 in the service's form when pdf-export cannot be reached
+    (and a `HEAD` sent to pdf-export too, its 405 listed in the register). nginx sets
+    `X-Reactome-Client` from the client's address; its `test-config.sh` runs each
+    deployment's image to show a request naming another client still named by its
+    address, seen failing without it. The errors compared on the development host through
+    the gateway, with a fresh token as R5's: `ci/replay.ts` over T001's error cases, 11
+    cases, 9 the same, the 2 listed (a malformed token, `%2F`), none other; the same nine
+    byte for byte (status, `Content-Type`, `Content-Disposition`, CORS, body, the 400's
+    time apart). The button opens a new tab (an e2e test, seen failing without it). The
+    register gains the report's timing not sent (in Assumptions, missing there) and the
+    button, and the gateway's three rows.
 
 ---
 
