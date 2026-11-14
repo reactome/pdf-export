@@ -384,7 +384,9 @@ export function reportReference(r: Reference): string {
     const pages = r.pages === null ? '' : `, ${text(r.pages)}`;
     return `${referenceLead(r)}<i>${chapter}${referenceTitle(r)}</i>${pages}.`;
   }
-  return reference(r);
+  // an article as spec 001's, its title trimmed of white space, commas and full stops at
+  // either end, as today's `ApaStyle` trims it before its own full stop
+  return reference({ ...r, title: r.title.replace(/^[\s,.]+|[\s,.]+$/g, '') });
 }
 
 /**
