@@ -11,6 +11,7 @@ import { after, before, describe, test } from 'node:test';
 
 import { checkToken, readReportAnalysis } from '../../src/analysis/report.ts';
 import {
+  MODIFIED_ROWS_LISTED,
   compareReportCommand,
   compareReports,
   reduceReportPdf,
@@ -379,6 +380,60 @@ describe("the analysis report's comparison (FR-208)", { timeout: 600_000 }, () =
     ];
     assert.deepEqual(
       differences(baseline, (await printed(model, details(model, renamed))).reduced),
+      ['section edits text']
+    );
+  });
+
+  test("the edit history's Modified rows: listed where pdf-export's has two or more, caught where it has one", async () => {
+    const modified = (date: string): HistoryRow => ({
+      date,
+      action: 'Modified',
+      names: ['Example, B'],
+      etAl: false,
+    });
+    // two modified edits: pdf-export prints a row for each, today's none (listed, R9)
+    const two = await printed(
+      model,
+      details(model, [...HISTORY, modified('2026-02-01'), modified('2026-03-01')])
+    );
+    const found = compareReports('report.pdf', baseline, two.reduced);
+    assert.deepEqual(
+      found.filter((d) => d.recorded === undefined),
+      []
+    );
+    assert.deepEqual(
+      found.map((d) => [d.part, d.field, d.kind, d.events, d.recorded]),
+      [
+        [
+          'section',
+          'edits',
+          'extra',
+          model.pathways.slice(0, 2).map((p) => p.stId),
+          MODIFIED_ROWS_LISTED,
+        ],
+      ]
+    );
+    const out: string[] = [];
+    const ours = await printed(model, details(model));
+    assert.equal(
+      await compareReportCommand([ours.path, two.path], {
+        out: (text) => out.push(text),
+        err: () => undefined,
+        output: new Output('salt'),
+      }),
+      0
+    );
+    assert.match(out.join(''), /"unrecorded": 0/);
+    // one modified edit: today's prints its row too, so a row missing or extra is caught
+    const one = await printed(model, details(model, [...HISTORY, modified('2026-02-01')]));
+    assert.deepEqual(differences(baseline, one.reduced), ['section edits text']);
+    assert.deepEqual(differences(one.reduced, baseline), ['section edits text']);
+    // two in pdf-export's and another Modified row in today's: that row is still missing
+    const elsewhere = await printed(model, details(model, [...HISTORY, modified('2026-04-01')]));
+    assert.deepEqual(
+      compareReports('report.pdf', elsewhere.reduced, two.reduced)
+        .filter((d) => d.recorded === undefined)
+        .map((d) => `${d.part} ${d.field ?? ''} ${d.kind}`),
       ['section edits text']
     );
   });

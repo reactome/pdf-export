@@ -333,6 +333,16 @@ describe('--expected', () => {
     );
     assert.equal(other.differences[0]?.recorded, undefined);
     assert.deepEqual(other.unmatched, [0]);
+    // a difference the comparison lists itself keeps its reason, and uses up no record
+    const listed = applyRecorded(
+      [{ ...difference, recorded: 'listed' }],
+      [{ part: 'section', kind: 'text', reason: 'x' }]
+    );
+    assert.deepEqual(
+      listed.differences.map((d) => d.recorded),
+      ['listed']
+    );
+    assert.deepEqual(listed.unmatched, [0]);
   });
 });
 

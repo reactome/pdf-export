@@ -314,7 +314,8 @@ function compareContents(
 
 /**
  * The differences with those `--expected` records marked, with their reasons, and the
- * records that matched nothing, by their place in the file. A record naming events covers
+ * records that matched nothing (a difference the comparison lists itself, already marked, is
+ * left as it is), by their place in the file. A record naming events covers
  * only those, and never a difference that names none.
  */
 export function applyRecorded(
@@ -324,6 +325,11 @@ export function applyRecorded(
   const used = new Set<number>();
   const out: Difference[] = [];
   for (const difference of differences) {
+    // a difference the comparison already lists keeps its own reason
+    if (difference.recorded !== undefined) {
+      out.push({ ...difference });
+      continue;
+    }
     let rest: Difference | null = { ...difference };
     for (const [index, record] of recorded.entries()) {
       if (!rest) break;

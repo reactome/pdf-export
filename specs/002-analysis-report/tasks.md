@@ -483,8 +483,9 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     two `modified` edits, and three references (R9). The grouping by day holds: one row in
     both on the two pathways with two edits of one kind on one day at different times.
   - **Left open:** the Modified rows and the book and web-page references, for a decision
-    (R9); the expression, interactors and species-comparison tokens, and each figure's
-    overlay check (quickstart §3), not run here.
+    (R9; the Modified rows decided 14 Nov 2026, T026); the expression, interactors and
+    species-comparison tokens, and each figure's overlay check (quickstart §3), not run
+    here.
 
 - [x] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.
@@ -515,6 +516,17 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     working folder. SC-204 not run (spec 001's T032). **Left:** SC-207 in the readers
     themselves on a desktop (pdf.js, Poppler and PDFium opened both reports here), and
     the failure while the PDF is made (R5).
+
+- [x] T026 [US1] The Modified rows, as the user decided on 14 Nov 2026 (T019, research R9):
+      every `modified` edit printed, as pdf-export does, a listed difference.
+  - Spec Assumptions lists it; R2's "at most one Modified row" corrected with a dated note.
+  - `compare-report` lists it itself (`listedModifiedRows`, `src/compare/report.ts`),
+    narrowly: a Modified row in pdf-export's and not in today's, for a pathway where
+    pdf-export's has two or more Modified rows, marked recorded with its reason, so it is
+    not counted as unrecorded. Seen failing without it; and a test that a Modified row
+    missing or extra where pdf-export's has only one, or one of today's missing beside two
+    of pdf-export's, is still caught, seen failing with the rule widened.
+  - **Done (#217).**
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after

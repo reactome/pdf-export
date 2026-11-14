@@ -135,8 +135,11 @@ no diagram of its own. Three additions:
   four kinds where it reads them, before both (`src/model/build.ts`), with a test that
   fails without that filter, on the rows and on the cover's names; spec 001's PDFs are
   otherwise unchanged. The report reads the extended query's edits itself, for its own
-  rule, not through spec 001's `assemble`, whose sections hold spec 001's merged rows. (The graph keeps one `modified` per object,
-  the latest, so there is at most one Modified row, as today.)
+  rule, not through spec 001's `assemble`, whose sections hold spec 001's merged rows. (This
+  said the graph keeps one `modified` per object, so there is at most one Modified row.
+  **Corrected 14 Nov 2026 by T019's run (R9):** in release 98, 20 of the 50 pathways
+  compared have two `modified` edits. Today's report prints no Modified row for those, and
+  pdf-export prints one for each; the user kept pdf-export's, a listed difference.)
 - **The edit history** follows today's report's rule, not spec 001's: one row for each
   date and action (created, modified, authored, edited, reviewed, revised), sorted by
   date, each with that row's names (up to five, then "et al."), and an edit with no
@@ -498,7 +501,7 @@ not known.
 | Part                             | Sections (25 / 50)                    | Reason                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Edit history, order within a day | 4 / 8 (and in some of the next row's) | **Bug, fixed (#213).** Today's groups a day's edits into a hash map with `computeIfAbsent`, which puts a new key at the head of its bucket; Created, Authored and Reviewed share one, so a day reads Modified, Revised, Edited, Reviewed, Authored, Created. R2 inferred the order of `put`. |
-| Edit history, Modified rows      | 11 / 20                               | **For a decision.** 20 of the 50 pathways have two `modified` edits in the release 98 graph (R2 said one). Today's prints none for them, and one where there is one; pdf-export prints a row for each.                                                                                       |
+| Edit history, Modified rows      | 11 / 20                               | **Listed (decided 14 Nov 2026).** 20 of the 50 pathways have two `modified` edits in the release 98 graph (R2 said one). Today's prints none for them, and one where there is one; pdf-export prints a row for each, kept by the user's decision. `compare-report` lists it itself (T026).   |
 | References                       | 1 / 2                                 | A Greek letter today's typeface lacks, written as U+0000 (an improvement). **For a decision:** a book's and a web page's reference printed in spec 001's form, where today's prints a web page's address and a book's publisher after a comma.                                               |
 
 Every other part agreed at both sizes. The edit history's grouping by day (T007) holds:

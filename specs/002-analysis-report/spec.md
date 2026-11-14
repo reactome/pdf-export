@@ -444,6 +444,12 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
     always empty and left out (an obvious bug: it compares their display names with the
     mappings' resources);
   - an edit with no date left out of the edit history, where today's report fails;
+  - a Modified row for each `modified` edit of a pathway that has two or more, where
+    today's report prints no Modified row for it (20 of 50 pathways in release 98, T019,
+    research R9): every edit printed (decided 14 Nov 2026). `compare-report` lists it
+    itself, narrowly: a Modified row in pdf-export's and not in today's, for a pathway
+    where pdf-export's has two or more; any other Modified row missing or extra is still a
+    difference;
   - a character today's typeface lacks (a Greek letter in a reference's title) printed,
     where today's writes U+0000 in its place (T019, research R9);
   - an `importableOnly` of spaces alone read as the default (false), where today's framework
