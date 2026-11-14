@@ -774,11 +774,36 @@ describe('figures and tables', () => {
     const image: Shape = { page: 0, x1: 300, y1: 450, x2: 400, y2: 520, image: true };
     assert.equal(figureBoxes([...cells, image], 595, 842).length, 1);
     // shapes in rows but taller than a table's row: a figure
-    const tall = cells.map((c) => ({ ...c, y2: c.y1 + 45 }));
+    const tall = cells.map((c) => ({ ...c, y2: c.y1 + 80 }));
     assert.equal(figureBoxes(tall, 595, 842).length, 1);
     // shapes overlapping in a row, as a diagram's node and its label's box: a figure
     const overlapping = [...cells, { page: 0, x1: 200, y1: 600, x2: 260, y2: 620 }];
     assert.equal(figureBoxes(overlapping, 595, 842).length, 1);
+  });
+
+  test("today's table, its rows as tall as their names' lines (T028), is not a figure", () => {
+    // as measured on today's real report: a row 10 pt plus 10.02 pt a line, its cells
+    // touching, every other row shaded; here rows of three, one, one, two and one lines
+    const cells: Shape[] = [];
+    let top = 306.74;
+    for (const [n, lines] of [3, 1, 1, 2, 1].entries()) {
+      const height = 10 + 10.02 * lines;
+      if (n % 2 === 0) {
+        for (const [x1, x2] of [
+          [90.5, 238.5],
+          [238.5, 287.83],
+          [287.83, 337.16],
+          [337.17, 386.5],
+          [386.5, 435.83],
+          [435.83, 485.16],
+          [485.17, 534.5],
+        ] as const) {
+          cells.push({ page: 0, x1, y1: top - height, x2, y2: top });
+        }
+      }
+      top -= height;
+    }
+    assert.equal(figureBoxes(cells, 595, 842).length, 0);
   });
 
   test("a table's shaded header and hairline borders are not a figure", () => {

@@ -435,6 +435,9 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
     }
     parts.push({ part: 'name', texts: headingLines.map((line) => line.text), lines: headingLines });
     let current: { part: PartName; texts: string[]; lines: Line[] } | null = null;
+    // today's report writes a fact `Label: …` and ends it with a full stop, wrapping it to
+    // the section's left edge: until that stop, the next line is the fact's, not a summation
+    let unended = false;
     for (let k = start + headingLines.length; k < end; k++) {
       const line = lines[k];
       if (!line) continue;
@@ -452,6 +455,18 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       if (matched) {
         current = { part: matched.part, texts: [matched.rest], lines: [line] };
         parts.push(current);
+        const label = plain(line.text).slice(0, plain(line.text).length - matched.rest.length);
+        unended =
+          options.report === true &&
+          ruleOf(matched.part)?.fact === true &&
+          /:\s*$/.test(label) &&
+          !/\.\s*$/.test(matched.rest);
+        continue;
+      }
+      if (unended) {
+        current?.texts.push(line.text);
+        current?.lines.push(line);
+        unended = !/\.\s*$/.test(line.text);
         continue;
       }
       // a short entry: an event's name and stable identifier, linked to its section
@@ -584,7 +599,8 @@ function reportItems(part: PartName, texts: readonly string[], own: readonly Lin
   if (part === 'name') {
     const name = plain(texts.join(' '))
       .replace(NUMBERED, '')
-      .replace(/\(R-[A-Z]{3}-[\d\s]+\)\s*$/, '');
+      // its stable identifier, which today's may break after its bracket or its `R-`
+      .replace(/\(\s*R\s*-\s*[A-Z]{3}\s*-\s*[\d\s]+\)\s*$/, '');
     return [unhyphened(name)].filter((item) => item !== '');
   }
   if (part === 'summation') return [unhyphened(texts.join(' '))].filter((item) => item !== '');
