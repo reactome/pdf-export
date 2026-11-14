@@ -395,7 +395,11 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
   here.
 - **One implementation:** the report is made by pdf-export, beside spec 001's
   single-event PDF, reusing its theme, fonts, layout, printing and figures; a reported
-  pathway's detail is close to spec 001's section, and shares its parts. The
+  pathway's detail is close to spec 001's section, and shares its parts. A book's and a web
+  page's references are printed in today's report's form, not spec 001's (decided 14 Nov
+  2026, T027, research R9): a web page's title and address, without authors or year; a
+  book's authors and year, its chapter's title and the book's parted by a comma, and its
+  pages, without publisher or ISBN. Spec 001's book keeps its own form. The
   constitution's Principle I is amended with this spec (version 1.1.0) to cover the
   website's PDFs generally, the analysis report among them.
 - **Spec 001's FR-017** (characters no font draws) is merged before this spec.

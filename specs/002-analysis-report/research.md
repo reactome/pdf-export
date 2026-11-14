@@ -495,11 +495,29 @@ not known.
 
 **Differences found** (the same at 25 and at 50):
 
-| Part                             | Sections (25 / 50)                    | Reason                                                                                                                                                                                                                                                                                       |
-| -------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Edit history, order within a day | 4 / 8 (and in some of the next row's) | **Bug, fixed (#213).** Today's groups a day's edits into a hash map with `computeIfAbsent`, which puts a new key at the head of its bucket; Created, Authored and Reviewed share one, so a day reads Modified, Revised, Edited, Reviewed, Authored, Created. R2 inferred the order of `put`. |
-| Edit history, Modified rows      | 11 / 20                               | **For a decision.** 20 of the 50 pathways have two `modified` edits in the release 98 graph (R2 said one). Today's prints none for them, and one where there is one; pdf-export prints a row for each.                                                                                       |
-| References                       | 1 / 2                                 | A Greek letter today's typeface lacks, written as U+0000 (an improvement). **For a decision:** a book's and a web page's reference printed in spec 001's form, where today's prints a web page's address and a book's publisher after a comma.                                               |
+| Part                             | Sections (25 / 50)                    | Reason                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edit history, order within a day | 4 / 8 (and in some of the next row's) | **Bug, fixed (#213).** Today's groups a day's edits into a hash map with `computeIfAbsent`, which puts a new key at the head of its bucket; Created, Authored and Reviewed share one, so a day reads Modified, Revised, Edited, Reviewed, Authored, Created. R2 inferred the order of `put`.                                                            |
+| Edit history, Modified rows      | 11 / 20                               | **For a decision.** 20 of the 50 pathways have two `modified` edits in the release 98 graph (R2 said one). Today's prints none for them, and one where there is one; pdf-export prints a row for each.                                                                                                                                                  |
+| References                       | 1 / 2                                 | A Greek letter today's typeface lacks, written as U+0000 (an improvement). **Decided 14 Nov 2026, today's form:** a book's and a web page's reference were printed in spec 001's form, where today's prints a web page's address and, after a comma, what this read as a book's publisher (corrected below). The report now prints today's form (T027). |
+
+**Today's form of a reference, read from its source (T027, 14 Nov 2026).** The analysis
+report library's `ApaStyle` (the `1.4.0-SNAPSHOT` build of `reactome/analysis-report` in the
+local Maven repository, read from its compiled classes; not shown to be the deployed build's
+own copy) writes:
+
+- **an article:** `Authors (year). Title. Journal, volume, pages.`, as spec 001's but for the
+  authors' form, which the comparison does not read;
+- **a web page:** `Title. Retrieved from address`, with no authors and no year;
+- **a book:** `Authors (year).` then, in italics, `Chapter, Book` (or `. Book` with no
+  chapter), then `, pages` and a full stop; no publisher and no ISBN.
+
+So the words after the comma that this table first called a book's publisher are the book's
+title, after its chapter's: on R-HSA-1280215 in release 98, `(2002). Cytokines and the immune
+system, Cytokine Reference.`, the book's publisher being in the graph but not printed. Spec
+001's form, which the report printed until T027, does print the publisher (`… In: Cytokine
+Reference. Elsevier Science.`), and links a web page's title to its address without printing
+it.
 
 Every other part agreed at both sizes. The edit history's grouping by day (T007) holds:
 on the two pathways with two edits of one kind on one day at different times, both

@@ -26,9 +26,10 @@ export interface SectionInput {
   report: Report;
   /**
    * The analysis report's own (spec 002 T009): markup in place of the edit history and what
-   * an analysis found, and the stable identifier linked to the event's page.
+   * an analysis found, the stable identifier linked to the event's page, and its own form of
+   * a reference (spec 002 T027).
    */
-  analysisReport?: { tail: string; linkStId: true };
+  analysisReport?: { tail: string; linkStId: true; reference: (r: Reference) => string };
 }
 
 /** An event's heading level: the PDF's own event or a chapter's is h1, h6 the deepest. */
@@ -119,7 +120,7 @@ export function sectionHtml(section: Section, input: SectionInput): string {
   if (section.references.length > 0) {
     parts.push(
       `<p class="part">Literature references</p><ol class="references">${section.references
-        .map((r) => `<li>${reference(r)}</li>`)
+        .map((r) => `<li>${(input.analysisReport?.reference ?? reference)(r)}</li>`)
         .join('')}</ol>`
     );
   }
@@ -159,21 +160,30 @@ function definitions(rows: readonly [string, string][]): string {
 
 const capital = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
-/** A literature reference: its authors, year, title and where it was published. */
-export function reference(r: Reference): string {
+/** A reference's authors and year, as markup: `Placeholder, A, Example, B (2003). `, or empty. */
+export function referenceLead(r: Reference): string {
   const authors =
     r.authors.length > 0 ? `${text(r.authors.join(', '))}${r.moreAuthors ? ' et al.' : ''}` : '';
   const year = r.year === null ? '' : ` (${String(r.year)})`;
   const named = `${authors}${year}`;
   // a list of authors may end in an initial's full stop: it is not doubled
-  const lead = named === '' ? '' : `${named}${named.endsWith('.') ? '' : '.'} `;
+  return named === '' ? '' : `${named}${named.endsWith('.') ? '' : '.'} `;
+}
+
+/** A reference's title as markup, linked to PubMed where it has a PubMed identifier. */
+export function referenceTitle(r: Reference): string {
+  return r.pubMedId === null
+    ? text(r.title)
+    : Links.a(`https://pubmed.ncbi.nlm.nih.gov/${String(r.pubMedId)}/`, r.title);
+}
+
+/** A literature reference: its authors, year, title and where it was published. */
+export function reference(r: Reference): string {
+  const lead = referenceLead(r);
   if (r.kind === 'web page') {
     return `${lead}${r.url ? Links.a(r.url, r.title) : text(r.title)}.`;
   }
-  const title =
-    r.pubMedId === null
-      ? text(r.title)
-      : Links.a(`https://pubmed.ncbi.nlm.nih.gov/${String(r.pubMedId)}/`, r.title);
+  const title = referenceTitle(r);
   if (r.kind === 'book') {
     const chapter = r.chapterTitle ? `${text(r.chapterTitle)}. In: ` : '';
     const rest = [r.publisher, r.isbn ? `ISBN ${r.isbn}` : null].filter((x) => x !== null);

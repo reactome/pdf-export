@@ -54,6 +54,33 @@ const REFERENCE: Reference = {
   moreAuthors: false,
 };
 
+const BOOK: Reference = {
+  ...REFERENCE,
+  dbId: 2,
+  kind: 'book',
+  title: 'A made-up book',
+  chapterTitle: 'A made-up chapter',
+  journal: null,
+  volume: null,
+  pages: '1-20',
+  year: 2010,
+  isbn: '0000000000',
+  publisher: 'Placeholder Press',
+  authors: ['Sample, C'],
+};
+const WEB_PAGE: Reference = {
+  ...REFERENCE,
+  dbId: 3,
+  kind: 'web page',
+  title: 'A made-up web page',
+  journal: null,
+  volume: null,
+  pages: null,
+  year: null,
+  url: 'https://example.org/placeholder',
+  authors: ['Dummy, D'],
+};
+
 /** A made-up detail for a pathway: spec 001's section and an edit history. */
 function detail(
   stId: string,
@@ -214,6 +241,17 @@ describe("the analysis report's comparison (FR-208)", { timeout: 600_000 }, () =
     assert.ok((t.found?.[0]?.rows.length ?? 0) > 0, 'the identifiers found');
     assert.equal(t.notFound?.length, baseline.notFound?.length);
     assert.deepEqual(differences(t, baseline), []);
+    // a book and a web page: today's form, which the report's matches (T027)
+    const cited = new Map(
+      [...details(model)].map(([id, d]) => [
+        id,
+        { ...d, section: { ...d.section, references: [REFERENCE, BOOK, WEB_PAGE] } },
+      ])
+    );
+    assert.deepEqual(
+      differences(await today(model, cited), (await printed(model, cited)).reduced),
+      []
+    );
     // no references: today's "References" over nothing is as pdf-export's none
     const bare = new Map(
       [...details(model)].map(([id, d]) => [

@@ -4,10 +4,10 @@ import { after, before, describe, test } from 'node:test';
 
 import { checkToken, readReportAnalysis, type ReportFilter } from '../../src/analysis/report.ts';
 import { graphSettings, openGraph } from '../../src/graph/connection.ts';
-import type { SpeciesRef } from '../../src/graph/queries.ts';
+import { literature, type SpeciesRef } from '../../src/graph/queries.ts';
 import { CharacterLog, REPLACEMENT } from '../../src/layout/characters.ts';
 import { Links } from '../../src/layout/html.ts';
-import type { Report } from '../../src/layout/section.ts';
+import { reference, type Report } from '../../src/layout/section.ts';
 import { readDetails, type PathwayDetail } from '../../src/report/details.ts';
 import {
   onRequestReport,
@@ -166,6 +166,57 @@ describe("the report's details and identifier lists", () => {
         assert.ok(!kept.includes('Spec 001 row'));
         // then its entities, after the history
         assert.ok(alpha.indexOf('Edit history') < alpha.indexOf('Entities found: UniProt'));
+      } finally {
+        await graph.close();
+      }
+    });
+
+    test("a book's and a web page's references in today's form; spec 001's unchanged (T027)", async () => {
+      const graph = openGraph(graphSettings(process.env));
+      try {
+        const m = await model(REPORT_TOKENS.overrepresentation);
+        const details = await readDetails(graph, m.pathways, new Set(['R-HSA-90000300']));
+        // the fixture's book (with its publisher) and web page, read by spec 001's query
+        const SHARED_REACTION = 90000220;
+        const cited = (await literature(graph, [SHARED_REACTION])).get(SHARED_REACTION) ?? [];
+        assert.deepEqual(
+          cited.map((r) => r.kind),
+          ['book', 'web page']
+        );
+        const [book, page] = cited;
+        assert.ok(book && page);
+        assert.equal(book.publisher, 'Placeholder Press');
+        assert.equal(page.url, 'https://example.org/placeholder');
+        const alphaId = 90000200;
+        const alphaDetail = details.get(alphaId);
+        assert.ok(alphaDetail);
+        const out = body(
+          m,
+          new Map([
+            ...details,
+            [alphaId, { ...alphaDetail, section: { ...alphaDetail.section, references: cited } }],
+          ])
+        );
+        const items = [
+          ...(/<ol class="references">([\s\S]*?)<\/ol>/
+            .exec(/<h2 id="s-R-HSA-90000200"[\s\S]*?<\/section>/.exec(out)?.[0] ?? '')?.[1]
+            ?.matchAll(/<li>([\s\S]*?)<\/li>/g) ?? []),
+        ].map((item) => item[1] ?? '');
+        const plain = (markup: string): string => markup.replace(/<[^>]*>/g, '');
+        // today's: a book's chapter and title parted by a comma, in italics, its pages after
+        // a comma, no publisher or ISBN; a web page's title and address, no authors or year
+        assert.deepEqual(items.map(plain), [
+          'Placeholder01, P. (2010). Placeholder chapter, Placeholder book, 1-20.',
+          'Placeholder web page. Retrieved from https://example.org/placeholder',
+        ]);
+        assert.match(items[0] ?? '', /<i>Placeholder chapter, Placeholder book<\/i>/);
+        assert.match(items[1] ?? '', /<a href="https:\/\/example\.org\/placeholder">/);
+        // spec 001's form, which its book keeps
+        assert.equal(
+          plain(reference(book)),
+          'Placeholder01, P. (2010). Placeholder chapter. In: Placeholder book. Placeholder Press, ISBN 0000000000.'
+        );
+        assert.equal(plain(reference(page)), 'Placeholder02, P. Placeholder web page.');
       } finally {
         await graph.close();
       }

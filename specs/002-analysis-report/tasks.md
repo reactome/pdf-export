@@ -483,7 +483,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     two `modified` edits, and three references (R9). The grouping by day holds: one row in
     both on the two pathways with two edits of one kind on one day at different times.
   - **Left open:** the Modified rows and the book and web-page references, for a decision
-    (R9); the expression, interactors and species-comparison tokens, and each figure's
+    (R9; the references decided 14 Nov 2026, T027); the expression, interactors and species-comparison tokens, and each figure's
     overlay check (quickstart §3), not run here.
 
 - [x] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
@@ -515,6 +515,27 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     working folder. SC-204 not run (spec 001's T032). **Left:** SC-207 in the readers
     themselves on a desktop (pdf.js, Poppler and PDFium opened both reports here), and
     the failure while the PDF is made (R5).
+
+- [x] T027 [US1] The references in today's form, as the user decided on 14 Nov 2026 (T019,
+      research R9): a book's and a web page's, in the analysis report.
+  - Today's form read from `reactome/analysis-report`'s `ApaStyle` (R9): a web page's title
+    and address; a book's chapter's title and the book's parted by a comma, and its pages.
+    T019's "a book's publisher after a comma" was the book's title: today's prints no
+    publisher.
+  - Spec 001's `reference` is shared with the report (its `sectionHtml`), so the report has
+    its own form, `reportReference` (`src/report/layout.ts`), passed to `sectionHtml`; spec
+    001's book is unchanged. An article is spec 001's in both.
+  - Read through spec 001's `literature` query, which already reads the address and the
+    publisher; no field added.
+  - Tests, each seen failing without the change: the fixture graph's book and web page in
+    the report's form, spec 001's form of them unchanged (`test/report/body.test.ts`); and
+    a book and a web page printed in today's form and the report's, agreeing in
+    `compare-report` (`test/compare/report.test.ts`, its today's-form helper taught both
+    from `ApaStyle`). The comparison's reader now leaves out pdf-export's list number on a
+    reference with no year (a web page in today's form), seen failing without it.
+  - **Follow-up, not done:** whether spec 001's book takes this form too is the user's to
+    decide later.
+  - **Done (#PR).**
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after

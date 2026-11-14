@@ -19,8 +19,9 @@ import type {
   ReportedPathway,
   ResourceTable,
 } from './model.ts';
+import type { Reference } from '../graph/queries.ts';
 import type { Report } from '../layout/section.ts';
-import { sectionHtml } from '../layout/section.ts';
+import { reference, referenceLead, referenceTitle, sectionHtml } from '../layout/section.ts';
 import {
   KEPT,
   OVERVIEW_CAPTION,
@@ -363,6 +364,30 @@ export interface DetailsInput {
 }
 
 /**
+ * A literature reference as the analysis report prints it (spec 002 T027, decided 14 Nov
+ * 2026: today's form for a book and a web page, read from `reactome/analysis-report`'s
+ * `ApaStyle`; research R9). An article is spec 001's, which today's matches.
+ *
+ * - **A web page:** its title, then "Retrieved from" and its address, linked; today's names
+ *   no authors and no year for one.
+ * - **A book:** its authors and year, then its chapter's title and the book's, parted by a
+ *   comma, in italics, then its pages after a comma; today's prints no publisher or ISBN.
+ */
+export function reportReference(r: Reference): string {
+  if (r.kind === 'web page') {
+    return r.url === null
+      ? `${text(r.title)}.`
+      : `${text(r.title)}. Retrieved from ${Links.a(r.url, r.url)}`;
+  }
+  if (r.kind === 'book') {
+    const chapter = r.chapterTitle === null ? '' : `${text(r.chapterTitle)}, `;
+    const pages = r.pages === null ? '' : `, ${text(r.pages)}`;
+    return `${referenceLead(r)}<i>${chapter}${referenceTitle(r)}</i>${pages}.`;
+  }
+  return reference(r);
+}
+
+/**
  * One pathway's detail: spec 001's section for it, with the report's edit history in place
  * of spec 001's and its stable identifier linked to its page, then its entities found per
  * resource and, with interactors, its interactors. A pathway the graph does not hold has its
@@ -392,7 +417,7 @@ export function detailHtml(
         figures: input.figures,
         found: null,
         report: input.report,
-        analysisReport: { tail, linkStId: true },
+        analysisReport: { tail, linkStId: true, reference: reportReference },
       }
     );
   }
