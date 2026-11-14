@@ -602,12 +602,12 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
       the overview, and the listed difference is removed here and in the register.
 - [x] T024 Remove the scratch baselines once T019 and T020 are recorded: today's reports,
       kept outside the repository, hold names.
-  - **Done (#PR), nothing left to remove:** searched for on 14 Nov 2026, no report PDF of
+  - **Done (#220), nothing left to remove:** searched for on 14 Nov 2026, no report PDF of
     November remains in any scratch folder, the clone or the home directory on the
     development host. T019's and T020's runs removed their own (research R9, R10); T001's
     and T002's were never kept with their tokens (R9).
 - [x] T025 Check the success criteria, SC-201 to SC-207, and record the result here.
-  - **Done (#PR; research R11):** checked against R9, R10, T016 and the website's #960 and
+  - **Done (#220; research R11):** checked against R9, R10, T016 and the website's #960 and
     #961; nothing measured for it. SC-205 and SC-206 met; SC-203 met for the
     over-representation token timed; SC-202 met but for the failure while the PDF is made,
     not run; SC-201 and SC-207 not met, each partly run; SC-204 not run. The task is to
