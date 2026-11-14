@@ -272,8 +272,12 @@ export function figureBoxes(boxes: readonly Shape[], width: number, height: numb
   );
 }
 
-/** A cell of a table's shading is no taller than this: a row of two or three lines. */
-export const CELL_MAX_PT = 40;
+/**
+ * A cell of a table's shading is no taller than this: a row of up to six lines. Today's
+ * report sets a row 10 pt plus 10.02 pt a line of its name (20.02, 30.05, 40.07 pt for one,
+ * two and three), and a pathway's name runs to five lines in its 148-pt column (T028).
+ */
+export const CELL_MAX_PT = 72;
 
 /** A table's cells share their edges within this. */
 export const CELL_ALIGN_PT = 1.5;
@@ -281,8 +285,9 @@ export const CELL_ALIGN_PT = 1.5;
 /**
  * A cluster's shapes are a table's shaded cells: two or more painted paths and no image,
  * each no taller than CELL_MAX_PT; those sharing a row (the same top and foot) side by side,
- * not overlapping; and at least four in five of them sharing their row with another. See
- * figureBoxes.
+ * not overlapping; and at least four in five of them sharing their row with another that
+ * touches it, within CELL_ALIGN_PT, as a table's cells do and a diagram's nodes in a row do
+ * not. See figureBoxes.
  */
 function banded(members: readonly Shape[]): boolean {
   if (members.length < 2 || members.some((b) => b.image === true)) return false;
@@ -295,7 +300,10 @@ function banded(members: readonly Shape[]): boolean {
     )
   );
   if (overlapping) return false;
-  const inRow = members.filter((a) => members.some((b) => b !== a && sameRow(a, b))).length;
+  const touching = (a: Shape, b: Shape): boolean => same(a.x2, b.x1) || same(b.x2, a.x1);
+  const inRow = members.filter((a) =>
+    members.some((b) => b !== a && sameRow(a, b) && touching(a, b))
+  ).length;
   return inRow * 5 >= members.length * 4;
 }
 
