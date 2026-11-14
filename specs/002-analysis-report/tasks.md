@@ -486,7 +486,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     (R9); the expression, interactors and species-comparison tokens, and each figure's
     overlay check (quickstart §3), not run here.
 
-- [ ] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
+- [x] T020 [US2] The replay and the time (SC-202, SC-203, SC-204, SC-205, SC-207), after
       T014, T015 and T017.
   - T001's set replayed against `pdf-export serve` on the development host's services:
     each status and file name as today's or a listed difference. The set gains a
@@ -509,6 +509,12 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     framework's bodies in T004's stub, read from the analysis service's source, not
     measured: the replay checks them against the private service.
   - Recorded in research.
+  - **Done (#215, #216; research R10):** the replay, `ci/replay.ts` (#215): 39 cases, 3
+    listed differences, none other; call 4's refusals as the stub's. SC-203 met: 102 s
+    cold at 25 pathways, 184 s at 50. SC-205: no submitted identifier in the logs or the
+    working folder. SC-204 not run (spec 001's T032). **Left:** SC-207 in the readers
+    themselves on a desktop (pdf.js, Poppler and PDFium opened both reports here), and
+    the failure while the PDF is made (R5).
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after

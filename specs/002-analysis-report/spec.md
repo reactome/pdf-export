@@ -447,8 +447,8 @@ disk, the printer's memory-backed folder included, for the submitted identifiers
   - a character today's typeface lacks (a Greek letter in a reference's title) printed,
     where today's writes U+0000 in its place (T019, research R9);
   - an `importableOnly` of spaces alone read as the default (false), where today's framework
-    reads it as no value and today's report then most likely fails with a 500 (read from its
-    source, not measured): a bug fixed here (decided 13 Nov 2026, T006);
+    reads it as no value and today's report then fails with a 500 and an empty body (read
+    from its source, then measured by T020): a bug fixed here (decided 13 Nov 2026, T006);
   - a malformed token answered 404, where today's answers its catch-all 500 (and one
     holding `%2F` the servlet container's HTML 400): a client's bad input, not a server
     error (decided 8 Nov 2026, research R8);
