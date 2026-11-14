@@ -508,3 +508,105 @@ reports print one row with both names.
 **Not run here:** the expression, interactors and species-comparison tokens (T002's
 sample), whose reports today's prints in forms not read yet (value columns, interactor
 tables); and the check of each figure for its overlay (quickstart §3).
+
+## R10. The replay and the time (T020, 13–14 Nov 2026)
+
+**The run.** On the development host's own services, on loopback: today's analysis service
+(release 98), pdf-export's `serve` from this repository's `main` on a private copy of the
+release 98 graph, and the website's render service. T001's tokens were not kept, so fresh
+ones were made as R5 and R9 describe: over-representation analyses of seven gene symbols
+and two made-up identifiers, a different pair of made-up identifiers for each token (1,546
+pathways found, 2 identifiers not found). One request at a time throughout. The reports
+were kept outside the repository and removed after the run.
+
+### The replay (SC-202)
+
+`node ci/replay.ts` (#215) sends each request to both services and compares the status,
+the `Content-Type`, the file name, and the body of anything but a PDF (the framework's 400
+by its form, its time apart). pdf-export's 202 is followed to its answer (FR-210, listed).
+**39 cases: 36 the same, 3 listed differences, none other.**
+
+- **The same:** the defaults; `number` at 0, 1, -1, 50, 51, empty, `abc` and `1.5` (the
+  last two the framework's 400, byte for byte but the time); `resource` held, in another
+  case, not held and not one; `importableOnly` true, false, 1 and `maybe` (400); four
+  colour profiles, one unknown; the species as `Homo_sapiens`, `hOMO_SAPIENS`,
+  `Homo%20sapiens`, `48887` and `Mus_musculus`; an unknown species with a good token, an
+  unknown one, and `number=abc` (400: parameters first); an unknown token (404), a gone
+  one (410); a malformed token with an unknown species (404: the species first); another
+  file name (`report.pdf` still).
+- **The parameters given twice**, as T006 read them from the framework's source:
+  `number=7&number=abc` 200 (the first value read), `importableOnly=true&importableOnly=maybe`
+  200, `resource=UNIPROT&resource=ENSEMBL` 200, in both.
+- **Listed:** a malformed token (today's catch-all 500) and one holding `%2F` (today's
+  servlet container's HTML 400), each 404 in the service's form here (R8); and
+  `importableOnly=%20`, 200 here. **Today's answer to it, measured for the first time:** 500,
+  `Content-Type: application/json;charset=UTF-8` with `Content-Disposition: attachment;
+filename="report.pdf"` and an empty body, the connection closed: the failure the spec's
+  Assumptions read from the source.
+- **Not compared by SC-202, noted:** a PDF's `Content-Type` is `application/pdf` here, as
+  contracts/service.md has it, and `application/pdf;charset=UTF-8` today. The replay
+  reads them as one type.
+- **Call 4's refusals** (another content type, an empty body): the analysis service's
+  status, type and body (by its form) are T004's stub's.
+- **The failure while the PDF is made** is still not replayed: no private build of the
+  deployed commit exists (R5).
+- **A finding, for WebsiteAngular:** the mouse report's figures (`Mus_musculus`, 25
+  pathways) lost 4 of 25 to the render service's 500 (two diagrams, two ancestors'
+  diagrams); the report was still 200 with each part without its figure, as the contract
+  says, and logged. Not investigated here.
+
+### The time (SC-203)
+
+One report alone, timed by a client from the first request to the PDF, asking again at
+once after each 202 (a browser following `Retry-After` adds up to 10 s). **Cold:** a fresh
+token, so no render cache entry can hold its figures (the render service keys each on the
+token): its counters showed every figure rendered (26 and 51) and no hit, and nothing else
+drawn meanwhile. **Warm:** the same request after `serve` was restarted (its kept reports
+gone), every figure a cache hit. Stages from the report's log line.
+
+| Report      | Today's | Cold  | Analysis | Graph | Figures | Layout | Print  | Warm |
+| ----------- | ------- | ----- | -------- | ----- | ------- | ------ | ------ | ---- |
+| 25 pathways | 23 s    | 102 s | 0.2 s    | 0.1 s | 74.1 s  | 1.0 s  | 26.4 s | 28 s |
+| 50 pathways | 36 s    | 184 s | 0.1 s    | 0.1 s | 132.4 s | 1.5 s  | 49.9 s | 56 s |
+
+- **Within SC-203:** today's is faster (as T002's 31 s and 52 s), so the targets are 2
+  and 4 minutes: 102 s and 184 s meet them, with 18 s and 56 s to spare.
+- **Where the time goes:** the figures, about 2.8 s each two at once (R4's estimate), and
+  the print, about a second a page with its contents' second pass. Warm, the print is
+  nearly all of it.
+- One sample each, on a host whose other services were not stopped.
+
+### What is kept (SC-205)
+
+The submitted identifiers of the four tokens, each token as issued, URL-decoded and
+Base64-decoded, searched for (case-insensitive) in `serve`'s logs of five runs and in its
+working folder, the search first shown to find them in a copy of the list:
+
+- after the replay, with seven reports kept in memory: none;
+- a report killed (`SIGKILL`) while it printed left its working page, holding the
+  identifiers, in the folder, and no browser behind it; `serve` started again emptied
+  the folder (the folder stays private to its user);
+- then every log and the folder: **none**.
+
+The log holds each report's token as a keyed hash, which differed between runs for the
+same token, as R7 says.
+
+### The look (SC-204)
+
+**Not run:** spec 001's colour and font check is its T032, not yet built.
+
+### The readers (SC-207)
+
+The 25- and 50-pathway reports (51 and 93 pages, 33 and 58 bookmarks two levels deep, 111
+and 208 links within the report, and links out to the website, PubMed and DOI):
+
+- **pdf.js** (Firefox's viewer): opened; every bookmark and every link within the report
+  resolved to one of its pages.
+- **Poppler** 24.02 (its command-line tools, unpacked into a scratch folder, not
+  installed or shipped): opened without an error; every bookmark and every link within
+  the report on one of its pages; the first page drawn.
+- **PDFium** (Chromium's viewer's engine, a WebAssembly build, likewise): opened, every
+  page drawn. That build gives no access to bookmarks or links, so they were not
+  followed in it.
+- **Not done:** opening each in the readers themselves and clicking through, which needs
+  a desktop, as spec 001's SC-004 (its T031) does.
