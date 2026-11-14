@@ -631,3 +631,36 @@ and 208 links within the report, and links out to the website, PubMed and DOI):
   followed in it.
 - **Not done:** opening each in the readers themselves and clicking through, which needs
   a desktop, as spec 001's SC-004 (its T031) does.
+
+## R11. The success criteria, checked (T025, 14 Nov 2026)
+
+Each criterion against what was measured: R9 (T019), R10 (T020), T016, T017, and the
+website's two pull requests since R10, reactome/WebsiteAngular#960 (the website routed to
+pdf-export, T018 and T021) and reactome/WebsiteAngular#961 (the render page's colouring of an
+inferred species' diagram). Nothing was measured for this task.
+
+**Since R10** (14 Nov 2026), on the development host:
+
+- **#960 deployed:** a 10-pathway report of a human over-representation token, asked for at
+  the website's address through its nginx and analysis gateway, on loopback, with a fresh
+  token: 202, then 200 `application/pdf` (6.6 MB) at about 60 s. The gateway counted it on
+  its report path, and pdf-export's working folder was empty afterwards. One report, not
+  timed by SC-203's rules (its size is neither 25 nor 50, and the cache and other traffic
+  were not controlled).
+- **#961:** the render page's analysis colouring threw on an entity an inferred species'
+  diagram lacks, so the page never became ready and the render service answered 500 at
+  its timeout: the cause of R10's 4 missing mouse figures. Two of those four figures now
+  render with a token, in about 4.5 s each. The mouse report was not made again.
+
+- **SC-201, not met (partly run).** One over-representation token, human, without interactors, at 25 and 50 pathways (R9): every part agreed but three, each since fixed (#213) or decided and listed (T026, T027). The pair was not compared again after T026 and T027 (#217, #218), which were tested on reports printed here, not on that pair. **Not run:** the expression, interactors and species-comparison tokens (today's forms for value columns and interactor tables not read yet); each figure's overlay check (quickstart §3); a species other than human since #961. The figures' resource (T023) is a listed difference until T023 is done.
+- **SC-202, met but for one case not run.** R10: 39 cases, 36 the same, 3 listed differences, none other. #960: T001's error cases through the gateway, 11 cases, 9 the same, the 2 listed. **Not run:** the failure while the PDF is made, which User Story 2's set includes, planted in a private build of the deployed commit: none exists (R5).
+- **SC-203, met for the token timed.** R10, an over-representation token, cold, one report alone, no other render traffic: 102 s at 25 pathways, 184 s at 50; today's faster (23 s, 36 s), so the targets are 2 and 4 minutes. One sample each, on a host whose other services were not stopped. Not timed: the expression and species-comparison tokens, today's slowest (R4).
+- **SC-204, not run.** Spec 001's colour and font check (its T032, SC-009) is not built yet.
+- **SC-205, met.** R10: the submitted identifiers of four tokens, searched in `serve`'s logs of five runs and its working folder, the search shown first to find them: none after the replay with seven reports kept, and none after a report killed while printing and the service started again (which emptied the folder). #960's deployed report left the working folder empty.
+- **SC-206, met.** T016 (#207): `node ci/licences.ts`, a step of CI, passes on the installed tree (168 packages) and fails on a planted `GPL-3.0-only` package.
+- **SC-207, not met (partly run).** R10: the 25- and 50-pathway reports opened by pdf.js and Poppler's tools, every bookmark and internal link resolved to a page in both; PDFium's WebAssembly build drew every page but cannot follow bookmarks or links. **Not run:** the three readers of spec 001's SC-004 themselves (Chromium's and Firefox's viewers, a Poppler-based desktop reader), clicking through, which needs a desktop.
+
+**What remains** (T028): SC-201's other tokens, a species other than human, the pair
+compared again after T026 and T027, and each figure's overlay; SC-202's failure while
+printing; SC-204 once spec 001's T032 is built; SC-207 in the readers on a desktop; and
+T023, the figures' resource.

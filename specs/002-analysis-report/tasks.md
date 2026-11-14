@@ -4,7 +4,7 @@ description: 'Tasks for spec 002: the analysis report PDF'
 
 # Tasks: The analysis report PDF
 
-**Input**: `specs/002-analysis-report/`: plan.md, spec.md, research.md (R1–R8),
+**Input**: `specs/002-analysis-report/`: plan.md, spec.md, research.md (R1–R11),
 data-model.md, contracts/ (service.md, analysis-api.md, render.md), quickstart.md; and
 spec 001's code, which this spec reuses (plan, Order of work, step 2: its analysis stub
 T010, client T020 and T021 and service T022 are merged).
@@ -600,9 +600,33 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
 - [ ] T023 [WA] Later, not blocking T021: the render service takes `resource` (FR-204);
       then the report passes its resource for the pathways' figures and the default for
       the overview, and the listed difference is removed here and in the register.
-- [ ] T024 Remove the scratch baselines once T019 and T020 are recorded: today's reports,
+- [x] T024 Remove the scratch baselines once T019 and T020 are recorded: today's reports,
       kept outside the repository, hold names.
-- [ ] T025 Check the success criteria, SC-201 to SC-207, and record the result here.
+  - **Done (#220), nothing left to remove:** searched for on 14 Nov 2026, no report PDF of
+    November remains in any scratch folder, the clone or the home directory on the
+    development host. T019's and T020's runs removed their own (research R9, R10); T001's
+    and T002's were never kept with their tokens (R9).
+- [x] T025 Check the success criteria, SC-201 to SC-207, and record the result here.
+  - **Done (#220; research R11):** checked against R9, R10, T016 and the website's #960 and
+    #961; nothing measured for it. SC-205 and SC-206 met; SC-203 met for the
+    over-representation token timed; SC-202 met but for the failure while the PDF is made,
+    not run; SC-201 and SC-207 not met, each partly run; SC-204 not run. The task is to
+    check and record, so it is ticked; what remains is T028.
+- [ ] T028 The success criteria left by T025 (research R11), on the development host's
+      services, made-up identifiers, one report at a time:
+  - SC-201: the expression, interactors and species-comparison tokens at 25 and 50
+    pathways (the reader taught today's value columns and interactor tables first); a
+    species other than human, now that reactome/WebsiteAngular#961 renders an inferred
+    species' figures; the over-representation pair compared again after T026 and T027;
+    and each figure's overlay checked (quickstart §3), seen failing on one captured
+    without it.
+  - SC-202: the failure while the PDF is made, once a private build of the deployed
+    commit exists (R5).
+  - SC-204: spec 001's colour and font check on a sample report, once its T032 is built.
+  - SC-207: the reports opened in spec 001's SC-004 readers on a desktop, bookmarks and
+    links followed.
+  - T023 (the figures' resource) is its own task; SC-201's listed difference for it goes
+    with it.
 
 ---
 
@@ -618,7 +642,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
 - **US4 and US3:** T015 after T013; T016 at any time.
 - **Live:** T017 at any time before T019; T018 when T019 or T021 needs it; T019 after T011
   and T017; T020 after T014, T015 and T017; T021 last of the build.
-- **Polish:** T022 at any time; T023 after T021; T024 after T019 and T020; T025 last.
+- **Polish:** T022 at any time; T023 after T021; T024 after T019 and T020; T025 last; T028 after T025.
 
 ## Parallel opportunities
 
