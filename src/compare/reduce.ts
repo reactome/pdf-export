@@ -600,7 +600,9 @@ function reportItems(part: PartName, texts: readonly string[], own: readonly Lin
     return found
       .map((text) => {
         const year = /\(\d{4}[a-z]?\)/.exec(text);
-        return unhyphened(year ? text.slice(year.index) : text);
+        // one with no year (a web page, in today's form) read whole, but pdf-export's
+        // list number (`3. `), which today's does not print
+        return unhyphened(year ? text.slice(year.index) : text.replace(/^\d+\.\s+/, ''));
       })
       .filter((item) => item !== '')
       .map(hash);

@@ -54,6 +54,12 @@ const FILLER =
     6
   );
 
+/**
+ * A reference as today's `ApaStyle` writes it (reactome/analysis-report): an article's
+ * authors, year, title and where; a web page's title and address alone; a book's authors and
+ * year, then (with no space, as today's) its chapter's title and the book's parted by a
+ * comma, and its pages; no publisher or ISBN.
+ */
 function reference(r: Reference): string {
   const authors = r.authors.map(todayName);
   const names =
@@ -61,6 +67,12 @@ function reference(r: Reference): string {
       ? `${authors.slice(0, -1).join(', ')} & ${authors.at(-1) ?? ''}`
       : (authors[0] ?? '');
   const year = r.year === null ? '' : ` (${String(r.year)})`;
+  if (r.kind === 'web page') return `${escape(r.title)}. Retrieved from ${escape(r.url ?? '')}`;
+  if (r.kind === 'book') {
+    const title = r.chapterTitle === null ? `. ${r.title}` : `.${r.chapterTitle}, ${r.title}`;
+    const pages = r.pages === null ? '' : `, ${r.pages}`;
+    return `${escape(`${names}${year}`)}<i>${escape(title)}</i>${escape(pages)}.`;
+  }
   const where = [r.journal, r.volume === null ? null : String(r.volume), r.pages].filter(
     (x) => x !== null
   );
