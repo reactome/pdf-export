@@ -507,8 +507,23 @@ export function compareReports(file: string, ref: ReportReduced, neu: ReportRedu
     contents: null,
     shortEntries: 0,
   });
+  const modified = listedModifiedRows(ref.reduced, neu.reduced);
+  if (modified.events.length > 0) {
+    add({
+      part: 'section',
+      field: 'edits',
+      kind: 'extra',
+      count: modified.events.length,
+      events: modified.events,
+      recorded: MODIFIED_ROWS_LISTED,
+    });
+  }
   out.push(
-    ...compareReduced(file, shell(ref.reduced, ref.properties), shell(neu.reduced, neu.properties))
+    ...compareReduced(
+      file,
+      shell(ref.reduced, ref.properties),
+      shell(modified.reduced, neu.properties)
+    )
   );
   for (const [side, properties] of [
     ['reference', ref.properties],
@@ -593,6 +608,41 @@ export function compareReports(file: string, ref: ReportReduced, neu: ReportRedu
     }
   });
   return out;
+}
+
+/** Why a pathway's Modified rows are a listed difference (spec 002 Assumptions). */
+export const MODIFIED_ROWS_LISTED =
+  "Listed (spec 002 Assumptions, decided 14 Nov 2026): a pathway with two or more modified edits has a Modified row for each, where today's report prints none";
+
+/** An edit-history row's action, as reportEditRows writes it: `<date> <action> <names>`. */
+const actionOf = (row: string): string | undefined => row.split(' ')[1];
+
+/**
+ * The listed difference in the edit history's Modified rows: where pdf-export's detail of a
+ * pathway has two or more Modified rows, each that today's does not have is taken out of
+ * pdf-export's side, and the pathway named. Nothing else is: a Modified row missing from
+ * pdf-export's, or one extra where it has only one, is still a difference.
+ */
+export function listedModifiedRows(
+  ref: Reduced,
+  neu: Reduced
+): { reduced: Reduced; events: string[] } {
+  const events: string[] = [];
+  const sections = neu.sections.map((section) => {
+    const theirs = ref.sections.find((s) => s.stId === section.stId);
+    const ours = section.parts.find((part) => part.part === 'edits');
+    if (!theirs || !ours) return section;
+    if (ours.items.filter((row) => actionOf(row) === 'modified').length < 2) return section;
+    const today = theirs.parts.find((part) => part.part === 'edits')?.items ?? [];
+    const kept = ours.items.filter((row) => actionOf(row) !== 'modified' || today.includes(row));
+    if (kept.length === ours.items.length) return section;
+    events.push(section.stId);
+    return {
+      ...section,
+      parts: section.parts.map((part) => (part === ours ? { ...part, items: kept } : part)),
+    };
+  });
+  return { reduced: { ...neu, sections }, events };
 }
 
 /** A part on both sides compared, or said missing or extra. */

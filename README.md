@@ -23,7 +23,8 @@ and, for the analysis report, `reactome/analysis-report`.
   `--site`) makes one report, for checks by hand and the comparison.
 - **`pdf-export compare-report <today's.pdf> <new.pdf> [--expected <file>]`** compares a
   report with today's by meaning (FR-208), printing counts and salted hashes, never a
-  name or a submitted identifier.
+  name or a submitted identifier. One listed difference it marks itself: a pathway's
+  Modified rows where it has two or more `modified` edits (the spec's Assumptions).
 
 See [`specs/002-analysis-report/`](specs/002-analysis-report/) for the address's answers
 (`contracts/service.md`) and what the report holds.
