@@ -535,7 +535,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     reference with no year (a web page in today's form), seen failing without it.
   - **Follow-up, not done:** whether spec 001's book takes this form too is the user's to
     decide later.
-  - **Done (#PR).**
+  - **Done (#218).**
 
 - [ ] T021 [WA] The website routed to pdf-export (research R6; plan, Order of work, step
       8), in WebsiteAngular under spec 010 (the analysis gateway, its Story 6), after
