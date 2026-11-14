@@ -231,7 +231,10 @@ export interface Difference {
   events?: string[];
   reference?: unknown;
   new?: unknown;
-  /** Why it is expected, from `--expected`'s file (never read from a PDF). */
+  /**
+   * Why it is expected: from `--expected`'s file, or a difference the comparison lists itself
+   * (spec 002's Modified rows); never read from a PDF.
+   */
   recorded?: string;
 }
 
