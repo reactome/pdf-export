@@ -955,8 +955,25 @@ of R4's T049 note).
   at once on average (inference).
   - **Accepted:** the user accepted the step's time on 4 Nov 2026: five to six hours is
     acceptable, and the release may later give the step a larger machine.
-  - **What might shorten it:** T042, many figures per page load, is expected to shorten
-    it and is measured there.
+  - **What might shorten it:** T042, many figures per page load, built in WebsiteAngular
+    as page reuse (its spec 018, `RENDER_REUSE`; its T010 holds the record). Its first
+    run of this step, 18 Nov 2026, reuse on with its defaults, `--parallel 4`, beta's
+    release 98 graph and the release's files:
+    - **Not finished:** 15,427 of 19,076 figures in 4 h 11 min, then stopped by the
+      step's breaker (8 unanswered in a row). The cause was the site server's
+      connections to the content service, piled up, not reuse (fixed in WebsiteAngular
+      #1006). A reuse-off run of the same build stopped the same way at once, so there is
+      no like-for-like time.
+    - **Per figure** (medians, held page against fresh): a reaction 1.2 s against 3.9 s,
+      a diagram 3.0 s against 6.0 s, an illustration 1.2 s against 3.8 s.
+    - **Held pages drew only 42% of the figures:** the service replaced a page 7,715
+      times for memory (half of a 3 GB container, shared by four pages) and 1,278 times
+      for a failure, most of them console errors that fresh pages log too.
+    - **Projected** from the rate before the slowdown (14,989 figures in 3 h 29 min,
+      4,306 an hour): about 4 h 26 min for the 19,076, against 5 h 47 min above. Not the
+      half (2 h 54 min) that spec 018 aims for; its T015 tunes the two rules and runs the
+      step again.
+    - **Peak memory:** 2,654 MiB of the render container's 3 GiB.
   - **The reactions:** 16,187, not the 16,424 above. 237 of the graph's human reactions
     are under no top-level pathway, so no PDF of the book prints them.
 
