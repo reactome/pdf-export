@@ -39,7 +39,10 @@ export function themeColours(
   return colours;
 }
 
-/** `#rgb`, `#rrggbb` or `rgb(r, g, b)` as `#rrggbb`; null for anything else. */
+/**
+ * A hex colour, short or long, as six lower-case digits after its hash; null for anything else
+ * (the theme writes every colour in hex).
+ */
 export function hexOf(value: string): string | null {
   const text = value.trim().toLowerCase();
   const long = /^#([0-9a-f]{6})$/.exec(text);
@@ -50,13 +53,6 @@ export function hexOf(value: string): string | null {
       .slice(1)
       .map((d) => `${d}${d}`)
       .join('')}`;
-  const rgb = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(text);
-  if (rgb) {
-    return `#${rgb
-      .slice(1)
-      .map((n) => Number(n).toString(16).padStart(2, '0'))
-      .join('')}`;
-  }
   return null;
 }
 
