@@ -6,6 +6,49 @@ implementation, under loose open-source licences, with diagrams in the website's
 browser's look. It is to replace [`reactome/event-pdf`](https://github.com/reactome/event-pdf)
 and, for the analysis report, `reactome/analysis-report`.
 
+## The release's book (spec 001)
+
+The book is a folder of PDFs, one per top-level pathway of the release's species, named as
+`event-pdf`'s are, which the release archives as it does today's. It is made in two runs of
+this repository's image (`Dockerfile`), one after the other:
+
+1. **`pdf-export figures`** draws every figure the book prints through WebsiteAngular's
+   render service, which must read the release's own files and draw from a content service
+   of the same release. Its inputs: the release's graph (`NEO4J_URI`, and the credentials as
+   `NEO4J_USER` and `NEO4J_PASSWORD`), the release's folder (`--files`: `diagram/`, `ehld/`
+   and the EHLD summary), the render service (`--render`) and that content service
+   (`--content`). It writes the figures' folder (`--out`, which must be empty or absent;
+   [`contracts/figures.md`](specs/001-pathway-pdfs/contracts/figures.md)). Set `--parallel`
+   to the render service's `RENDER_CONCURRENCY`.
+2. **`pdf-export book`** reads the graph, the release's folder and that figures' folder
+   (`--figures`); it asks no service. `--site` is the website's address, written into the
+   PDFs' links and never fetched. It writes the book's folder (`--out`) and, with
+   `--report`, a run report.
+
+```
+docker build -t pdf-export .
+docker run --rm --network host -e NEO4J_URI=... -v <release folder>:/files:ro -v <work>:/work \
+  pdf-export figures --files /files --render <render service> --content <content service> \
+  --parallel 4 --out /work/figures --report /work/figures.json
+docker run --rm --network host -e NEO4J_URI=... -v <release folder>:/files:ro -v <work>:/work \
+  pdf-export book --files /files --figures /work/figures --site <website> \
+  --out /work/TheReactomeBook --report /work/book.json
+```
+
+- **Exit codes** ([`contracts/cli.md`](specs/001-pathway-pdfs/contracts/cli.md)): 0, done; 1,
+  a fault in the release's data or files, each named (a figure missing, a character no font
+  draws, a figure that could not be drawn): the step has failed and nothing is to be
+  published; 2, bad arguments or a service or graph that cannot be reached. Either run
+  refuses an `--out` that is not empty, so a failed run is run again into a new folder.
+- **`pdf-export check-book <book folder> --files <release folder>`** checks a finished book
+  for FR-011's faults (exit 1 on any); `book` runs it itself before it succeeds.
+- **What it takes,** measured on release 98 (research R7): the book in about 18 minutes and
+  6 GB of memory; the figures, about 19,000 of them, in hours at four at once, which spec 018
+  of WebsiteAngular (render page reuse) is shortening.
+- **CI** builds the image and runs both steps over the fixture graph against stub services,
+  and a book with a figure missing, which must fail with exit 1 and no PDFs
+  (`ci/image/run.sh`); `ci/image/check.sh` checks the image's licences and fonts.
+
 ## The analysis report (spec 002)
 
 - **`pdf-export serve`** answers today's address,
