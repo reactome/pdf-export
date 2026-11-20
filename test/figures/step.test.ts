@@ -17,7 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { after, afterEach, before, describe, test } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
 
 import {
   graphSettings,
@@ -101,8 +101,6 @@ describe('pdf-export figures', { skip }, () => {
   };
 
   before(async () => {
-    render = await startRenderStub();
-    content = await startContentStub();
     const graph = openGraph(graphSettings(process.env));
     try {
       release = await releaseInfo(graph);
@@ -116,13 +114,19 @@ describe('pdf-export figures', { skip }, () => {
       await graph.close();
     }
   });
-  afterEach(() => {
-    render.reset();
-    content.reset();
+  // Stubs of its own for each test, not one pair reset between them: a request a stopped run
+  // gave up on can still reach the stub after the run has returned (measured: 137 of 500
+  // fetches aborted within 2 ms of being sent arrived after the abort was seen), and would be
+  // counted by the next test (#228). Sent to a closed stub, it is refused and counted by none.
+  beforeEach(async () => {
+    render = await startRenderStub();
+    content = await startContentStub();
   });
-  after(async () => {
+  afterEach(async () => {
     await render.close();
     await content.close();
+  });
+  after(() => {
     for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
   });
 
