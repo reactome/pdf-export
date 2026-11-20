@@ -11,3 +11,6 @@ target
 node_modules
 package-lock.json
 dist
+
+# Written by ci/fixture/baseline.ts (spec 001 T036), not by hand
+ci/fixture/expected.json

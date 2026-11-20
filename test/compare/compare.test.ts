@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { PDFDocument } from '@cantoo/pdf-lib';
 
 import {
+  baselineOf,
   compareCommand,
   comparePaths,
   compareReduced,
@@ -353,6 +354,34 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
       writeFileSync(join(refFolder, 'Only today.pdf'), ref);
       writeFileSync(join(newFolder, 'Only new.pdf'), ours);
       expected = join(folder, 'expected.json');
+    });
+
+    test('a baseline of reduced PDFs as the reference (--reduced, T036)', async () => {
+      const baseline = join(folder, 'baseline.json');
+      writeFileSync(baseline, await baselineOf(newFolder));
+      // the same files: no difference
+      const same = await run(['--reduced', baseline, newFolder]);
+      assert.equal(same.code, 0, same.err);
+      const report = (out: string) =>
+        JSON.parse(out) as { counts: { differences: number }; differences: Difference[] };
+      assert.equal(report(same.out).counts.differences, 0);
+      // one PDF, by its name
+      const one = await run([
+        '--reduced',
+        baseline,
+        join(newFolder, 'Alpha signalling pathway.pdf'),
+      ]);
+      assert.equal(one.code, 0, one.err);
+      // a changed section (refFolder's Alpha has one moved) and a file the baseline lacks
+      const changed = await run(['--reduced', baseline, refFolder]);
+      assert.equal(changed.code, 1);
+      const found = report(changed.out).differences.map((d) => `${d.file} ${d.part} ${d.kind}`);
+      assert.ok(found.includes('Alpha signalling pathway.pdf sections order'), found.join('; '));
+      assert.ok(found.includes('Only new.pdf file missing'), found.join('; '));
+      assert.ok(found.includes('Only today.pdf file extra'), found.join('; '));
+      // not a baseline, or two paths with it: exit 2
+      assert.equal((await run(['--reduced', join(newFolder, 'Only new.pdf'), newFolder])).code, 2);
+      assert.equal((await run(['--reduced', baseline, refFolder, newFolder])).code, 2);
     });
 
     test('folders file by file, a file on one side only a difference; exit 1', async () => {

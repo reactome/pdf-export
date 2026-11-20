@@ -260,6 +260,12 @@ pathway, and a file on one side only is reported as a difference.
   any other key is refused (exit 2). A record naming events covers only those events, and
   never a difference that names none. Each difference it covers is reported with its
   reason. With it, the exit is 1 only for a difference not recorded.
+- **`--reduced <baseline>`** (T036): the reference is a baseline, each PDF's reduced form by
+  its file name as `ci/fixture/baseline.ts` writes it (`{ "files": { "<name>.pdf": ... } }`),
+  and one path is given, the new side: a PDF, compared with the baseline's file of its name,
+  or a folder, compared file by file. Not with `--reference-margin`. A file that is not a
+  baseline, or holds no PDF, is refused (exit 2). CI compares the fixture's book and a
+  single-event PDF with `ci/fixture/expected.json` this way.
 - **`--reference-margin <pt>`:** the depth of the bands at the top and bottom of the
   reference's pages read as margins (running headers, page numbers), 50 by default, as
   pdf-export's own; T040 sets it for `event-pdf`'s files from their real margins.

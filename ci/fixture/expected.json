@@ -1,0 +1,773 @@
+{
+  "files": {
+    "Alpha pathway.pdf": {
+      "cover": {
+        "title": {
+          "hash": "53a5be3c1730b94b",
+          "length": 12
+        },
+        "diagram": true,
+        "excerpt": false,
+        "names": {
+          "count": 0,
+          "hash": "e3b0c44298fc1c14"
+        }
+      },
+      "introduction": {
+        "release": 98,
+        "pathways": 5,
+        "reactions": 5
+      },
+      "analysis": null,
+      "sections": [
+        {
+          "stId": "R-HSA-90000200",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Alphapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000200"]
+            },
+            {
+              "part": "summation",
+              "items": ["Aplaceholdersummationwithbold,italicandalink.unsafelink"]
+            },
+            {
+              "part": "edits",
+              "items": ["5ab7f0e3fafa7692"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000220",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Sharedreaction"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000220"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "compartments",
+              "items": ["cytosol"]
+            },
+            {
+              "part": "after",
+              "items": ["Blackboxtwo"]
+            },
+            {
+              "part": "references",
+              "items": ["140c1d35999968eb", "2b0187fa4bc38936"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000230",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Alphasubtwo"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000230"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000250",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Two-parentsub"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubtwo"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000250"]
+            }
+          ],
+          "figure": "selection"
+        },
+        {
+          "stId": "R-HSA-90000251",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Diseasereaction"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubtwo", "Two-parentsub"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000251"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "diseases",
+              "items": ["placeholderinfectiousdisease"]
+            },
+            {
+              "part": "before",
+              "items": ["Reactionone"]
+            },
+            {
+              "part": "after",
+              "items": ["Blackboxtwo"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000210",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Alphasubone"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000210"]
+            }
+          ],
+          "figure": "selection"
+        },
+        {
+          "stId": "R-HSA-90000211",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Reactionone"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubone"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000211"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "compartments",
+              "items": ["nucleoplasm", "cytosol"]
+            },
+            {
+              "part": "summation",
+              "items": [
+                "Athirdplaceholdersummation,firstbyorder.Asecond,plainplaceholdersummation,withanapostrophe'squote.Afourthplaceholdersummation,lastbyorder."
+              ]
+            },
+            {
+              "part": "after",
+              "items": ["Blackboxtwo", "Diseasereaction"]
+            },
+            {
+              "part": "references",
+              "items": [
+                "dc539f9eaecf605d",
+                "f27a5aa4a7bc1542",
+                "5161121539a73fb9",
+                "94cceda211e6f624",
+                "036eb344705a2ab3"
+              ]
+            },
+            {
+              "part": "edits",
+              "items": ["9216b8b648a1b44c", "061a10ee8859d93f", "fd977b20a3a42016"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000212",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Blackboxtwo"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubone"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000212"]
+            },
+            {
+              "part": "type",
+              "items": ["omitted"]
+            },
+            {
+              "part": "before",
+              "items": ["Reactionone", "Sharedreaction", "Diseasereaction"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000215",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Alphasubonediagramchild"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubone"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000215"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000216",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Reactionnine"]
+            },
+            {
+              "part": "location",
+              "items": ["Alphapathway", "Alphasubone", "Alphasubonediagramchild"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000216"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            }
+          ],
+          "figure": "reaction"
+        }
+      ],
+      "contents": [
+        {
+          "title": "Introduction",
+          "target": "introduction"
+        },
+        {
+          "title": "Alphapathway",
+          "target": "R-HSA-90000200"
+        },
+        {
+          "title": "Sharedreaction",
+          "target": "R-HSA-90000220"
+        },
+        {
+          "title": "Alphasubtwo",
+          "target": "R-HSA-90000230"
+        },
+        {
+          "title": "Two-parentsub",
+          "target": "R-HSA-90000250"
+        },
+        {
+          "title": "Diseasereaction",
+          "target": "R-HSA-90000251"
+        },
+        {
+          "title": "Alphasubone",
+          "target": "R-HSA-90000210"
+        },
+        {
+          "title": "Reactionone",
+          "target": "R-HSA-90000211"
+        },
+        {
+          "title": "Blackboxtwo",
+          "target": "R-HSA-90000212"
+        },
+        {
+          "title": "Alphasubonediagramchild",
+          "target": "R-HSA-90000215"
+        },
+        {
+          "title": "Reactionnine",
+          "target": "R-HSA-90000216"
+        },
+        {
+          "title": "Two-parentsub",
+          "target": "R-HSA-90000250"
+        },
+        {
+          "title": "Contents",
+          "target": "contents"
+        }
+      ],
+      "shortEntries": 1
+    },
+    "Gamma pathway.pdf": {
+      "cover": {
+        "title": {
+          "hash": "018ccf5727d9e910",
+          "length": 12
+        },
+        "diagram": true,
+        "excerpt": false,
+        "names": {
+          "count": 0,
+          "hash": "e3b0c44298fc1c14"
+        }
+      },
+      "introduction": {
+        "release": 98,
+        "pathways": 2,
+        "reactions": 1
+      },
+      "analysis": null,
+      "sections": [
+        {
+          "stId": "R-HSA-90000300",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Gammapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000300"]
+            },
+            {
+              "part": "edits",
+              "items": ["7d66a7c3b80de698"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000310",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Gammasub"]
+            },
+            {
+              "part": "location",
+              "items": ["Gammapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000310"]
+            }
+          ],
+          "figure": "selection"
+        },
+        {
+          "stId": "R-HSA-90000313",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Polymerisationfour"]
+            },
+            {
+              "part": "location",
+              "items": ["Gammapathway", "Gammasub"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000313"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            }
+          ],
+          "figure": "reaction"
+        }
+      ],
+      "contents": [
+        {
+          "title": "Introduction",
+          "target": "introduction"
+        },
+        {
+          "title": "Gammapathway",
+          "target": "R-HSA-90000300"
+        },
+        {
+          "title": "Gammasub",
+          "target": "R-HSA-90000310"
+        },
+        {
+          "title": "Polymerisationfour",
+          "target": "R-HSA-90000313"
+        },
+        {
+          "title": "Contents",
+          "target": "contents"
+        }
+      ],
+      "shortEntries": 0
+    },
+    "beta pathway.pdf": {
+      "cover": {
+        "title": {
+          "hash": "76619008cdd358ac",
+          "length": 11
+        },
+        "diagram": true,
+        "excerpt": false,
+        "names": {
+          "count": 0,
+          "hash": "e3b0c44298fc1c14"
+        }
+      },
+      "introduction": {
+        "release": 98,
+        "pathways": 5,
+        "reactions": 4
+      },
+      "analysis": null,
+      "sections": [
+        {
+          "stId": "R-HSA-90000100",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["betapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000100"]
+            },
+            {
+              "part": "edits",
+              "items": ["22f4c8d49a6f2b70"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000220",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Sharedreaction"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000220"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "compartments",
+              "items": ["cytosol"]
+            },
+            {
+              "part": "references",
+              "items": ["140c1d35999968eb", "2b0187fa4bc38936"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000120",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Inferredreaction"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000120"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "inferredFrom",
+              "items": ["Mousesource(Musmusculus)", "Ratsource(Rattusnorvegicus)"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000130",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["betasubwithdiagram"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000130"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000131",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["betasubsub"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway", "betasubwithdiagram"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000131"]
+            }
+          ],
+          "figure": "selection"
+        },
+        {
+          "stId": "R-HSA-90000132",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Reactioneight"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway", "betasubwithdiagram", "betasubsub"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000132"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            }
+          ],
+          "figure": "reaction"
+        },
+        {
+          "stId": "R-HSA-90000230",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Alphasubtwo"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway", "betasubwithdiagram"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000230"]
+            }
+          ],
+          "figure": "diagram"
+        },
+        {
+          "stId": "R-HSA-90000250",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Two-parentsub"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway", "betasubwithdiagram", "Alphasubtwo"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000250"]
+            }
+          ],
+          "figure": "selection"
+        },
+        {
+          "stId": "R-HSA-90000251",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Diseasereaction"]
+            },
+            {
+              "part": "location",
+              "items": ["betapathway", "betasubwithdiagram", "Alphasubtwo", "Two-parentsub"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000251"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "diseases",
+              "items": ["placeholderinfectiousdisease"]
+            }
+          ],
+          "figure": "reaction"
+        }
+      ],
+      "contents": [
+        {
+          "title": "Introduction",
+          "target": "introduction"
+        },
+        {
+          "title": "betapathway",
+          "target": "R-HSA-90000100"
+        },
+        {
+          "title": "Sharedreaction",
+          "target": "R-HSA-90000220"
+        },
+        {
+          "title": "Inferredreaction",
+          "target": "R-HSA-90000120"
+        },
+        {
+          "title": "betasubwithdiagram",
+          "target": "R-HSA-90000130"
+        },
+        {
+          "title": "betasubsub",
+          "target": "R-HSA-90000131"
+        },
+        {
+          "title": "Reactioneight",
+          "target": "R-HSA-90000132"
+        },
+        {
+          "title": "Alphasubtwo",
+          "target": "R-HSA-90000230"
+        },
+        {
+          "title": "Two-parentsub",
+          "target": "R-HSA-90000250"
+        },
+        {
+          "title": "Diseasereaction",
+          "target": "R-HSA-90000251"
+        },
+        {
+          "title": "Contents",
+          "target": "contents"
+        }
+      ],
+      "shortEntries": 0
+    },
+    "event-R-HSA-90000211.pdf": {
+      "cover": {
+        "title": {
+          "hash": "390f8f1cf3e24f30",
+          "length": 11
+        },
+        "diagram": false,
+        "excerpt": false,
+        "names": {
+          "count": 0,
+          "hash": "e3b0c44298fc1c14"
+        }
+      },
+      "introduction": {
+        "release": 98,
+        "pathways": 0,
+        "reactions": 1
+      },
+      "analysis": null,
+      "sections": [
+        {
+          "stId": "R-HSA-90000211",
+          "parts": [
+            {
+              "part": "name",
+              "items": ["Reactionone"]
+            },
+            {
+              "part": "stId",
+              "items": ["R-HSA-90000211"]
+            },
+            {
+              "part": "type",
+              "items": ["transition"]
+            },
+            {
+              "part": "compartments",
+              "items": ["nucleoplasm", "cytosol"]
+            },
+            {
+              "part": "summation",
+              "items": [
+                "Athirdplaceholdersummation,firstbyorder.Asecond,plainplaceholdersummation,withanapostrophe'squote.Afourthplaceholdersummation,lastbyorder."
+              ]
+            },
+            {
+              "part": "references",
+              "items": [
+                "dc539f9eaecf605d",
+                "f27a5aa4a7bc1542",
+                "5161121539a73fb9",
+                "94cceda211e6f624",
+                "036eb344705a2ab3"
+              ]
+            },
+            {
+              "part": "edits",
+              "items": ["9216b8b648a1b44c", "061a10ee8859d93f", "fd977b20a3a42016"]
+            }
+          ],
+          "figure": "reaction"
+        }
+      ],
+      "contents": null,
+      "shortEntries": 0
+    }
+  }
+}
