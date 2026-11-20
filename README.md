@@ -49,6 +49,41 @@ docker run --rm --network host -e NEO4J_URI=... -v <release folder>:/files:ro -v
   and a book with a figure missing, which must fail with exit 1 and no PDFs
   (`ci/image/run.sh`); `ci/image/check.sh` checks the image's licences and fonts.
 
+## The website's PDF of one event (spec 001, Story 2)
+
+**`pdf-export serve`** answers `GET /event/{stId}.pdf` (and `?token=` for an analysis's
+overlay) and `GET /health`
+([`contracts/service.md`](specs/001-pathway-pdfs/contracts/service.md)). WebsiteAngular's
+content service sends it the website's requests. It reads the graph (`--graph` or
+`NEO4J_URI`), the release's folder (`--files`), the figures' folder `figures` wrote
+(`--figures`, for PDFs without an analysis), the render service (`--render`) for any other
+figure, and the analysis service (`--analysis`) for a token's results. It binds
+`127.0.0.1:4370` by default (`--bind`, `--port`). Every setting of every command is in
+[`contracts/cli.md`](specs/001-pathway-pdfs/contracts/cli.md).
+
+## Working on it
+
+- **Install:** Node 24, then `npm ci` and `npx playwright-core install --with-deps
+--only-shell chromium`. Commands run from the checkout: `node src/cli.ts <command>`.
+- **Test:** `npm run check` runs types, lint, formatting, the unit tests and the licence
+  check, as CI does. Most tests need the fixture graph: a Neo4j 4.4 with
+  `ci/fixture/fixture.cypher` loaded into `graph.db` and `NEO4J_URI` set
+  ([`ci/fixture/README.md`](ci/fixture/README.md)); without it they are skipped. The render,
+  content and analysis services are stubs (`test/stubs/`).
+- **The image:** CI builds `Dockerfile` and runs `ci/image/run.sh` (both release steps over
+  the fixture, a single-event PDF, a planted fault) and `ci/image/check.sh` (licences and
+  fonts in the image).
+- **The checks:**
+  - `check-book`: FR-011's faults in a finished book; `book` runs it before it succeeds.
+  - `compare`: FR-012's comparison with `event-pdf`'s files, or with a baseline of reduced
+    PDFs (`--reduced`). CI compares the fixture's book and a single-event PDF with
+    `ci/fixture/expected.json`; a change to what they print rewrites it in the same pull
+    request (`BASELINE=write bash ci/image/run.sh <image> <bolt address>`).
+  - `src/check/look.ts`: SC-009's colours and fonts, on pages printed with the figures
+    hidden; `src/check/figures.ts`: SC-008's figures against the render service's SVGs. Both
+    run in the tests, on the fixture book.
+  - `ci/licences.ts`: every package's licence on the allowlist (`npm run check` runs it).
+
 ## The analysis report (spec 002)
 
 - **`pdf-export serve`** answers today's address,
