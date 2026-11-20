@@ -694,12 +694,27 @@ passes.
 
   Show it failing on a changed section.
 
-- [ ] T037 [US5] The container image, `Dockerfile`.
+- [x] T037 [US5] The container image, `Dockerfile`. (#TBD)
   - Node 24 on a slim base, Playwright's Chromium, and only FR-015's fonts.
   - It runs as a non-root user, and its entry point is `pdf-export`.
   - CI builds it and runs `figures` then `book` over the fixture against the stubs.
 
   Test: a planted missing file fails the run with exit 1 and no book.
+  - **Done (20 Nov 2026):** `node:24-slim`, the packages built in a `node:24` stage (the theme
+    package is a GitHub dependency), Playwright's headless shell with its libraries, user `node`,
+    entry point `pdf-export` (`--help` by default). CI's `image` job builds it and runs
+    `ci/image/run.sh`: `figures` against the render and content stubs (`ci/image/stubs.ts`), then
+    `book` and `check-book` over the fixture (18 of 18 figures; 3 PDFs, 18 pages), then `book`
+    with one figure gone from the folder: `missing-file`, exit 1, no PDF. Run here first against
+    a local `neo4j:4.4.48-community` holding the fixture.
+  - **One system font stays, DejaVu (`fonts-dejavu-core`).** Every other package that ships a
+    font goes, and the build fails if any other is left. Measured in the image: Chromium loads
+    no web font at all without one TrueType system font; with none, or with only a Roboto
+    woff2 copied in, every `@font-face`, @fontsource's included, fails to load and the book
+    stops ("Fonts did not load"), while one DejaVu file is enough. DejaVu is fontconfig's own
+    dependency; the pages name only FR-015's faces, and a character none of them draws is the
+    preflight's to find (FR-017), so it is never drawn. T038's `fc-list` check takes it as the
+    one exception.
 
 - [ ] T038 [US4] Licences and fonts in the image (SC-006, constitution II).
   - Run T002's check over the image's installed packages.
