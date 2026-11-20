@@ -43,6 +43,7 @@ import {
 } from '../../src/graph/connection.ts';
 import type { Row } from '../../src/graph/rows.ts';
 import { CHECKS } from '../../src/check/book.ts';
+import { figuresHidden, lookFaults, type LookFault } from '../../src/check/look.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PAGE } from '../../src/layout/figure.ts';
 import { PLACEHOLDER, PROBE } from '../../src/layout/html.ts';
@@ -1189,6 +1190,38 @@ describe('pdf-export book', { skip }, () => {
     assert.deepEqual(
       pieces.filter((p) => p !== 'Phosphofructokinase' && p.startsWith('Phospho')),
       []
+    );
+  });
+  // SC-009's check (T032): the book printed with its figures and logo hidden, through the
+  // same join and stamping, paints only theme colours in FR-015's fonts; a planted
+  // off-theme colour and a planted system font are each found.
+  test("paints its own pages in the theme's colours and FR-015's fonts (SC-009)", async () => {
+    const lookOf = async (plant = ''): Promise<LookFault[]> => {
+      const { out, args } = place();
+      const run = await book(args, {
+        startPrinter: async () => {
+          const printer = await Printer.start();
+          return {
+            part: (html) => printer.part(figuresHidden(html).replace('</head>', `${plant}</head>`)),
+            close: () => printer.close(),
+          };
+        },
+      });
+      assert.equal(run.code, 0, run.out + run.err);
+      const faults: LookFault[] = [];
+      for (const name of BOOK) faults.push(...(await lookFaults(readFileSync(join(out, name)))));
+      return faults;
+    };
+    assert.deepEqual(await lookOf(), []);
+    const colour = await lookOf('<style>* { color: #123456 !important; }</style>');
+    assert.ok(
+      colour.some((f) => f.kind === 'colour' && f.value === '#123456'),
+      JSON.stringify(colour)
+    );
+    const font = await lookOf('<style>* { font-family: serif !important; }</style>');
+    assert.ok(
+      font.some((f) => f.kind === 'font'),
+      JSON.stringify(font)
     );
   });
 });
