@@ -693,7 +693,7 @@ passes.
   - CI compares each PR's output with it, and fails on any difference that the PR does not also update.
 
   Show it failing on a changed section.
-  - **Done (20 Nov 2026, #TBD):** `compare --reduced <baseline> <new>` takes the reference as
+  - **Done (20 Nov 2026, #229):** `compare --reduced <baseline> <new>` takes the reference as
     reduced forms (`readBaseline`, `compareBaseline`); `ci/fixture/baseline.ts` writes one
     (`baselineOf`). `ci/fixture/expected.json` holds the fixture book's three PDFs and
     `event-R-HSA-90000211.pdf`, a reaction's single-event PDF from `serve` on the figures'
