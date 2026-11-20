@@ -694,7 +694,7 @@ passes.
 
   Show it failing on a changed section.
 
-- [x] T037 [US5] The container image, `Dockerfile`. (#TBD)
+- [x] T037 [US5] The container image, `Dockerfile`. (#224)
   - Node 24 on a slim base, Playwright's Chromium, and only FR-015's fonts.
   - It runs as a non-root user, and its entry point is `pdf-export`.
   - CI builds it and runs `figures` then `book` over the fixture against the stubs.
