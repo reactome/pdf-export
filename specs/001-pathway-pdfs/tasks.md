@@ -584,12 +584,22 @@ passes.
 
 **Independent test:** quickstart §5.
 
-- [ ] T032 [US6] The colour and font check, `src/check/look.ts` (SC-009, research R8).
+- [x] T032 [US6] The colour and font check, `src/check/look.ts` (SC-009, research R8). (#TBD)
   - A sample of pages goes through printing, the join and the stamping, with figures hidden.
   - Every fill and stroke colour must be in the compiled theme.
   - Every font must be one FR-015 names, including the stamped Roboto.
 
   Tests: a planted off-theme colour and a planted system font each fail it.
+  - **Done (20 Nov 2026):** `lookFaults` reads each page's fill and stroke colours (pdf.js gives
+    them as `#rrggbb` whatever the colour space) and every embedded font's name (pdf-lib), and
+    refuses a colour not among the compiled theme's and a font not FR-015's (Roboto, Roboto
+    Mono, Noto Sans, Noto Sans Math, Noto Sans Symbols 2). `figuresHidden` hides each figure's
+    drawing and the logo with `visibility: hidden`: the pages are the same, and the figure's
+    link around its drawing stays, which is how `check-book` finds it (hiding the whole figure
+    box made every figure a `missing-figure` fault). The test prints the fixture book through
+    `book` itself, so through the same join and stamping, with a printer that hides the
+    figures: no fault; with `* { color: #123456 }` planted, that colour is found; with
+    `* { font-family: serif }`, a system font is found.
 
 - [ ] T033 [US6] The judgement.
   - **The sample:** 12 random pages of T031's book, including a cover, a contents page and a pathway section with its figure, each set beside today's book.
