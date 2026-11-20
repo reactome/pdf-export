@@ -716,7 +716,7 @@ passes.
     preflight's to find (FR-017), so it is never drawn. T038's `fc-list` check takes it as the
     one exception.
 
-- [x] T038 [US4] Licences and fonts in the image (SC-006, constitution II). (#TBD)
+- [x] T038 [US4] Licences and fonts in the image (SC-006, constitution II). (#225)
   - Run T002's check over the image's installed packages.
   - Keep Chromium's and the base image's licence notices in the image.
   - `fc-list` shows only FR-015's fonts, seen failing with `fonts-liberation` installed.
