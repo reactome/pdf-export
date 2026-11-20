@@ -54,6 +54,16 @@ What `pdf-export figures` writes and `pdf-export book` reads (SC-010, research R
     Only `unanswered` triggers the read and counts towards the breaker, so figures that
     fail on their own, however many and in whatever order, never stop the run.
 
+    A 502 is the render service saying its page could not read the figure's pathway from
+    the content service (WebsiteAngular's spec 018, T017): the content service failing,
+    not the figure. So it is `unanswered`, not retried: the read that follows stops the
+    run if the content service is gone, and 502s in a row trip the breaker if it still
+    answers that read.
+    Before that change the same failure was a 500 ("no pathway found"), counted as
+    `failed`, and a content service down would have left every figure missing without
+    stopping the run. Only a 404 or 410 from the content service is a pathway not there,
+    which the render service answers as a 404 (`refused`).
+
   - **Its last line, when every figure has its line:** `complete`, whose fingerprint
     fields equal the first line's.
 - **The lines' form** (T024, `src/preflight/folder.ts`, which T046 writes with): each a JSON
