@@ -725,7 +725,7 @@ passes.
   - Keep it generic: the image, its inputs and its output, with no schedules, hosts or paths.
   - Time `book` against SC-003 and `figures` for SC-010 on the machine the release uses, and show a planted fault failing each.
   - Raise the switch from `event-pdf` with the release's owners (spec, Assumptions).
-  - **Written (20 Nov 2026, #TBD):** `README.md`, "The release's book": the image's two runs,
+  - **Written (20 Nov 2026, #226):** `README.md`, "The release's book": the image's two runs,
     their inputs and outputs, exit codes and what they take, with no schedules, hosts or
     paths. **Left:** the times on the machine the release uses (the book's 18 min on release
     98 is this host's; the figures' wait on WebsiteAngular's spec 018 T010), and the switch
