@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { BREAK_EVERY, LONG_TOKEN, markupBreaks, text } from '../../src/layout/html.ts';
+import { BREAK_EVERY, LONG_TOKEN, cssString, markupBreaks, text } from '../../src/layout/html.ts';
 import { sanitiseSummation } from '../../src/model/rules.ts';
 
 /** Each piece's length in characters, a character reference counted as one. */
@@ -176,5 +176,19 @@ describe("markupBreaks()'s breaks", () => {
     const out = markupBreaks(sanitiseSummation(raw));
     assert.doesNotMatch(out, /<[^>]*<wbr>/);
     assert.match(out, /^<p>w+<wbr>w+<wbr>w+<\/p>$/);
+  });
+});
+
+describe('a CSS string', () => {
+  test('escapes every control character, a form feed among them, so none ends the string', () => {
+    // CSS ends a string at a form feed as at a line feed: a sample named
+    // "x\f} body { … }" wrote rules into the report's page (review of 20 Nov)
+    for (let code = 0; code < 0x20; code++) {
+      const quoted = cssString(`a${String.fromCodePoint(code)}b`);
+      assert.doesNotMatch(quoted, /\p{Cc}/u, `U+${code.toString(16)}`);
+      assert.equal(quoted, `"a\\${code.toString(16)} b"`);
+    }
+    assert.equal(cssString('a\u007fb'), '"a\\7f b"');
+    assert.equal(cssString('Report - "x"\\<y'), '"Report - \\22 x\\22 \\5c \\3c y"');
   });
 });
