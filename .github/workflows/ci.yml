@@ -73,3 +73,40 @@ jobs:
             # (T002, FR-009, constitution II).
             - name: Licences
               run: node ci/licences.ts
+
+    # The release's image (spec 001 T037): built, then `figures` and `book` run from it over the
+    # fixture against the stubs, and `book` again with a figure missing, which must exit 1 with
+    # no book (ci/image/run.sh).
+    image:
+        runs-on: ubuntu-latest
+        services:
+            neo4j:
+                image: neo4j:4.4.48-community
+                env:
+                    NEO4J_AUTH: none
+                    NEO4J_dbms_default__database: graph.db
+                ports:
+                    - 7687:7687
+                options: >-
+                    --health-cmd "cypher-shell -d graph.db 'RETURN 1'"
+                    --health-interval 5s --health-timeout 10s --health-retries 30
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: '24'
+                  cache: npm
+
+            - run: npm ci
+
+            - name: Load the fixture graph
+              run: |
+                  docker cp ci/fixture/fixture.cypher ${{ job.services.neo4j.id }}:/fixture.cypher
+                  docker exec ${{ job.services.neo4j.id }} cypher-shell -d graph.db -f /fixture.cypher
+
+            - name: Build the image
+              run: docker build -t pdf-export:ci .
+
+            - name: The release's steps from the image
+              run: bash ci/image/run.sh pdf-export:ci bolt://localhost:7687
