@@ -776,7 +776,7 @@ passes.
 
 ## Phase 8: Polish
 
-- [x] T041 [P] `README.md` and `CLAUDE.md`: how to build, test, run `book` and `serve`; the settings; the fixture; and the checks. (#TBD)
+- [x] T041 [P] `README.md` and `CLAUDE.md`: how to build, test, run `book` and `serve`; the settings; the fixture; and the checks. (#231)
 - [ ] T042 [P] In WebsiteAngular, an issue, and later a spec there, for its part (research R10, FR-014):
   - the single-event route, in the content service, nginx and the dev proxy;
   - a cache-off setting for the render service;
