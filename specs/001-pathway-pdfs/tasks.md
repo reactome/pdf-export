@@ -584,7 +584,7 @@ passes.
 
 **Independent test:** quickstart §5.
 
-- [x] T032 [US6] The colour and font check, `src/check/look.ts` (SC-009, research R8). (#TBD)
+- [x] T032 [US6] The colour and font check, `src/check/look.ts` (SC-009, research R8). (#227)
   - A sample of pages goes through printing, the join and the stamping, with figures hidden.
   - Every fill and stroke colour must be in the compiled theme.
   - Every font must be one FR-015 names, including the stamped Roboto.
