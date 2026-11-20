@@ -624,7 +624,7 @@ passes.
   - At most 1% of their pixels may differ.
 
   Tests: a figure drawn with a different selection fails it, and so does one with a different overlay (another token). Then run it on a sample of T031's book and of T023's single-event PDFs, and record the result here.
-  - **Built (20 Nov 2026, #TBD); left open for the run on the real book.** `src/check/figures.ts`:
+  - **Built (20 Nov 2026, #230); left open for the run on the real book.** `src/check/figures.ts`:
     the figure's box from its link to the website (`figureBox`, the link `check-book` finds a
     figure by); the SVG printed alone by the same printer at the size `figureHtml` gives it,
     with the book's @font-face rules, on a page of that size (`printedAlone`); both rasterised
