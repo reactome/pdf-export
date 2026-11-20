@@ -974,6 +974,14 @@ of R4's T049 note).
       half (2 h 54 min) that spec 018 aims for; its T015 tunes the two rules and runs the
       step again.
     - **Peak memory:** 2,654 MiB of the render container's 3 GiB.
+  - **With page reuse, 20 Nov 2026: 1 h 55 min.** The same step after spec 018's T015,
+    T019 and T020 (WebsiteAngular), reuse on, `--parallel 4`, beta's release 98 graph and
+    the release's files: complete, nothing missing, in 6,910 s, against 5 h 47 min
+    without reuse (a third of the time; spec 018's SC-001 asked for no more than half).
+    80% of the figures were drawn on a held page; per figure (medians, held against
+    fresh) a reaction 0.4 s against 3.1 s, a diagram 2.6 s against 5.5 s, an
+    illustration 0.5 s against 3.1 s. Every one of the 19,076 files is byte-identical to
+    those of a reuse-off run. Recorded in full in WebsiteAngular's spec 018, T010.
   - **The reactions:** 16,187, not the 16,424 above. 237 of the graph's human reactions
     are under no top-level pathway, so no PDF of the book prints them.
 
