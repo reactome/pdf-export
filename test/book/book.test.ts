@@ -43,6 +43,7 @@ import {
 } from '../../src/graph/connection.ts';
 import type { Row } from '../../src/graph/rows.ts';
 import { CHECKS } from '../../src/check/book.ts';
+import { compareFigure, MAX_DIFFERING } from '../../src/check/figures.ts';
 import { figuresHidden, lookFaults, type LookFault } from '../../src/check/look.ts';
 import { releaseInfo } from '../../src/graph/queries.ts';
 import { PAGE } from '../../src/layout/figure.ts';
@@ -1223,5 +1224,45 @@ describe('pdf-export book', { skip }, () => {
       font.some((f) => f.kind === 'font'),
       JSON.stringify(font)
     );
+  });
+  // SC-008's comparison (T034): a figure as the book prints it and the render service's SVG
+  // of it, printed alone, differ in at most 1% of their pixels; the SVG drawn with a selection,
+  // or with an overlay, does not.
+  test('prints each figure as the render service draws it (SC-008)', async () => {
+    const { out, args } = place();
+    const run = await book(args);
+    assert.equal(run.code, 0, run.out + run.err);
+    const record = [...expected.values()].find((r) => r.kind === 'diagram');
+    assert.ok(record, 'the fixture has a pathway drawn in its own diagram');
+    const svg = readFileSync(join(FIGURES, `${record.source}.svg`), 'utf8');
+    const address = `/PathwayBrowser/#/${record.source}`;
+    const pdfs = BOOK.map((name) => new Uint8Array(readFileSync(join(out, name))));
+    const printer = await Printer.start();
+    try {
+      const compared = async (drawn: string) => {
+        for (const pdf of pdfs) {
+          const result = await compareFigure(pdf, address, drawn, printer);
+          if (result) return result;
+        }
+        throw new Error(`no PDF of the book draws ${record.source}`);
+      };
+      const same = await compared(svg);
+      assert.ok(same.within, `${String(same.share)} of the pixels differ`);
+      // drawn with a selection: thick outlines on its shapes
+      const selected = await compared(
+        svg.replace(
+          /<\/svg>\s*$/,
+          '<style>* { stroke: #ff8800 !important; stroke-width: 4px !important; }</style></svg>'
+        )
+      );
+      assert.ok(selected.share > MAX_DIFFERING, `a selection: ${String(selected.share)}`);
+      // drawn with an overlay: its boxes filled with an analysis's colour
+      const overlaid = await compared(
+        svg.replace(/<\/svg>\s*$/, '<style>rect, path { fill: #ffcc00 !important; }</style></svg>')
+      );
+      assert.ok(overlaid.share > MAX_DIFFERING, `an overlay: ${String(overlaid.share)}`);
+    } finally {
+      await printer.close();
+    }
   });
 });

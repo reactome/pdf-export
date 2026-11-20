@@ -624,6 +624,16 @@ passes.
   - At most 1% of their pixels may differ.
 
   Tests: a figure drawn with a different selection fails it, and so does one with a different overlay (another token). Then run it on a sample of T031's book and of T023's single-event PDFs, and record the result here.
+  - **Built (20 Nov 2026, #TBD); left open for the run on the real book.** `src/check/figures.ts`:
+    the figure's box from its link to the website (`figureBox`, the link `check-book` finds a
+    figure by); the SVG printed alone by the same printer at the size `figureHtml` gives it,
+    with the book's @font-face rules, on a page of that size (`printedAlone`); both rasterised
+    by pdf.js at 2 px a point, the book's page cropped to the box (`rasterise`); a pixel
+    differs where a channel is more than 48 apart, for anti-aliasing (`differingShare`). Both
+    sides are rasterised by pdf.js in Node, not inside Chromium as research R8 has it: the
+    same means for both, and the fonts are those the PDFs embed. On the fixture book, a
+    pathway's diagram (780 by 240 px, about 65,800 inked on each side): 0 differing; the SVG
+    with a selection's outlines, 13.5%; with an overlay's fills, 95.3%.
 
 ---
 
