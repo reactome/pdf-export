@@ -424,6 +424,109 @@ export interface CompareOptions {
   unreadable?: (path: string, error: unknown) => void;
 }
 
+/**
+ * A baseline (T036): each PDF's reduced form by its file name, as `ci/fixture/baseline.ts`
+ * writes it, `{ "files": { "<name>.pdf": <reduced> } }`, so a reference need not be kept as
+ * PDFs. Refused (a SettingsError) if it is not one, or holds no PDF.
+ */
+export function readBaseline(path: string): Map<string, Reduced> {
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  const files = isRecord(parsed) ? parsed['files'] : undefined;
+  if (!isRecord(files)) throw new SettingsError(`${path} is not a baseline of reduced PDFs`);
+  const baseline = new Map<string, Reduced>();
+  for (const [file, value] of Object.entries(files)) {
+    if (!isReduced(value)) throw new SettingsError(`${path}: ${file} is not a reduced PDF`);
+    baseline.set(file, value);
+  }
+  if (baseline.size === 0) throw new SettingsError(`${path} holds no PDF`);
+  return baseline;
+}
+
+/** The reduced form's shape, as far as reading a baseline can tell. */
+const isReduced = (value: unknown): value is Reduced =>
+  isRecord(value) &&
+  isRecord(value['cover']) &&
+  isRecord(value['introduction']) &&
+  Array.isArray(value['sections']) &&
+  typeof value['shortEntries'] === 'number';
+
+/** A folder of PDFs as a baseline's JSON (T036): each file's reduced form, by name, in order. */
+export async function baselineOf(folder: string): Promise<string> {
+  const files: Record<string, Reduced> = {};
+  for (const file of pdfsIn(folder)) files[file] = await reducePdf(join(folder, file));
+  return `${JSON.stringify({ files }, null, 2)}\n`;
+}
+
+/** Two sides of one file compared; a side not read, or with no section read, a difference. */
+function compareSides(
+  file: string,
+  a: Reduced | null,
+  b: Reduced | null,
+  paths: { reference: string; new: string }
+): Difference[] {
+  const failed: Difference[] = [];
+  if (!a) failed.push({ file, part: 'file', field: 'reference', kind: 'unreadable', count: 1 });
+  if (!b) failed.push({ file, part: 'file', field: 'new', kind: 'unreadable', count: 1 });
+  if (!a || !b) return failed;
+  // A side with no section the reader recognised was not read, whatever else
+  // it holds: two such sides are not "the same".
+  const unread: Difference[] = [];
+  if (a.sections.length === 0)
+    unread.push({ file, part: 'sections', field: 'reference', kind: 'unreadable', count: 1 });
+  if (b.sections.length === 0)
+    unread.push({ file, part: 'sections', field: 'new', kind: 'unreadable', count: 1 });
+  return [...unread, ...compareReduced(file, a, b, paths)];
+}
+
+/** A folder's PDFs, by name; a folder with none is refused, as comparing nothing is no pass. */
+function pdfsIn(path: string): string[] {
+  const files = readdirSync(path)
+    .filter((name) => name.toLowerCase().endsWith('.pdf'))
+    .sort();
+  if (files.length === 0) throw new SettingsError(`${path} holds no PDF`);
+  return files;
+}
+
+/** Each file on one side alone, as `missing` (only the reference's) or `extra` (only the new's). */
+function alone(refFiles: readonly string[], newFiles: readonly string[]): Difference[] {
+  return [
+    ...refFiles
+      .filter((file) => !newFiles.includes(file))
+      .map((file): Difference => ({ file, part: 'file', kind: 'missing', count: 1 })),
+    ...newFiles
+      .filter((file) => !refFiles.includes(file))
+      .map((file): Difference => ({ file, part: 'file', kind: 'extra', count: 1 })),
+  ];
+}
+
+/**
+ * A new side, a PDF or a folder of them, compared with a baseline (`--reduced`, T036): a
+ * folder file by file, and a single PDF with the baseline's file of its name.
+ */
+export async function compareBaseline(
+  baselinePath: string,
+  neu: string,
+  { unreadable = () => undefined }: CompareOptions = {}
+): Promise<Difference[]> {
+  const baseline = readBaseline(baselinePath);
+  const folder = statSync(neu).isDirectory();
+  const newFiles = folder ? pdfsIn(neu) : [basename(neu)];
+  const refFiles = folder ? [...baseline.keys()].sort() : newFiles;
+  const out = alone(refFiles, newFiles);
+  for (const file of refFiles.filter((f) => newFiles.includes(f))) {
+    const newPath = folder ? join(neu, file) : neu;
+    let b: Reduced | null = null;
+    try {
+      b = await reducePdf(newPath);
+    } catch (error) {
+      unreadable(newPath, error);
+    }
+    const a = baseline.get(file) ?? null;
+    out.push(...compareSides(file, a, b, { reference: baselinePath, new: newPath }));
+  }
+  return out;
+}
+
 /** A reference and a new side, each a PDF or a folder of them, compared (contracts/cli.md). */
 export async function comparePaths(
   reference: string,
@@ -447,38 +550,11 @@ export async function comparePaths(
     };
     const a = await read(refPath, referenceMargin);
     const b = await read(newPath, MARGIN_BAND_PT);
-    const failed: Difference[] = [];
-    if (!a) failed.push({ file, part: 'file', field: 'reference', kind: 'unreadable', count: 1 });
-    if (!b) failed.push({ file, part: 'file', field: 'new', kind: 'unreadable', count: 1 });
-    if (!a || !b) return failed;
-    // A side with no section the reader recognised was not read, whatever else
-    // it holds: two such sides are not "the same".
-    const unread: Difference[] = [];
-    if (a.sections.length === 0)
-      unread.push({ file, part: 'sections', field: 'reference', kind: 'unreadable', count: 1 });
-    if (b.sections.length === 0)
-      unread.push({ file, part: 'sections', field: 'new', kind: 'unreadable', count: 1 });
-    return [...unread, ...compareReduced(file, a, b, { reference: refPath, new: newPath })];
+    return compareSides(file, a, b, { reference: refPath, new: newPath });
   };
   if (!refFolder) return pair(basename(neu), reference, neu);
-  const pdfs = (path: string): string[] =>
-    readdirSync(path)
-      .filter((name) => name.toLowerCase().endsWith('.pdf'))
-      .sort();
-  const [refFiles, newFiles] = [pdfs(reference), pdfs(neu)];
-  // A folder with no PDF compares nothing: not a pass.
-  for (const [path, files] of [
-    [reference, refFiles],
-    [neu, newFiles],
-  ] as const)
-    if (files.length === 0) throw new SettingsError(`${path} holds no PDF`);
-  const out: Difference[] = [];
-  for (const file of refFiles) {
-    if (!newFiles.includes(file)) out.push({ file, part: 'file', kind: 'missing', count: 1 });
-  }
-  for (const file of newFiles) {
-    if (!refFiles.includes(file)) out.push({ file, part: 'file', kind: 'extra', count: 1 });
-  }
+  const [refFiles, newFiles] = [pdfsIn(reference), pdfsIn(neu)];
+  const out = alone(refFiles, newFiles);
   for (const file of refFiles.filter((f) => newFiles.includes(f))) {
     out.push(...(await pair(file, join(reference, file), join(neu, file))));
   }
@@ -486,10 +562,13 @@ export async function comparePaths(
 }
 
 export interface CompareSettings {
+  /** The reference: a PDF or a folder of them, or with `--reduced` the baseline file. */
   reference: string;
   neu: string;
   expected: string | null;
   referenceMargin: number;
+  /** Whether the reference is a baseline of reduced PDFs (`--reduced`, T036). */
+  reduced: boolean;
 }
 
 export function compareSettings(args: readonly string[]): CompareSettings {
@@ -502,13 +581,32 @@ export function compareSettings(args: readonly string[]): CompareSettings {
       continue;
     }
     const [name = '', inline] = arg.split(/=(.*)/s, 2);
-    if (name !== '--expected' && name !== '--reference-margin') {
+    if (name !== '--expected' && name !== '--reference-margin' && name !== '--reduced') {
       throw new SettingsError(`Unknown argument: ${name}`);
     }
     const value = inline ?? args[++i];
     if (value === undefined || value === '') throw new SettingsError(`${name} needs a value`);
     if (flags.has(name)) throw new SettingsError(`${name} is given twice`);
     flags.set(name, value);
+  }
+  const baseline = flags.get('--reduced');
+  if (baseline !== undefined) {
+    const [neu] = paths;
+    if (paths.length !== 1 || !neu) {
+      throw new SettingsError(
+        'One path is needed with --reduced: pdf-export compare --reduced <baseline> <new>'
+      );
+    }
+    if (flags.has('--reference-margin')) {
+      throw new SettingsError('--reference-margin is for a PDF reference, not --reduced');
+    }
+    return {
+      reference: baseline,
+      neu,
+      expected: flags.get('--expected') ?? null,
+      referenceMargin: MARGIN_BAND_PT,
+      reduced: true,
+    };
   }
   const [reference, neu] = paths;
   if (paths.length !== 2 || !reference || !neu) {
@@ -519,7 +617,13 @@ export function compareSettings(args: readonly string[]): CompareSettings {
   if (!Number.isFinite(referenceMargin) || referenceMargin < 0 || referenceMargin > 300) {
     throw new SettingsError('--reference-margin is a number of points, 0 to 300');
   }
-  return { reference, neu, expected: flags.get('--expected') ?? null, referenceMargin };
+  return {
+    reference,
+    neu,
+    expected: flags.get('--expected') ?? null,
+    referenceMargin,
+    reduced: false,
+  };
 }
 
 export { errorKind };
@@ -606,14 +710,14 @@ export async function compareCommand(
   let result: { differences: Difference[]; unmatched: number[] };
   try {
     const { reference, neu, referenceMargin } = settings;
+    const unreadable = (path: string, error: unknown): void => {
+      err(`Not read: ${path} (${errorKind(error)})\n`);
+    };
     const found = await withConsoleHeld(
       () =>
-        comparePaths(reference, neu, {
-          referenceMargin,
-          unreadable: (path, error) => {
-            err(`Not read: ${path} (${errorKind(error)})\n`);
-          },
-        }),
+        settings.reduced
+          ? compareBaseline(reference, neu, { unreadable })
+          : comparePaths(reference, neu, { referenceMargin, unreadable }),
       err
     );
     result = applyRecorded(found, recorded);

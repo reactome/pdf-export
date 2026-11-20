@@ -688,11 +688,21 @@ passes.
     - **Found:** pdf-export's analysis part does not print the resource (`TOTAL`), which FR-012 lists among the properties: `analysis resource missing` until it does, for T040 to record or fix.
     - **Known gaps, for T040:** `event-pdf`'s own labels, its cover's names' separator (whether U+2060 survives pdf.js's reading of its files), its margins and its contents' form are not known here, so the reference's shape is the Background's and R2's, and its wording this task's. A label not known leaves its part unread, which shows as a difference, never a pass; T040 adds `event-pdf`'s labels to `RULES` and `PROPERTIES` in `src/compare/reduce.ts` and sets `--reference-margin`. A table with stroked or shaded cells can still be read as a figure, its text then left out: borders 4 pt or thicker are shapes, not lines; borders touching two shaded cells join them; shaded rows within 30 pt of each other cluster; and a shaded table header within 30 pt below a figure is taken into it. T040 checks `event-pdf`'s tables. A figure's label outside its shapes is read as text. A fact's value wrapped to the section's left edge would be read as the summation's start. A cover whose title a figure takes in compares its largest remaining text as its title (it says `differs`, nothing more). A summation and an analysis's found tables are compared as text and rows, not by their markup.
 
-- [ ] T036 [US5] The fixture's output as a baseline (the constitution's quality gate for a change to what is written).
+- [x] T036 [US5] The fixture's output as a baseline (the constitution's quality gate for a change to what is written).
   - `ci/fixture/expected.json` holds the fixture book and a fixture single-event PDF, reduced by T035's `compare`; `compare` gains `--reduced <file>` to take a reduced form as the reference, added to contracts/cli.md in this task (the fixture PDFs are not committed).
   - CI compares each PR's output with it, and fails on any difference that the PR does not also update.
 
   Show it failing on a changed section.
+  - **Done (20 Nov 2026, #TBD):** `compare --reduced <baseline> <new>` takes the reference as
+    reduced forms (`readBaseline`, `compareBaseline`); `ci/fixture/baseline.ts` writes one
+    (`baselineOf`). `ci/fixture/expected.json` holds the fixture book's three PDFs and
+    `event-R-HSA-90000211.pdf`, a reaction's single-event PDF from `serve` on the figures'
+    folder. CI's `image` job makes both from the image and compares them with it
+    (`ci/image/run.sh`; `BASELINE=write` writes it again, for a pull request that changes what
+    they print). Seen: a second run matches it; with one reaction renamed in the fixture graph,
+    it fails (the section's text and the contents' entries). Test: a folder and a single PDF
+    against a baseline, a moved section and a file on each side alone found, a non-baseline
+    and two paths refused; it fails with the comparison left out.
 
 - [x] T037 [US5] The container image, `Dockerfile`. (#224)
   - Node 24 on a slim base, Playwright's Chromium, and only FR-015's fonts.
