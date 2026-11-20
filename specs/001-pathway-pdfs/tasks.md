@@ -716,10 +716,17 @@ passes.
     preflight's to find (FR-017), so it is never drawn. T038's `fc-list` check takes it as the
     one exception.
 
-- [ ] T038 [US4] Licences and fonts in the image (SC-006, constitution II).
+- [x] T038 [US4] Licences and fonts in the image (SC-006, constitution II). (#TBD)
   - Run T002's check over the image's installed packages.
   - Keep Chromium's and the base image's licence notices in the image.
   - `fc-list` shows only FR-015's fonts, seen failing with `fonts-liberation` installed.
+  - **Done (20 Nov 2026):** `ci/image/check.sh`, a step of CI's `image` job: T002's check run
+    in the image (168 packages, none offending); Chromium's notice (`LICENSE.headless_shell`),
+    Node's (`notices/node-LICENSE`, fetched in the build from the release the image runs,
+    since the official images leave it out, and checked to be that release's) and every
+    Debian package's `copyright`; and no system font but DejaVu (the user's decision, 20 Nov:
+    the one exception, tasks T037). Seen failing on the image with `fonts-liberation`
+    installed and both licence notices removed: each named, exit 1.
 - [ ] T039 [US5] The release's step, documented in `README.md`.
   - Two runs of the image: `figures`, with the render service and its content service beside it, writing the figures' folder; then `book`, with the release's graph, files and that folder as inputs, writing the book's folder of PDFs, which the release archives as it does today's.
   - Keep it generic: the image, its inputs and its output, with no schedules, hosts or paths.
