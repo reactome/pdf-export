@@ -11,6 +11,11 @@ WORKDIR /pdf-export
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY . .
+# Node's own licence, which the official images leave out (T038): from the release this
+# stage runs, checked below to be the one the image runs.
+RUN mkdir -p notices && node -p 'process.version' > notices/node-version \
+    && curl -fsSL "https://raw.githubusercontent.com/nodejs/node/$(cat notices/node-version)/LICENSE" \
+      -o notices/node-LICENSE
 
 FROM node:24-slim
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -25,6 +30,7 @@ COPY --from=packages /pdf-export /pdf-export
 # faces, and a character none of them draws is the preflight's to find (FR-017), so DejaVu is
 # never drawn. The build fails if any other system font is left.
 RUN set -eu; \
+    [ "$(node -p 'process.version')" = "$(cat notices/node-version)" ] || { echo "Node's licence is another release's" >&2; exit 1; }; \
     npx playwright-core install --with-deps --only-shell chromium; \
     fonts=$(find /usr/share/fonts -type f -exec dpkg-query -S {} + 2>/dev/null | cut -d: -f1 | tr ',' '\n' | tr -d ' ' | grep -vx fonts-dejavu-core | sort -u); \
     if [ -n "$fonts" ]; then apt-get purge -y --auto-remove $fonts; fi; \
