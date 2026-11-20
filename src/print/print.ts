@@ -4,6 +4,7 @@
 // A single event's PDF is printed tagged, with Chromium's outline, and with a contents list
 // it is printed twice, the second time with the numbers the first gave. A part of the book
 // is printed untagged, its links placeholders for the join (T026).
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +17,12 @@ import { contentsTargets, fillContents, landed, movedPages } from './contents.ts
 export class Printer {
   readonly #browser: Browser;
   readonly #folder: string;
+  /**
+   * Its pages' names begin with this: a browser started again after a crash prints into the
+   * same `work` folder, and a page of the old printer's, removed late, would have the name of
+   * the new one's (review of 20 Nov).
+   */
+  readonly #prefix = randomUUID();
   #count = 0;
 
   readonly #onExit: () => void;
@@ -71,7 +78,7 @@ export class Printer {
    */
   async print(html: string, tagged: boolean, signal?: AbortSignal): Promise<Uint8Array> {
     signal?.throwIfAborted();
-    const file = join(this.#folder, `${String(++this.#count)}.html`);
+    const file = join(this.#folder, `${this.#prefix}-${String(++this.#count)}.html`);
     const page = await this.#browser.newPage();
     const stop = (): void => {
       void page.close().catch(() => undefined);

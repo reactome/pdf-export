@@ -199,9 +199,17 @@ export function attribute(value: string): string {
   return plainText(value).replace(/"/g, '&quot;');
 }
 
-/** Text for a CSS string, quoted with double quotes, inside a style element. */
+/**
+ * Text for a CSS string, quoted with double quotes, inside a style element.
+ * Every control character is escaped, not only the line feed and carriage
+ * return: CSS ends a string at a form feed too, and what followed was read as
+ * rules (a report's title carries the sample's name; review of 20 Nov).
+ */
 export function cssString(value: string): string {
-  const escaped = value.replace(/[\\"<\n\r]/g, (c) => `\\${c.codePointAt(0)?.toString(16) ?? ''} `);
+  const escaped = value.replace(
+    /[\\"<\p{Cc}]/gu,
+    (c) => `\\${c.codePointAt(0)?.toString(16) ?? ''} `
+  );
   return `"${escaped}"`;
 }
 
