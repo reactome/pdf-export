@@ -27,7 +27,7 @@
     "@types/node": "24.19.2",
     "@types/sanitize-html": "2.16.2",
     "eslint": "10.13.0",
-    "ngx-reactome-style": "github:reactome/ngx-reactome-base#606de81b66283029fb0ccfa170ed757e95701a35",
+    "ngx-reactome-style": "github:reactome/ngx-reactome-base#74c0891a8d27ed79ec1a9ca0aa573cb99242a208",
     "prettier": "3.9.10",
     "sass": "1.97.3",
     "typescript": "6.0.3",

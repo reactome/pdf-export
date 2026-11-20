@@ -27,13 +27,10 @@ export const ALLOWED: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Packages allowed without a declared licence, each with its reason. The website's
- * theme package declares none in its package.json; its repository is CC0-1.0. Its
- * owners are asked to declare it (tasks T043), and the entry goes once they have.
+ * Packages allowed without a declared licence, each with its reason. None now: the website's
+ * theme package, the one there was, declares CC0-1.0 since ngx-reactome-base#50 (tasks T043).
  */
-export const EXCEPTIONS: ReadonlyMap<string, string> = new Map([
-  ['ngx-reactome-style', 'CC0-1.0 by its repository; the package declares none (tasks T043)'],
-]);
+export const EXCEPTIONS: ReadonlyMap<string, string> = new Map();
 
 /** A package as `npm query` reports it, as far as this check needs. */
 export interface Installed {
