@@ -793,7 +793,7 @@ passes.
   - **Many figures per page load: built in WebsiteAngular as page reuse** (its spec 018, `RENDER_REUSE`); its release run is not yet a result (its T010, 18 Nov 2026). This repository's `figures --parallel 4` against beta's release 98 graph, with reuse on and its defaults, drew 15,427 of 19,076 figures in 4 h 11 min and then stopped (8 unanswered in a row): the site server's connections to the content service had piled up, not reuse (fixed in [reactome/WebsiteAngular#1006](https://github.com/reactome/WebsiteAngular/pull/1006)). A reaction took 1.2 s on a held page against 3.9 s fresh (medians), but the service's replacement rules left only 42% of the figures to held pages. Projected from the rate before the slowdown, about 4 h 26 min against T031's 5 h 47 min, not the half its spec aims for. Its T015 tunes the rules and runs the step again; research R7 has the numbers.
 
 - [x] T043 [P] Ask the theme package's owners to declare its licence in the package. Link the issue here, and drop T002's exception once it is declared.
-  - **Done (20 Nov 2026, #TBD):** the libraries' owners are this project's (ngx-reactome-base);
+  - **Done (20 Nov 2026, #232):** the libraries' owners are this project's (ngx-reactome-base);
     reactome/ngx-reactome-base#50 declares `CC0-1.0` in each of its three libraries'
     `package.json`. The theme package is now pinned at its published build `74c0891`, which
     differs from the one before (`606de81`) in that line alone, and `ci/licences.ts` has no
