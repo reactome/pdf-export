@@ -110,3 +110,6 @@ jobs:
 
             - name: The release's steps from the image
               run: bash ci/image/run.sh pdf-export:ci bolt://localhost:7687
+
+            - name: The image's licences and fonts
+              run: bash ci/image/check.sh pdf-export:ci
