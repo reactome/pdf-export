@@ -50,6 +50,12 @@ Feature-sized work goes through Spec Kit before any code, and the specs live in
 - **Imports name their `.ts` file:** Node runs the TypeScript as it is, so a relative
   import, export or dynamic import of `.js` passes the type check but fails at run time;
   lint refuses each.
+- **The fixture's output is a baseline:** CI's `image` job compares the fixture book and a
+  single-event PDF with `ci/fixture/expected.json` (spec 001 T036). A pull request that
+  changes what they print on purpose writes it again,
+  `BASELINE=write bash ci/image/run.sh <image> <bolt address>`, and says why.
+- **The image's fonts:** no system font but DejaVu (Chromium loads no web font without one
+  TrueType system font; tasks T037). `ci/image/check.sh` fails on any other.
 - **Run from a checkout:** the `pdf-export` command is `src/cli.ts`, run by Node's type
   stripping, which does not work from an installed package. Publishing would need a
   build step.
