@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 
 import {
+  ALLOWED,
   allowed,
   declared,
+  EXCEPTIONS,
   fontsWithoutLicence,
   offenders,
   unusedExceptions,
@@ -61,19 +63,37 @@ test('every offender is listed, not only the first, with its reason', () => {
   );
 });
 
-test('the theme package is the one documented exception, by name, and only while it declares none', () => {
-  assert.deepEqual(offenders([{ name: 'ngx-reactome-style', version: '0.1.0' }]), []);
-  assert.equal(offenders([{ name: 'ngx-reactome-styles', version: '0.1.0' }]).length, 1);
+test('there is no exception: a package that declares no licence is an offender', () => {
+  assert.equal(EXCEPTIONS.size, 0);
+  assert.equal(offenders([{ name: 'ngx-reactome-style', version: '0.1.0' }]).length, 1);
+});
+
+/** An exception as one would be written, by name and with its reason. */
+const excepted = new Map([['excepted-package', 'its licence by its repository']]);
+
+test('an exception is by name, and only while the package declares none', () => {
+  assert.deepEqual(
+    offenders([{ name: 'excepted-package', version: '0.1.0' }], ALLOWED, excepted),
+    []
+  );
+  assert.equal(
+    offenders([{ name: 'excepted-packages', version: '0.1.0' }], ALLOWED, excepted).length,
+    1
+  );
   // A declared licence is always read, even the excepted package's
   assert.equal(
-    offenders([{ name: 'ngx-reactome-style', version: '0.2.0', license: 'GPL-3.0' }]).length,
+    offenders(
+      [{ name: 'excepted-package', version: '0.2.0', license: 'GPL-3.0' }],
+      ALLOWED,
+      excepted
+    ).length,
     1
   );
 });
 
 test('an exception that matches nothing installed is reported, to be removed', () => {
-  assert.deepEqual(unusedExceptions([{ name: 'other' }]), ['ngx-reactome-style']);
-  assert.deepEqual(unusedExceptions([{ name: 'ngx-reactome-style' }]), []);
+  assert.deepEqual(unusedExceptions([{ name: 'other' }], excepted), ['excepted-package']);
+  assert.deepEqual(unusedExceptions([{ name: 'excepted-package' }], excepted), []);
 });
 
 /** The test's folders, each removed once the file's tests are done. */
