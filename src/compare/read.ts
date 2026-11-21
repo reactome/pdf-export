@@ -5,7 +5,8 @@
 // - **Lines:** the pieces of text that share a baseline on a page, left to right, each with
 //   its left edge and its largest size. What is in a page's top or bottom margin band (the
 //   running headers and page numbers, which FR-012 does not compare; MARGIN_BAND_PT unless
-//   set) and what is inside a figure (a vector diagram's labels) is left out.
+//   set) and what is inside a figure (a vector diagram's labels, a piece by its middle) is
+//   left out.
 // - **Links:** each link's box, its address or where in the PDF it lands.
 // - **Figures:** the boxes of what is drawn, images and painted paths (figureBoxes): shapes
 //   at least a few points each way clustered within FIGURE_GAP_PT of each other, and lines
@@ -400,7 +401,10 @@ export async function readLayout(
         if (!('str' in item) || item.str === '') continue;
         const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = textTransform(item.transform);
         if (y <= margin || y >= height - margin) continue;
-        if (figures.some((box) => inside(x, y, box))) continue;
+        // By the piece's middle, not its first point: a diagram's title starts a few points
+        // left of its nearest shape, so its first point is outside the figure's box (T040).
+        const middle = x + (typeof item.width === 'number' ? item.width / 2 : 0);
+        if (figures.some((box) => inside(middle, y, box))) continue;
         pieces.push({ x, y, size: Math.max(Math.hypot(a, b), Math.hypot(c, d)), str: item.str });
       }
       layout.lines.push(...linesOf(pieces, i).filter((line) => line.text.trim() !== ''));

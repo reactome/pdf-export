@@ -276,6 +276,32 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test('a diagram whose title starts left of its shapes keeps the title as its own', async () => {
+    // As the render service draws a pathway's diagram (T040, 21 Nov 2026): its name, small,
+    // at the top left, starting a few points left of the nearest node, so a label's first
+    // point fell outside the figure's box and the name was read into the summation.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="90pt" viewBox="0 0 400 90">
+<text x="2" y="8" font-size="6">Gamma pathway title</text>
+<rect x="10" y="20" width="55" height="70" fill="#9ab"/>
+<path d="M65 55 H345" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="345" y="0" width="55" height="90" fill="#9ab"/></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<p>${svg}</p>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    const section = read.sections[0];
+    assert.equal(section?.figure, 'figure');
+    assert.deepEqual(section.parts.find((p) => p.part === 'summation')?.items, [
+      'Asummation,writtenforthesetests.',
+    ]);
+    // nowhere else either
+    assert.ok(!JSON.stringify(read).includes('Gamma'), JSON.stringify(read));
+  });
+
   test('a reference laid out unlike the sample: facts in a table, contents first, vector figures, numbered references in brackets', async () => {
     const doc = sampleDocument();
     const props = sampleAnalysis();
