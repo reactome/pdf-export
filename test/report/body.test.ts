@@ -214,7 +214,7 @@ describe("the report's details and identifier lists", () => {
         // spec 001's form, which its book keeps
         assert.equal(
           plain(reference(book)),
-          'Placeholder01, P. (2010). Placeholder chapter. In: Placeholder book. Placeholder Press, ISBN 0000000000.'
+          'Placeholder01, P. (2010). Placeholder chapter. In: Placeholder book. Placeholder Press, 1-20, ISBN 0000000000.'
         );
         assert.equal(plain(reference(page)), 'Placeholder02, P. Placeholder web page.');
       } finally {
