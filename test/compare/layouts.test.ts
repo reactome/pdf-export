@@ -71,7 +71,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
       `<p style="font-size: 28pt">Alpha signalling pathway</p>
 <section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
 <section class="front"><h2>Zeta binding \u2197</h2>
-<p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Zeta binding</p>
+<p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Theta and iota receptor binding events → Kappa</p><p style="margin:0">→ Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
 <p>Zeta binds eta, written for these tests.</p>
 <h3>Literature references</h3>
@@ -84,7 +84,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     const ours = page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
 <section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
 <section class="front"><h2>Zeta binding</h2>
-<p>Location: ${deep.replace(/ → /g, ' › ')}phagy › Zeta binding</p>
+<p>Location: ${deep.replace(/ → /g, ' › ')}phagy › Theta and iota receptor binding events › Kappa › Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
 <p>Zeta binds eta, written for these tests.</p>
 <h3>Literature references</h3>
@@ -101,7 +101,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     const [a, b] = [parts(await reduced(theirs)), parts(await reduced(ours))];
     // folded: white space left out
     assert.deepEqual(a['name'], ['Zetabinding']);
-    assert.equal(a['location']?.length, 5);
+    assert.equal(a['location']?.length, 7);
     // the facts after the wrapped location are read as facts, not as the summation
     assert.deepEqual(a['stId'], ['R-HSA-9000002']);
     assert.deepEqual(a['type'], ['binding']);
