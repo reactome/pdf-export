@@ -307,6 +307,15 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   const wrapsFacts = lines.some(
     (line) => heading(line) && /^\s*editions\s*$/i.test(plain(line.text))
   );
+  // `event-pdf` writes every fact `Label: value`, so in its files a fact's label is one only
+  // with its colon: a summation's line that begins "Disease …" took the summation for the
+  // Diseases fact, and the lines before it for the compartments (T040)
+  const factLabel = (text: string, rule: (typeof RULES)[number]): string | null => {
+    const rest = labelled(text, rule.labels);
+    if (rest === null || !wrapsFacts || rule.fact !== true) return rest;
+    const read = plain(text);
+    return /:\s*$/.test(read.slice(0, read.length - rest.length)) ? rest : null;
+  };
   /** Whether there is a line at an index, and it is a heading. */
   const headingAt = (k: number): boolean => {
     const line = lines[k];
@@ -473,7 +482,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
           // a fact printed before the summation: the events before and after it follow it
           if (rule.fact !== true || orderOf(rule.part) <= orderOf(part)) continue;
           if (orderOf(rule.part) >= orderOf('summation')) continue;
-          if (labelled(text, rule.labels) !== null) return true;
+          if (factLabel(text, rule) !== null) return true;
         }
       }
       return false;
@@ -496,7 +505,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       let matched: { part: PartName; rest: string } | null = null;
       for (const rule of RULES) {
         if (orderOf(rule.part) <= order || rule.labels.length === 0) continue;
-        const rest = labelled(line.text, rule.labels);
+        const rest = factLabel(line.text, rule);
         if (rest !== null) {
           matched = { part: rule.part, rest };
           break;
@@ -795,8 +804,13 @@ function items(part: PartName, texts: readonly string[], own: readonly Line[] = 
     // and an edit's names parted by a comma as by a semicolon: `event-pdf` writes
     // `Surname, I, Surname, I`, pdf-export `Surname, I; Surname, I` (T040)
     .map((item) => (part === 'edits' ? item.replace(/;/g, ',') : item))
-    // and their hyphens: `event-pdf` breaks a reference's words at a line's end with one
-    .map((item) => (part === 'references' ? item.replace(/[-\u00ad\u2010]/g, '') : item))
+    // and their hyphens: `event-pdf` breaks a reference's words, a long title's and a
+    // summation's, at a line's end with one ("glyco-" then "genin"), which joined lines keep
+    .map((item) =>
+      part === 'references' || part === 'name' || part === 'summation'
+        ? item.replace(/[-\u00ad\u2010]/g, '')
+        : item
+    )
     .filter((item) => item !== '');
   return rule?.names ? folded.map(hash) : folded;
 }

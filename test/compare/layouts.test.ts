@@ -70,11 +70,11 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     const theirs = page(
       `<p style="font-size: 28pt">Alpha signalling pathway</p>
 <section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
-<section class="front"><h2>Zeta binding \u2197</h2>
+<section class="front"><h2>Zeta bind-<br>ing \u2197</h2>
 <p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Theta and iota receptor binding events → Kappa</p><p style="margin:0">→ Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
 <p style="margin:0;line-height:1.5">Inferred from: Zeta binding (Mus musculus); Zeta binding (Rattus norvegicus); Zeta binding (Danio rerio)</p>
-<p style="margin:13pt 0 0;line-height:1.15">Zeta binds eta, written for these tests.</p>
+<p style="margin:13pt 0 0;line-height:1.15">Zeta binds eta, writ-<br>ten for these tests.</p>
 <h3>Literature references</h3>
 <p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding in signal trans-</p>
 <p style="margin:0 0 0 15pt">duction. A journal, 1, 2-3. \u2197</p>
@@ -123,6 +123,32 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     ]) {
       assert.deepEqual(a[part], b[part], part);
     }
+  });
+
+  test("event-pdf's form: a summation's line beginning with a fact's word is no fact (T040)", async () => {
+    // event-pdf writes every fact with its colon; a summation's line beginning "Disease" was
+    // read as the Diseases fact, and the summation's lines before it as the compartments
+    const section = (diseaseLine: string) =>
+      reduced(
+        page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Eta binding \u2197</h2>
+<p>Location: Alpha signalling pathway \u2192 Eta binding</p>
+<p>Stable identifier: R-HSA-9000003</p><p>Compartments: cytosol</p>
+<p style="margin:13pt 0 0;line-height:1.15">Eta binds theta in the cytosol.<br>${diseaseLine}<br>Written for these tests.</p>
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p></section>`)
+      );
+    const parts = (r: Reduced) =>
+      Object.fromEntries(
+        (r.sections.find((s) => s.stId === 'R-HSA-9000003')?.parts ?? []).map((p) => [
+          p.part,
+          p.items,
+        ])
+      );
+    const a = parts(await section('Disease forms of it are known.'));
+    assert.equal(a['diseases'], undefined, 'no Diseases fact');
+    assert.deepEqual(a['compartments'], ['cytosol']);
+    assert.equal(a['summation']?.length, 1);
   });
 
   describe('a cover whose title a figure takes in: the title is never printed, the names never', () => {
