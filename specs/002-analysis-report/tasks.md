@@ -646,6 +646,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     `wait=99` held 30 s at most; the browser's page byte-identical for a 202. Each seen
     failing with its change undone.
   - **Then:** WebsiteAngular's deployment pins the commit (its spec 031 T006).
+  - **Done** in #244.
 
 ---
 
