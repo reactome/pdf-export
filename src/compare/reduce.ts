@@ -287,6 +287,11 @@ const NUMBERED = /^\s*\d+\.\s*/;
  * summation, so no summation's line is followed by one (T040).
  */
 const WRAPPED_LINES = 6;
+/**
+ * A wrapped fact's spacing, in its size: `event-pdf` wraps a fact's lines at 1.5, sets a
+ * summation's lines at 1.15 and its paragraphs at 2.3, so only the first is a fact's wrap.
+ */
+const WRAP_SPACING = [1.35, 1.65] as const;
 const HEADING_ID = /\((R-[A-Z]{3}-\d+)\)$/;
 
 /** A layout reduced to FR-012's parts. */
@@ -296,6 +301,12 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   const figuresOn = byPage(figures, (box) => box.page);
   const body = bodySize(lines.filter((line) => line.page > 0));
   const heading = (line: Line): boolean => line.size >= body * HEADING_RATIO;
+  // `event-pdf`'s form, known by its edits' heading: it wraps a fact at the left edge, where
+  // pdf-export's own wraps it indented and may start a summation at a line's spacing below
+  // its last fact, so the spacing is read as a wrap in `event-pdf`'s files alone (T040)
+  const wrapsFacts = lines.some(
+    (line) => heading(line) && /^\s*editions\s*$/i.test(plain(line.text))
+  );
   /** Whether there is a line at an index, and it is a heading. */
   const headingAt = (k: number): boolean => {
     const line = lines[k];
@@ -467,6 +478,16 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       }
       return false;
     };
+    /**
+     * Whether a line is the one before it wrapped: on its page, at a fact's wrap spacing
+     * below it (WRAP_SPACING), so a fact wrapped as the last before the summation (an
+     * `Inferred from:`, a `Compartments:`) is read as its own (T040).
+     */
+    const wrapped = (above: Line | undefined, below: Line): boolean =>
+      above !== undefined &&
+      above.page === below.page &&
+      above.y - below.y >= below.size * WRAP_SPACING[0] &&
+      above.y - below.y <= below.size * WRAP_SPACING[1];
     for (let k = start + headingLines.length; k < end; k++) {
       const line = lines[k];
       if (!line) continue;
@@ -510,7 +531,12 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       // `event-pdf` wraps a long fact (a deep location) to the section's left edge: a line
       // there is the fact's own while another fact's label follows within WRAPPED_LINES, not
       // the summation's start, which would take in every fact after it (T040)
-      if (fact && current && line.x <= left + 1 && laterFact(k, current.part)) {
+      if (
+        fact &&
+        current &&
+        line.x <= left + 1 &&
+        (laterFact(k, current.part) || (wrapsFacts && wrapped(current.lines.at(-1), line)))
+      ) {
         current.texts.push(line.text);
         current.lines.push(line);
         continue;
