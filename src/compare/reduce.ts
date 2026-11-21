@@ -281,6 +281,12 @@ export const REPORT_SMALL = 0.6;
 
 /** A section's heading in today's report: its number, its name, its stable identifier in brackets. */
 const NUMBERED = /^\s*\d+\.\s*/;
+/**
+ * How far ahead a wrapped fact's next label may be: `event-pdf` wraps a deep location over
+ * as many as four lines (release 98). The facts it looks for are printed before the
+ * summation, so no summation's line is followed by one (T040).
+ */
+const WRAPPED_LINES = 6;
 const HEADING_ID = /\((R-[A-Z]{3}-\d+)\)$/;
 
 /** A layout reduced to FR-012's parts. */
@@ -446,11 +452,11 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
     // the section's left edge: until that stop, the next line is the fact's, not a summation
     let unended = false;
     /**
-     * Whether one of the two lines after the k-th begins with the label of a fact after
-     * `part`'s and before the summation.
+     * Whether one of the lines after the k-th, up to WRAPPED_LINES, begins with the label of
+     * a fact after `part`'s and before the summation.
      */
     const laterFact = (k: number, part: PartName): boolean => {
-      for (let n = k + 1; n <= k + 2 && n < end; n++) {
+      for (let n = k + 1; n <= k + WRAPPED_LINES && n < end; n++) {
         const text = lines[n]?.text ?? '';
         for (const rule of RULES) {
           // a fact printed before the summation: the events before and after it follow it
@@ -502,7 +508,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       );
       const fact = current ? ruleOf(current.part)?.fact === true : true;
       // `event-pdf` wraps a long fact (a deep location) to the section's left edge: a line
-      // there is the fact's own while another fact's label follows within two lines, not
+      // there is the fact's own while another fact's label follows within WRAPPED_LINES, not
       // the summation's start, which would take in every fact after it (T040)
       if (fact && current && line.x <= left + 1 && laterFact(k, current.part)) {
         current.texts.push(line.text);
