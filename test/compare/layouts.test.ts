@@ -302,6 +302,28 @@ ${label ? `<p>${label}</p>` : ''}
     assert.ok(!JSON.stringify(read).includes('Gamma'), JSON.stringify(read));
   });
 
+  test("a diagram's label too small to read, just outside its shapes, is the figure's", async () => {
+    // As a pathway's diagram draws a node's name at its zoom (T040, 21 Nov 2026): 0.78 pt
+    // text 3 pt below the figure's box, read into the summation after it.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="90pt" viewBox="0 0 400 90">
+<rect x="0" y="0" width="55" height="80" fill="#9ab"/>
+<path d="M55 40 H345" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="345" y="0" width="55" height="80" fill="#9ab"/>
+<text x="100" y="84" font-size="0.8">Delta tiny label</text></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<p>${svg}</p>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    assert.ok(!JSON.stringify(read).includes('Delta'), JSON.stringify(read));
+    assert.deepEqual(read.sections[0]?.parts.find((p) => p.part === 'summation')?.items, [
+      'Asummation,writtenforthesetests.',
+    ]);
+  });
+
   test('a reference laid out unlike the sample: facts in a table, contents first, vector figures, numbered references in brackets', async () => {
     const doc = sampleDocument();
     const props = sampleAnalysis();

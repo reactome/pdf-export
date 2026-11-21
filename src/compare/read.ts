@@ -5,8 +5,8 @@
 // - **Lines:** the pieces of text that share a baseline on a page, left to right, each with
 //   its left edge and its largest size. What is in a page's top or bottom margin band (the
 //   running headers and page numbers, which FR-012 does not compare; MARGIN_BAND_PT unless
-//   set) and what is inside a figure (a vector diagram's labels, a piece by its middle) is
-//   left out.
+//   set), what is inside a figure (a vector diagram's labels, a piece by its middle) and
+//   text too small to read (MIN_TEXT_PT) is left out.
 // - **Links:** each link's box, its address or where in the PDF it lands.
 // - **Figures:** the boxes of what is drawn, images and painted paths (figureBoxes): shapes
 //   at least a few points each way clustered within FIGURE_GAP_PT of each other, and lines
@@ -32,6 +32,13 @@ export const FIGURE_GAP_PT = 30;
 
 /** A figure is at least this wide and this tall: a logo's mark or a bullet is not. */
 export const FIGURE_MIN_PT = 60;
+
+/**
+ * Text smaller than this is no one's to read: a diagram's label drawn at the diagram's zoom
+ * (0.78 pt in release 98's book, T040), never a document's prose. It is left out wherever it
+ * is, so one just outside its figure's box is not read into the text after it.
+ */
+export const MIN_TEXT_PT = 3;
 
 /** A place in a PDF: its page, counted from 0, and a height on it in points from its foot. */
 export interface Spot {
@@ -403,9 +410,11 @@ export async function readLayout(
         if (y <= margin || y >= height - margin) continue;
         // By the piece's middle, not its first point: a diagram's title starts a few points
         // left of its nearest shape, so its first point is outside the figure's box (T040).
+        const size = Math.max(Math.hypot(a, b), Math.hypot(c, d));
+        if (size < MIN_TEXT_PT) continue;
         const middle = x + (typeof item.width === 'number' ? item.width / 2 : 0);
         if (figures.some((box) => inside(middle, y, box))) continue;
-        pieces.push({ x, y, size: Math.max(Math.hypot(a, b), Math.hypot(c, d)), str: item.str });
+        pieces.push({ x, y, size, str: item.str });
       }
       layout.lines.push(...linesOf(pieces, i).filter((line) => line.text.trim() !== ''));
       const annotations: unknown[] = await page.getAnnotations();
