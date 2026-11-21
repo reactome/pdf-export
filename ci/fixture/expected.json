@@ -25,19 +25,27 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Alphapathway"]
+              "items": [
+                "Alphapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000200"]
+              "items": [
+                "R-HSA-90000200"
+              ]
             },
             {
               "part": "summation",
-              "items": ["Aplaceholdersummationwithbold,italicandalink.unsafelink"]
+              "items": [
+                "Aplaceholdersummationwithbold,italicandalink.unsafelink"
+              ]
             },
             {
               "part": "edits",
-              "items": ["5ab7f0e3fafa7692"]
+              "items": [
+                "1a4d9caf844ca341"
+              ]
             }
           ],
           "figure": "diagram"
@@ -47,31 +55,46 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Sharedreaction"]
+              "items": [
+                "Sharedreaction"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway"]
+              "items": [
+                "Alphapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000220"]
+              "items": [
+                "R-HSA-90000220"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "compartments",
-              "items": ["cytosol"]
+              "items": [
+                "cytosol"
+              ]
             },
             {
               "part": "after",
-              "items": ["Blackboxtwo"]
+              "items": [
+                "Blackboxtwo"
+              ]
             },
             {
               "part": "references",
-              "items": ["140c1d35999968eb", "2b0187fa4bc38936"]
+              "items": [
+                "041024e687047090",
+                "43ef5242ad817ac1"
+              ]
             }
           ],
           "figure": "reaction"
@@ -81,15 +104,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Alphasubtwo"]
+              "items": [
+                "Alphasubtwo"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway"]
+              "items": [
+                "Alphapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000230"]
+              "items": [
+                "R-HSA-90000230"
+              ]
             }
           ],
           "figure": "diagram"
@@ -99,15 +128,22 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Two-parentsub"]
+              "items": [
+                "Two-parentsub"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubtwo"]
+              "items": [
+                "Alphapathway",
+                "Alphasubtwo"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000250"]
+              "items": [
+                "R-HSA-90000250"
+              ]
             }
           ],
           "figure": "selection"
@@ -117,31 +153,47 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Diseasereaction"]
+              "items": [
+                "Diseasereaction"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubtwo", "Two-parentsub"]
+              "items": [
+                "Alphapathway",
+                "Alphasubtwo",
+                "Twoparentsub"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000251"]
+              "items": [
+                "R-HSA-90000251"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "diseases",
-              "items": ["placeholderinfectiousdisease"]
+              "items": [
+                "placeholderinfectiousdisease"
+              ]
             },
             {
               "part": "before",
-              "items": ["Reactionone"]
+              "items": [
+                "Reactionone"
+              ]
             },
             {
               "part": "after",
-              "items": ["Blackboxtwo"]
+              "items": [
+                "Blackboxtwo"
+              ]
             }
           ],
           "figure": "reaction"
@@ -151,15 +203,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Alphasubone"]
+              "items": [
+                "Alphasubone"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway"]
+              "items": [
+                "Alphapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000210"]
+              "items": [
+                "R-HSA-90000210"
+              ]
             }
           ],
           "figure": "selection"
@@ -169,23 +227,35 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Reactionone"]
+              "items": [
+                "Reactionone"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubone"]
+              "items": [
+                "Alphapathway",
+                "Alphasubone"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000211"]
+              "items": [
+                "R-HSA-90000211"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "compartments",
-              "items": ["nucleoplasm", "cytosol"]
+              "items": [
+                "nucleoplasm",
+                "cytosol"
+              ]
             },
             {
               "part": "summation",
@@ -195,21 +265,28 @@
             },
             {
               "part": "after",
-              "items": ["Blackboxtwo", "Diseasereaction"]
+              "items": [
+                "Blackboxtwo",
+                "Diseasereaction"
+              ]
             },
             {
               "part": "references",
               "items": [
-                "dc539f9eaecf605d",
-                "f27a5aa4a7bc1542",
-                "5161121539a73fb9",
-                "94cceda211e6f624",
-                "036eb344705a2ab3"
+                "263afbe252b125b3",
+                "05901558d9abdd87",
+                "2c38827a2e761191",
+                "a6b95b430679df6f",
+                "68b190ed316fd9f9"
               ]
             },
             {
               "part": "edits",
-              "items": ["9216b8b648a1b44c", "061a10ee8859d93f", "fd977b20a3a42016"]
+              "items": [
+                "d0e070e36c1965da",
+                "b0889f307f51729c",
+                "7dcfc51e3ab4e2c6"
+              ]
             }
           ],
           "figure": "reaction"
@@ -219,23 +296,36 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Blackboxtwo"]
+              "items": [
+                "Blackboxtwo"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubone"]
+              "items": [
+                "Alphapathway",
+                "Alphasubone"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000212"]
+              "items": [
+                "R-HSA-90000212"
+              ]
             },
             {
               "part": "type",
-              "items": ["omitted"]
+              "items": [
+                "omitted"
+              ]
             },
             {
               "part": "before",
-              "items": ["Reactionone", "Sharedreaction", "Diseasereaction"]
+              "items": [
+                "Reactionone",
+                "Sharedreaction",
+                "Diseasereaction"
+              ]
             }
           ],
           "figure": "reaction"
@@ -245,15 +335,22 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Alphasubonediagramchild"]
+              "items": [
+                "Alphasubonediagramchild"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubone"]
+              "items": [
+                "Alphapathway",
+                "Alphasubone"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000215"]
+              "items": [
+                "R-HSA-90000215"
+              ]
             }
           ],
           "figure": "diagram"
@@ -263,19 +360,29 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Reactionnine"]
+              "items": [
+                "Reactionnine"
+              ]
             },
             {
               "part": "location",
-              "items": ["Alphapathway", "Alphasubone", "Alphasubonediagramchild"]
+              "items": [
+                "Alphapathway",
+                "Alphasubone",
+                "Alphasubonediagramchild"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000216"]
+              "items": [
+                "R-HSA-90000216"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             }
           ],
           "figure": "reaction"
@@ -362,15 +469,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Gammapathway"]
+              "items": [
+                "Gammapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000300"]
+              "items": [
+                "R-HSA-90000300"
+              ]
             },
             {
               "part": "edits",
-              "items": ["7d66a7c3b80de698"]
+              "items": [
+                "5bfba97fed4f1729"
+              ]
             }
           ],
           "figure": "diagram"
@@ -380,15 +493,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Gammasub"]
+              "items": [
+                "Gammasub"
+              ]
             },
             {
               "part": "location",
-              "items": ["Gammapathway"]
+              "items": [
+                "Gammapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000310"]
+              "items": [
+                "R-HSA-90000310"
+              ]
             }
           ],
           "figure": "selection"
@@ -398,19 +517,28 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Polymerisationfour"]
+              "items": [
+                "Polymerisationfour"
+              ]
             },
             {
               "part": "location",
-              "items": ["Gammapathway", "Gammasub"]
+              "items": [
+                "Gammapathway",
+                "Gammasub"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000313"]
+              "items": [
+                "R-HSA-90000313"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             }
           ],
           "figure": "reaction"
@@ -465,15 +593,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["betapathway"]
+              "items": [
+                "betapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000100"]
+              "items": [
+                "R-HSA-90000100"
+              ]
             },
             {
               "part": "edits",
-              "items": ["22f4c8d49a6f2b70"]
+              "items": [
+                "1452d093c519c04d"
+              ]
             }
           ],
           "figure": "diagram"
@@ -483,27 +617,40 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Sharedreaction"]
+              "items": [
+                "Sharedreaction"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway"]
+              "items": [
+                "betapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000220"]
+              "items": [
+                "R-HSA-90000220"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "compartments",
-              "items": ["cytosol"]
+              "items": [
+                "cytosol"
+              ]
             },
             {
               "part": "references",
-              "items": ["140c1d35999968eb", "2b0187fa4bc38936"]
+              "items": [
+                "041024e687047090",
+                "43ef5242ad817ac1"
+              ]
             }
           ],
           "figure": "reaction"
@@ -513,23 +660,34 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Inferredreaction"]
+              "items": [
+                "Inferredreaction"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway"]
+              "items": [
+                "betapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000120"]
+              "items": [
+                "R-HSA-90000120"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "inferredFrom",
-              "items": ["Mousesource(Musmusculus)", "Ratsource(Rattusnorvegicus)"]
+              "items": [
+                "Mousesource(Musmusculus)",
+                "Ratsource(Rattusnorvegicus)"
+              ]
             }
           ],
           "figure": "reaction"
@@ -539,15 +697,21 @@
           "parts": [
             {
               "part": "name",
-              "items": ["betasubwithdiagram"]
+              "items": [
+                "betasubwithdiagram"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway"]
+              "items": [
+                "betapathway"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000130"]
+              "items": [
+                "R-HSA-90000130"
+              ]
             }
           ],
           "figure": "diagram"
@@ -557,15 +721,22 @@
           "parts": [
             {
               "part": "name",
-              "items": ["betasubsub"]
+              "items": [
+                "betasubsub"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway", "betasubwithdiagram"]
+              "items": [
+                "betapathway",
+                "betasubwithdiagram"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000131"]
+              "items": [
+                "R-HSA-90000131"
+              ]
             }
           ],
           "figure": "selection"
@@ -575,19 +746,29 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Reactioneight"]
+              "items": [
+                "Reactioneight"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway", "betasubwithdiagram", "betasubsub"]
+              "items": [
+                "betapathway",
+                "betasubwithdiagram",
+                "betasubsub"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000132"]
+              "items": [
+                "R-HSA-90000132"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             }
           ],
           "figure": "reaction"
@@ -597,15 +778,22 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Alphasubtwo"]
+              "items": [
+                "Alphasubtwo"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway", "betasubwithdiagram"]
+              "items": [
+                "betapathway",
+                "betasubwithdiagram"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000230"]
+              "items": [
+                "R-HSA-90000230"
+              ]
             }
           ],
           "figure": "diagram"
@@ -615,15 +803,23 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Two-parentsub"]
+              "items": [
+                "Two-parentsub"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway", "betasubwithdiagram", "Alphasubtwo"]
+              "items": [
+                "betapathway",
+                "betasubwithdiagram",
+                "Alphasubtwo"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000250"]
+              "items": [
+                "R-HSA-90000250"
+              ]
             }
           ],
           "figure": "selection"
@@ -633,23 +829,36 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Diseasereaction"]
+              "items": [
+                "Diseasereaction"
+              ]
             },
             {
               "part": "location",
-              "items": ["betapathway", "betasubwithdiagram", "Alphasubtwo", "Two-parentsub"]
+              "items": [
+                "betapathway",
+                "betasubwithdiagram",
+                "Alphasubtwo",
+                "Twoparentsub"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000251"]
+              "items": [
+                "R-HSA-90000251"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "diseases",
-              "items": ["placeholderinfectiousdisease"]
+              "items": [
+                "placeholderinfectiousdisease"
+              ]
             }
           ],
           "figure": "reaction"
@@ -728,19 +937,28 @@
           "parts": [
             {
               "part": "name",
-              "items": ["Reactionone"]
+              "items": [
+                "Reactionone"
+              ]
             },
             {
               "part": "stId",
-              "items": ["R-HSA-90000211"]
+              "items": [
+                "R-HSA-90000211"
+              ]
             },
             {
               "part": "type",
-              "items": ["transition"]
+              "items": [
+                "transition"
+              ]
             },
             {
               "part": "compartments",
-              "items": ["nucleoplasm", "cytosol"]
+              "items": [
+                "nucleoplasm",
+                "cytosol"
+              ]
             },
             {
               "part": "summation",
@@ -751,16 +969,20 @@
             {
               "part": "references",
               "items": [
-                "dc539f9eaecf605d",
-                "f27a5aa4a7bc1542",
-                "5161121539a73fb9",
-                "94cceda211e6f624",
-                "036eb344705a2ab3"
+                "263afbe252b125b3",
+                "05901558d9abdd87",
+                "2c38827a2e761191",
+                "a6b95b430679df6f",
+                "68b190ed316fd9f9"
               ]
             },
             {
               "part": "edits",
-              "items": ["9216b8b648a1b44c", "061a10ee8859d93f", "fd977b20a3a42016"]
+              "items": [
+                "d0e070e36c1965da",
+                "b0889f307f51729c",
+                "7dcfc51e3ab4e2c6"
+              ]
             }
           ],
           "figure": "reaction"
