@@ -14,6 +14,8 @@
 // error to every request then waiting and to the next request, and is then forgotten, so the
 // one after starts it again; unasked, it is forgotten after the hour too.
 
+import type { ReportProgress, ReportStatus, Times } from './progress.ts';
+
 /** A report's state (data-model Job). */
 export type JobState = 'queued' | 'making' | 'ready' | 'failed';
 
@@ -50,6 +52,8 @@ export interface JobSettings<T> {
   budgetError: () => Error;
   /** The clock keeping is measured by. */
   now?: () => number;
+  /** Past reports' times, recorded as each finishes, for the status's estimate (T029). */
+  times?: Times;
 }
 
 interface Entry<T> {
@@ -58,11 +62,18 @@ interface Entry<T> {
   state: JobState;
   result: T | undefined;
   error: unknown;
-  make: (signal: AbortSignal) => Promise<T>;
+  make: (signal: AbortSignal, progress: (progress: ReportProgress) => void) => Promise<T>;
   done: Promise<void>;
   finish: () => void;
   /** When it finished, for keeping. */
   endedAt: number;
+  /** Where it is while being made, as its making last said (T029). */
+  progress: ReportProgress | undefined;
+  /** When it started being made, its figures started, and they ended. */
+  startedAt: number;
+  figuresFrom: number | undefined;
+  figuresTo: number | undefined;
+  figures: number;
 }
 
 /** The counts `/health` gives. */
@@ -98,7 +109,11 @@ export class Jobs<T> {
    * makes, for `client`. A failed one is given to this request, its last, and forgotten. A
    * new one beyond the waiting places, or the client's share of them, is refused.
    */
-  join(key: string, client: string, make: (signal: AbortSignal) => Promise<T>): Job<T> | Refused {
+  join(
+    key: string,
+    client: string,
+    make: (signal: AbortSignal, progress: (progress: ReportProgress) => void) => Promise<T>
+  ): Job<T> | Refused {
     this.#expire();
     const known = this.#jobs.get(key);
     if (known) {
@@ -125,6 +140,11 @@ export class Jobs<T> {
       done,
       finish,
       endedAt: 0,
+      progress: undefined,
+      startedAt: 0,
+      figuresFrom: undefined,
+      figuresTo: undefined,
+      figures: 0,
     };
     this.#jobs.set(key, entry);
     this.#queue.push(entry);
@@ -160,6 +180,45 @@ export class Jobs<T> {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * A job's status for its 202 (contracts/service.md, T029): queued with its place, or being
+   * made with its stage and counts, each with an estimate where past reports give one.
+   * Undefined for a job no longer waiting or being made.
+   */
+  status(job: Job<T>): ReportStatus | undefined {
+    const entry = this.#jobs.get(job.key);
+    if (!entry) return undefined;
+    const times = this.#settings.times;
+    if (entry.state === 'queued') {
+      const place = this.#queue.indexOf(entry) + 1;
+      if (place === 0) return undefined;
+      const estimate = times?.estimate({
+        queued: true,
+        place: place - 1 + this.#working,
+        making: this.#settings.making,
+      });
+      return { state: 'queued', place, ...(estimate === undefined ? {} : { estimate }) };
+    }
+    if (entry.state !== 'making') return undefined;
+    const progress = entry.progress ?? { stage: 'reading' };
+    const now = this.#now();
+    const madeMs = now - entry.startedAt;
+    const figuresMs =
+      entry.figuresFrom === undefined ? 0 : (entry.figuresTo ?? now) - entry.figuresFrom;
+    const estimate = times?.estimate({
+      queued: false,
+      progress,
+      madeMs,
+      otherSpentMs: madeMs - figuresMs,
+    });
+    return {
+      state: 'making',
+      stage: progress.stage,
+      ...(progress.stage === 'figures' ? { done: progress.done, total: progress.total } : {}),
+      ...(estimate === undefined ? {} : { estimate }),
+    };
   }
 
   /** Drops the kept reports of a token its check no longer finds (404 or 410). */
@@ -198,12 +257,22 @@ export class Jobs<T> {
   #start(entry: Entry<T>): void {
     this.#working += 1;
     entry.state = 'making';
+    entry.startedAt = this.#now();
     const budget = new AbortController();
     const timer = setTimeout(() => {
       budget.abort(this.#settings.budgetError());
     }, this.#settings.budgetMs);
     timer.unref();
-    const work = entry.make(budget.signal);
+    const work = entry.make(budget.signal, (progress) => {
+      const now = this.#now();
+      if (progress.stage === 'figures') {
+        entry.figuresFrom ??= now;
+        entry.figures = progress.total;
+      } else if (progress.stage === 'printing' && entry.figuresFrom !== undefined) {
+        entry.figuresTo ??= now;
+      }
+      entry.progress = progress;
+    });
     // the answer: the work's, or the budget's error once it has passed
     const pastBudget = new Promise<never>((_resolve, reject) => {
       budget.signal.addEventListener(
@@ -220,6 +289,15 @@ export class Jobs<T> {
           entry.state = 'ready';
           entry.result = result;
           this.#keep(entry);
+          // its times, for the estimates of the reports after it
+          const ended = this.#now();
+          const figuresMs =
+            entry.figuresFrom === undefined ? 0 : (entry.figuresTo ?? ended) - entry.figuresFrom;
+          this.#settings.times?.record({
+            figures: entry.figures,
+            figuresMs,
+            otherMs: ended - entry.startedAt - figuresMs,
+          });
         },
         (error: unknown) => {
           entry.state = 'failed';

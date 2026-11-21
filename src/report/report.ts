@@ -30,6 +30,7 @@ import { isPageRef } from '../print/pdfjs.ts';
 import { isRecord } from '../unknown.ts';
 import { readDetails } from './details.ts';
 import { OVERVIEW, Slots, drawReportFigures, pathwayFigures } from './figures.ts';
+import type { ReportProgress } from './progress.ts';
 import {
   PARTS,
   PART_NAMES,
@@ -70,6 +71,8 @@ export interface ReportPrinter {
 }
 
 export interface ReportServices {
+  /** Told where the report is as it is made: its job's status (T029). */
+  progress?: (progress: ReportProgress) => void;
   graph: Graph;
   printer: ReportPrinter;
   /** The analysis service's address, its `/AnalysisService` included. */
@@ -161,6 +164,7 @@ export async function makeChecked(
   };
   // each stage's time, for the report's one log line (FR-211, research R7)
   const stages: [string, number][] = [];
+  services.progress?.({ stage: 'reading' });
   let mark = performance.now();
   const stage = (stageName: string): void => {
     const now = performance.now();
@@ -208,10 +212,12 @@ export async function makeChecked(
       ...(services.figureTimeoutMs === undefined ? {} : { timeoutMs: services.figureTimeoutMs }),
       ...(services.retryPauseMs === undefined ? {} : { retryPauseMs: services.retryPauseMs }),
       ...(signal === undefined ? {} : { signal }),
+      onProgress: (done, total) => services.progress?.({ stage: 'figures', done, total }),
     }
   );
   going();
   stage('figures');
+  services.progress?.({ stage: 'printing' });
   const printed = onRequestReport(model, details, characters);
   const html = reportPage(printed.model, printed.details, {
     site: services.site,

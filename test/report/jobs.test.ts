@@ -6,6 +6,7 @@ import { after, afterEach, before, describe, test } from 'node:test';
 
 import { graphSettings, openGraph, type Graph } from '../../src/graph/connection.ts';
 import { Jobs, type Job, type JobSettings } from '../../src/report/jobs.ts';
+import { Times, type ReportProgress } from '../../src/report/progress.ts';
 import { startService, type ServeSettings, type Service } from '../../src/serve.ts';
 import { REPORT_TOKENS, startAnalysisStub, type AnalysisStub } from '../stubs/analysis.ts';
 import { startRenderStub, type RenderStub } from '../stubs/render.ts';
@@ -13,9 +14,11 @@ import { startRenderStub, type RenderStub } from '../stubs/render.ts';
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface Controlled {
-  make: (signal: AbortSignal) => Promise<string>;
+  make: (signal: AbortSignal, progress: (p: ReportProgress) => void) => Promise<string>;
   started: number;
   signal: AbortSignal | null;
+  /** What the report's making tells its job (T029). */
+  progress: (p: ReportProgress) => void;
   end: (value: string) => void;
   fail: (error: Error) => void;
 }
@@ -27,15 +30,17 @@ function controlled(): Controlled {
   const state: Controlled = {
     started: 0,
     signal: null,
+    progress: () => undefined,
     end: (value) => {
       resolve(value);
     },
     fail: (error) => {
       reject(error);
     },
-    make: (signal) => {
+    make: (signal, progress) => {
       state.started += 1;
       state.signal = signal;
+      state.progress = progress;
       return new Promise<string>((res, rej) => {
         resolve = res;
         reject = rej;
@@ -60,7 +65,7 @@ const SETTINGS: JobSettings<string> = {
 function take<T>(
   jobs: Jobs<T>,
   key: string,
-  make: (signal: AbortSignal) => Promise<T>,
+  make: (signal: AbortSignal, progress: (p: ReportProgress) => void) => Promise<T>,
   client = 'c'
 ): Job<T> {
   const job = jobs.join(key, client, make);
@@ -272,6 +277,48 @@ describe('the jobs', () => {
 const skip = process.env['NEO4J_URI'] ? false : 'no fixture graph: set NEO4J_URI';
 const FILES = fileURLToPath(new URL('../../ci/fixture/files/', import.meta.url));
 
+describe("a job's status (T029)", () => {
+  test('queued with its place, from 1; being made with its stage and counts', () => {
+    const jobs = new Jobs<string>(SETTINGS);
+    const [a, b, c, d] = [controlled(), controlled(), controlled(), controlled()];
+    const ja = take(jobs, 'a', a.make);
+    take(jobs, 'b', b.make);
+    const jc = take(jobs, 'c', c.make);
+    const jd = take(jobs, 'd', d.make);
+    assert.deepEqual(jobs.status(jc), { state: 'queued', place: 1 });
+    assert.deepEqual(jobs.status(jd), { state: 'queued', place: 2 });
+    // being made: reading until its making says otherwise
+    assert.deepEqual(jobs.status(ja), { state: 'making', stage: 'reading' });
+    a.progress({ stage: 'figures', done: 3, total: 10 });
+    assert.deepEqual(jobs.status(ja), { state: 'making', stage: 'figures', done: 3, total: 10 });
+    a.progress({ stage: 'printing' });
+    assert.deepEqual(jobs.status(ja), { state: 'making', stage: 'printing' });
+  });
+
+  test('no estimate before a report has finished; one after, from its times', async () => {
+    let clock = 0;
+    const times = new Times();
+    const jobs = new Jobs<string>({ ...SETTINGS, now: () => clock, times });
+    const first = controlled();
+    const done = take(jobs, 'first', first.make);
+    assert.equal(jobs.status(done)?.estimate, undefined);
+    // 10 s reading, 20 figures in 40 s, then 5 s printing
+    clock = 10_000;
+    first.progress({ stage: 'figures', done: 0, total: 20 });
+    clock = 50_000;
+    first.progress({ stage: 'printing' });
+    clock = 55_000;
+    first.end('pdf');
+    await jobs.wait(done, 1_000);
+    // a second report half through its figures: 10 figures at 2 s, and 5 s after them
+    const second = controlled();
+    const job = take(jobs, 'second', second.make);
+    clock = 65_000;
+    second.progress({ stage: 'figures', done: 10, total: 20 });
+    assert.equal(jobs.status(job)?.estimate, 10 * 2 + 5);
+  });
+});
+
 describe('the report in the background, at its address', { skip }, () => {
   let graph: Graph;
   /** The graph as the service reads it: its release moved by `shift`, as a new release's. */
@@ -343,11 +390,17 @@ describe('the report in the background, at its address', { skip }, () => {
     assert.equal(first.status, 202);
     assert.equal(first.headers.get('retry-after'), '10');
     assert.equal(first.headers.get('cache-control'), 'no-store');
-    assert.deepEqual(await first.json(), {
-      code: 202,
-      reason: 'Accepted',
-      messages: ['The report is being made; ask again in 10 seconds'],
-    });
+    const body = (await first.json()) as Record<string, unknown>;
+    assert.deepEqual(
+      { code: body['code'], reason: body['reason'], messages: body['messages'] },
+      {
+        code: 202,
+        reason: 'Accepted',
+        messages: ['The report is being made; ask again in 10 seconds'],
+      }
+    );
+    // and where it is (T029)
+    assert.equal((body['status'] as { state?: string } | undefined)?.state, 'making');
     let answer = await fetch(address(1));
     for (let i = 0; answer.status === 202 && i < 40; i++) {
       await answer.body?.cancel();
@@ -481,6 +534,29 @@ describe('the report in the background, at its address', { skip }, () => {
     assert.equal(health.reports.making, 2);
     assert.equal(health.reports.waiting, 3);
     render.reset();
+  });
+
+  test('Prefer: wait holds a request less, and says so; the status names the stage (T029)', async () => {
+    render.slow(400);
+    const started = Date.now();
+    const res = await fetch(address(21), { headers: { Prefer: 'wait=0' } });
+    assert.equal(res.status, 202);
+    assert.ok(Date.now() - started < 1_000, 'not held for the wait');
+    assert.equal(res.headers.get('preference-applied'), 'wait=0');
+    const body = (await res.json()) as {
+      status?: { state?: string; stage?: string; place?: number };
+    };
+    // queued behind the reports earlier tests left being made, or being made itself
+    if (body.status?.state === 'queued') {
+      assert.ok((body.status.place ?? 0) >= 1, 'its place');
+    } else {
+      assert.equal(body.status?.state, 'making');
+      assert.ok(['reading', 'figures', 'printing'].includes(body.status.stage ?? ''));
+    }
+    // without Prefer: no Preference-Applied
+    const plain = await fetch(address(21));
+    assert.equal(plain.headers.get('preference-applied'), null);
+    await plain.body?.cancel();
   });
 
   test('a browser waiting is given a page that asks again', async () => {
