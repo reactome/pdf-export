@@ -70,11 +70,11 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     const theirs = page(
       `<p style="font-size: 28pt">Alpha signalling pathway</p>
 <section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
-<section class="front"><h2>Zeta binding \u2197</h2>
+<section class="front"><h2>Zeta bind-<br>ing \u2197</h2>
 <p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Theta and iota receptor binding events → Kappa</p><p style="margin:0">→ Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
 <p style="margin:0;line-height:1.5">Inferred from: Zeta binding (Mus musculus); Zeta binding (Rattus norvegicus); Zeta binding (Danio rerio)</p>
-<p style="margin:13pt 0 0;line-height:1.15">Zeta binds eta, written for these tests.</p>
+<p style="margin:13pt 0 0;line-height:1.15">Zeta binds eta, writ-<br>ten for these tests.</p>
 <h3>Literature references</h3>
 <p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding in signal trans-</p>
 <p style="margin:0 0 0 15pt">duction. A journal, 1, 2-3. \u2197</p>

@@ -795,8 +795,13 @@ function items(part: PartName, texts: readonly string[], own: readonly Line[] = 
     // and an edit's names parted by a comma as by a semicolon: `event-pdf` writes
     // `Surname, I, Surname, I`, pdf-export `Surname, I; Surname, I` (T040)
     .map((item) => (part === 'edits' ? item.replace(/;/g, ',') : item))
-    // and their hyphens: `event-pdf` breaks a reference's words at a line's end with one
-    .map((item) => (part === 'references' ? item.replace(/[-\u00ad\u2010]/g, '') : item))
+    // and their hyphens: `event-pdf` breaks a reference's words, a long title's and a
+    // summation's, at a line's end with one ("glyco-" then "genin"), which joined lines keep
+    .map((item) =>
+      part === 'references' || part === 'name' || part === 'summation'
+        ? item.replace(/[-\u00ad\u2010]/g, '')
+        : item
+    )
     .filter((item) => item !== '');
   return rule?.names ? folded.map(hash) : folded;
 }
