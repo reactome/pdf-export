@@ -60,7 +60,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     await printer.close();
   });
 
-  test("event-pdf's own form (T040): its arrows, a wrapped location, references unnumbered, its Editions", async () => {
+  test("event-pdf's own form (T040): its arrows, a wrapped location, references unnumbered, its Editions and their names' commas", async () => {
     // As today's book prints a section: its title ending in a link's arrow; `Location:` with
     // the pathways joined by `→`, long enough to wrap to the left edge at a hyphen, before the
     // stable identifier and the type; references unnumbered with a hanging indent, initials
@@ -78,7 +78,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
 <p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding in signal trans-</p>
 <p style="margin:0 0 0 15pt">duction. A journal, 1, 2-3. \u2197</p>
 <p style="margin:0">${t(PEOPLE[1])}. (2003). Another title. A journal, 4, 5-6. \u2197</p>
-<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}.</p></section>`,
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}., ${t(PEOPLE[0])}.</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}.</p></section>`,
       'body { width: 380pt }'
     );
     const ours = page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
@@ -90,7 +90,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
 <h3>Literature references</h3>
 <p>1. ${t(PEOPLE[0])} (2001). A title about binding in signal transduction. A journal, 1, 2-3.</p>
 <p>2. ${t(PEOPLE[1])} (2003). Another title. A journal, 4, 5-6.</p>
-<h3>Edit history</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}</p></section>`);
+<h3>Edit history</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}; ${t(PEOPLE[0])}</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}</p></section>`);
     const parts = (r: Reduced) =>
       Object.fromEntries(
         (r.sections.find((s) => s.stId === 'R-HSA-9000002')?.parts ?? []).map((p) => [
