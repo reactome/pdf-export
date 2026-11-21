@@ -1,0 +1,82 @@
+# Differences from `event-pdf`, release 98 (T040)
+
+FR-012's comparison of pdf-export's book with `event-pdf`'s, by part and kind, with each
+difference's reason where it is known (SC-002). No names: the comparison prints none
+(FR-013), and this file quotes none.
+
+## The run
+
+- **`event-pdf`'s book:** release 98's `TheReactomeBook.pdf.tgz` from the download folder,
+  29 PDFs.
+- **pdf-export's book:** `pdf-export book` on main of 20 Nov 2026 (after #236), from the
+  figures WebsiteAngular's spec 018 T010 drew on 20 Nov 2026, against release 98's graph
+  and folder: 29 PDFs, 21,503 pages, 692 MB, in 25 min 35 s; no fault (`check-book`'s
+  checks passed).
+- **The comparison:** `pdf-export compare <event-pdf's folder> <pdf-export's folder>` after
+  #239 and this file's change, which teach it `event-pdf`'s own form (below). It found 570
+  differences, file by file.
+
+## What the comparison learned of `event-pdf`'s form
+
+Read from release 98's files with each letter masked, so their form was seen and not their
+words. Each is a rule of the comparison, applied to both sides, not a difference:
+
+| Form                                | `event-pdf`                                           | pdf-export           | The comparison                                     |
+| ----------------------------------- | ----------------------------------------------------- | -------------------- | -------------------------------------------------- |
+| A linked title or reference         | ends in an arrow, U+2197                              | no arrow             | the arrow is left out (#239)                       |
+| A location's pathways               | joined by `→`                                         | joined by `›`        | both are a list's parts (#239)                     |
+| The edit history's heading          | `Editions`                                            | `Edit history`       | both head the edits (#239)                         |
+| References                          | unnumbered, each at the left edge, a hanging indent   | numbered             | both read (#239)                                   |
+| A long location                     | wrapped to the section's left edge, often at a hyphen | in one line          | read as the fact's; hyphens left out (#239)        |
+| An initial                          | ends in a full stop (`Surname, I.`)                   | none (`Surname, I`)  | full stops left out of names and references (#239) |
+| A reference's words at a line's end | broken by a hyphen                                    | not broken           | hyphens left out of references (#239)              |
+| An edit's names                     | parted by commas                                      | parted by semicolons | both a list's commas (this change)                 |
+
+Before these, 19,816 sections' titles and 15,023 sections' facts read as different, from
+the reading alone.
+
+## The differences, by part and kind
+
+Counts are summed over the 29 files: a count is of sections (or entries) differing in that
+part, not of PDFs.
+
+### Expected, with their reasons
+
+| Part, kind                          | Count                | Reason                                                                                                                                                                                                                                                                                                                                                                                              | Decided                                                                   |
+| ----------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Sections, order                     | 15,837               | The order of lists: `event-pdf` writes a pathway's children in the database's order below the PDF's root, pdf-export in the curators' (`hasEvent`'s `order`).                                                                                                                                                                                                                                       | Spec 001, expected differences; research R2                               |
+| Compartments, order                 | 4,192                | The same, for compartments.                                                                                                                                                                                                                                                                                                                                                                         | As above                                                                  |
+| References, order                   | 75                   | The same, for literature.                                                                                                                                                                                                                                                                                                                                                                           | As above                                                                  |
+| Diseases, order                     | 157                  | The same, for diseases.                                                                                                                                                                                                                                                                                                                                                                             | As above                                                                  |
+| References, text                    | 17,520               | Three reasons, the first the largest: **(a)** a reference's **authors in the publication's order** (`author`'s `order`) in pdf-export, in another in `event-pdf` (seen on Autophagy: the same names, in another order); **(b)** **which five** references show, by the order of lists above; **(c)** a **book**'s reference with its publisher and ISBN in pdf-export, without them in `event-pdf`. | (b) spec 001; (a) and (c) new here, recorded in WebsiteAngular's register |
+| Edits, text                         | 1,152                | **The names' form:** `event-pdf` writes a person's initials (`Surname, I`), pdf-export their given names in full (`Surname, Given`), as the graph's display names have them.                                                                                                                                                                                                                        | New here; register                                                        |
+| Before and after, text              | 2,109 and 2,216      | The order of lists (the events before and after), and with it which are written first.                                                                                                                                                                                                                                                                                                              | Spec 001, expected differences                                            |
+| Contents, missing and extra; target | 2,581 and 2,259; 213 | The contents list is pdf-export's own (before the sections, every event beneath the pathway), `event-pdf`'s after them; an entry's title and target are read as each prints them.                                                                                                                                                                                                                   | Spec 001, expected differences                                            |
+| Short entries, count                | 21                   | Short entries at every later place an event recurs in one PDF, where `event-pdf` writes nothing.                                                                                                                                                                                                                                                                                                    | Spec 001, expected differences                                            |
+| Figures, missing, extra and kind    | 20, 2 and 3          | A section with a figure in one and not the other, or another kind of figure.                                                                                                                                                                                                                                                                                                                        | Spec 001, expected differences (each to be recorded: below)               |
+
+### Not yet explained
+
+Each is open in T040 until it is fixed or recorded with its reason:
+
+| Part, kind                                   | Count            | What is known                                                                                                                                       |
+| -------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Summation, text                              | 1,323            | Likely FR-017's substitutions (1,104 made in the book, U+2011 among them) and summations in the order of lists; not yet checked section by section. |
+| Location, text                               | 547              | Not checked: a location's pathways in another form, or a wrap the reading does not join.                                                            |
+| Name, text                                   | 409              | Not checked: FR-017's substitutions are the likely part (U+2011 in 197 events' names).                                                              |
+| Stable identifier, type, compartments: extra | 326, 314 and 314 | `event-pdf`'s facts unread in some sections of 9 to 11 files: a form of its the comparison does not read yet (as the wrapped location was).         |
+| Stable identifier, text                      | 173              | Not checked.                                                                                                                                        |
+| Compartments, text                           | 241              | Not checked.                                                                                                                                        |
+| Diseases, text and extra                     | 143 and 23       | Not checked: diseases in the order of lists, or the one named "disease" (left out in both).                                                         |
+| Inferred from, text                          | 399              | Likely: `event-pdf`'s graph library holds `inferredFrom` as a set (research R2), written in no order; not checked.                                  |
+| Edits, order                                 | 31               | Not checked: dates that tie, or the edit history's grouping.                                                                                        |
+| Cover, names count                           | 29               | In every file: which people the cover names, by count; the rules of each not yet compared.                                                          |
+| The rest                                     | under 70 each    | Before or after, inferred from and type missing or extra; three sections missing; one cover's diagram.                                              |
+
+## Still to do in T040
+
+- The open rows above, each fixed (in the comparison or the book) or recorded.
+- A sample of single-event PDFs against `event-pdf`'s, and a reaction's with a token
+  (research R10).
+- With every row recorded, the records as `--expected` (contracts/cli.md), so the
+  comparison exits 0 on release 98 and 1 on anything new.
