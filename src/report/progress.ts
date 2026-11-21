@@ -5,7 +5,10 @@
 
 /** Where a report being made is: reading, then drawing its figures, then printing. */
 export type ReportProgress =
-  { stage: 'reading' } | { stage: 'figures'; done: number; total: number } | { stage: 'printing' };
+  /** `expected`: the figures it is likely to draw, from the pathways asked for. */
+  | { stage: 'reading'; expected?: number }
+  | { stage: 'figures'; done: number; total: number }
+  | { stage: 'printing' };
 
 /** The 202's `status`: each field absent where it does not apply, never null or 0. */
 export interface ReportStatus {
@@ -75,8 +78,13 @@ export class Times {
       // the reports ahead, made `making` at once, then this one
       ms = Math.ceil(at.place / Math.max(1, at.making)) * means.reportMs + means.reportMs;
     } else if (at.progress.stage === 'reading') {
-      // its figures not yet counted: a past report's time
-      ms = means.reportMs - at.madeMs;
+      // its figures not yet counted: those expected at the past reports' pace, or without
+      // them a past report's time, which over-estimated a small report by nearly twice
+      // (spec 031 SC-004: 10 pathways, 38 s for 22)
+      ms =
+        at.progress.expected === undefined
+          ? means.reportMs - at.madeMs
+          : at.progress.expected * means.perFigureMs + Math.max(0, means.otherMs - at.otherSpentMs);
     } else if (at.progress.stage === 'figures') {
       // the figures left at the past reports' pace, then the rest of the other time
       const left = Math.max(0, at.progress.total - at.progress.done);

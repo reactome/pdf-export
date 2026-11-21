@@ -42,6 +42,32 @@ describe('the estimate', () => {
     );
   });
 
+  test('a report reading: its expected figures at the past pace, not a past report whole', () => {
+    const times = new Times();
+    // a past report of 50 figures: 2 s a figure, 10 s besides
+    times.record({ figures: 50, figuresMs: 100_000, otherMs: 10_000 });
+    // 11 figures expected, 2 s of the other time spent: 22 s and 8 s, not the past 110 s
+    assert.equal(
+      times.estimate({
+        queued: false,
+        progress: { stage: 'reading', expected: 11 },
+        madeMs: 2_000,
+        otherSpentMs: 2_000,
+      }),
+      30
+    );
+    // none expected: a past report's time, less what has passed
+    assert.equal(
+      times.estimate({
+        queued: false,
+        progress: { stage: 'reading' },
+        madeMs: 2_000,
+        otherSpentMs: 2_000,
+      }),
+      108
+    );
+  });
+
   test('a report queued: those ahead, made so many at once, then its own', () => {
     const times = new Times();
     times.record({ figures: 10, figuresMs: 20_000, otherMs: 10_000 });

@@ -164,7 +164,8 @@ export async function makeChecked(
   };
   // each stage's time, for the report's one log line (FR-211, research R7)
   const stages: [string, number][] = [];
-  services.progress?.({ stage: 'reading' });
+  // the figures it is likely to draw: a pathway's each, and the overview
+  services.progress?.({ stage: 'reading', expected: request.number + 1 });
   let mark = performance.now();
   const stage = (stageName: string): void => {
     const now = performance.now();

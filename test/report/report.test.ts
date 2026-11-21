@@ -141,7 +141,7 @@ describe('making a report', { skip }, () => {
   test('tells its job where it is: reading, each figure counted, then printing (T029)', async () => {
     const told: ReportProgress[] = [];
     await makeReport(request(), { ...services(), progress: (p) => told.push(p) });
-    assert.deepEqual(told[0], { stage: 'reading' });
+    assert.deepEqual(told[0], { stage: 'reading', expected: request().number + 1 });
     assert.deepEqual(told.at(-1), { stage: 'printing' });
     const figures = told.filter(
       (p): p is Extract<ReportProgress, { stage: 'figures' }> => p.stage === 'figures'
