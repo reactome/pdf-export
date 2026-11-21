@@ -310,11 +310,17 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   // `event-pdf` writes every fact `Label: value`, so in its files a fact's label is one only
   // with its colon: a summation's line that begins "Disease …" took the summation for the
   // Diseases fact, and the lines before it for the compartments (T040)
-  const factLabel = (text: string, rule: (typeof RULES)[number]): string | null => {
-    const rest = labelled(text, rule.labels);
-    if (rest === null || !wrapsFacts || rule.fact !== true) return rest;
-    const read = plain(text);
-    return /:\s*$/.test(read.slice(0, read.length - rest.length)) ? rest : null;
+  // pdf-export prints a fact's label as a piece of its own (`<dt>`), without a colon: there a
+  // label without one is a label only as the line's whole first piece, so prose that wraps
+  // to begin "followed by …" or "inferred from …" stays prose (T040)
+  const factLabel = (line: Line, rule: (typeof RULES)[number]): string | null => {
+    const rest = labelled(line.text, rule.labels);
+    if (rest === null || rule.fact !== true) return rest;
+    const read = plain(line.text);
+    if (/:\s*$/.test(read.slice(0, read.length - rest.length))) return rest;
+    if (wrapsFacts) return null;
+    const first = line.cells?.[0];
+    return first === undefined || labelled(first, rule.labels) === '' ? rest : null;
   };
   /** Whether there is a line at an index, and it is a heading. */
   const headingAt = (k: number): boolean => {
@@ -477,12 +483,13 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
      */
     const laterFact = (k: number, part: PartName): boolean => {
       for (let n = k + 1; n <= k + WRAPPED_LINES && n < end; n++) {
-        const text = lines[n]?.text ?? '';
+        const next = lines[n];
+        if (!next) continue;
         for (const rule of RULES) {
           // a fact printed before the summation: the events before and after it follow it
           if (rule.fact !== true || orderOf(rule.part) <= orderOf(part)) continue;
           if (orderOf(rule.part) >= orderOf('summation')) continue;
-          if (factLabel(text, rule) !== null) return true;
+          if (factLabel(next, rule) !== null) return true;
         }
       }
       return false;
@@ -505,7 +512,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
       let matched: { part: PartName; rest: string } | null = null;
       for (const rule of RULES) {
         if (orderOf(rule.part) <= order || rule.labels.length === 0) continue;
-        const rest = factLabel(line.text, rule);
+        const rest = factLabel(line, rule);
         if (rest !== null) {
           matched = { part: rule.part, rest };
           break;
