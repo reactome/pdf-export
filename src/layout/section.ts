@@ -186,7 +186,9 @@ export function reference(r: Reference): string {
   const title = referenceTitle(r);
   if (r.kind === 'book') {
     const chapter = r.chapterTitle ? `${text(r.chapterTitle)}. In: ` : '';
-    const rest = [r.publisher, r.isbn ? `ISBN ${r.isbn}` : null].filter((x) => x !== null);
+    // its pages too, which `event-pdf` prints (T040): left out, a chapter's reference did
+    // not say where in the book it is
+    const rest = [r.publisher, r.pages, r.isbn ? `ISBN ${r.isbn}` : null].filter((x) => x !== null);
     return `${lead}${chapter}<i>${title}</i>.${rest.length > 0 ? ` ${text(rest.join(', '))}.` : ''}`;
   }
   const where = [
