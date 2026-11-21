@@ -771,6 +771,7 @@ passes.
   - Compare the new book with today's 29 files, and a sample of single-event PDFs with today's.
   - Record each difference by part, kind and count, with its reason, in `specs/001-pathway-pdfs/differences.md`, with no names (SC-002).
   - Include the reaction overlay that the render service cannot draw yet (research R10), for single-event PDFs of reactions with a token.
+  - **The book, 20–21 Nov 2026:** compared with release 98's 29 files (#239, and the PR adding `differences.md`). `compare` learned `event-pdf`'s own form from its real files, letters masked (a title's arrow, `→`, `Editions`, unnumbered references, wrapped locations, initials' full stops, names parted by commas), which took 19,816 titles and 15,023 sections' facts out of the differences. 570 remain, each by part and kind in `differences.md`: most explained (the order of lists; a reference's authors in the publication's order; a book's publisher and ISBN; names' form in the edit history), the rest listed there as open. Still open: those rows, the single-event sample, and the records as `--expected`.
 
 ---
 
