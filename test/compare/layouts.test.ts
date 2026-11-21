@@ -324,6 +324,28 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test("a summation's line that begins with a fact's words is the summation's, in pdf-export's layout", async () => {
+    // pdf-export prints a fact's label as a piece of its own (<dt>), without a colon. Prose
+    // that wraps to begin "followed by …" or "inferred from …" was read as that fact, and the
+    // lines before it as the fact above's wrap (T040, 21 Nov 2026: R-HSA-376176, R-HSA-210747).
+    const doc = sampleDocument();
+    const target = doc.places
+      .flatMap((p) => (p.full ? [p.section] : []))
+      .find((s) => s.event.after.length === 0);
+    assert.ok(target, 'the sample has a section with no events after it');
+    target.summations = [
+      '<p>The receptors hold five domains<br>followed by three repeats in each.<br>Its kinetics are inferred from the properties of networks in mouse.<br>inferred from the properties of networks in mouse, too.</p>',
+    ];
+    const read = reduce(await readLayout(await printOurs(printer, doc, sampleAnalysis())));
+    const section = read.sections.find((s) => s.stId === target.event.stId);
+    const parts = Object.fromEntries((section?.parts ?? []).map((p) => [p.part, p.items.join('')]));
+    assert.equal(parts['after'], undefined, JSON.stringify(parts));
+    assert.equal(parts['inferredFrom'], undefined, JSON.stringify(parts));
+    assert.match(parts['summation'] ?? '', /^Thereceptorsholdfivedomainsfollowedbythreerepeats/);
+    assert.match(parts['summation'] ?? '', /mouse,too\.$/);
+    assert.equal(parts['compartments'], 'cytosol');
+  });
+
   test('a reference laid out unlike the sample: facts in a table, contents first, vector figures, numbered references in brackets', async () => {
     const doc = sampleDocument();
     const props = sampleAnalysis();
