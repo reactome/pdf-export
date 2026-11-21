@@ -23,8 +23,16 @@ import { isRecord } from '../unknown.ts';
 
 const UNPRINTED = new RegExp(`${NEVER_DRAWN.source}+`, 'gu');
 
-/** Text as compared: compatibility forms folded, white space and joiners left out. */
-export const fold = (text: string): string => text.normalize('NFKC').replace(UNPRINTED, '');
+/**
+ * Text as compared: compatibility forms folded, white space and joiners left out, and the
+ * arrow `event-pdf` prints after a linked title or reference (U+2197), a link's mark, not
+ * its text (T040).
+ */
+export const fold = (text: string): string =>
+  text
+    .normalize('NFKC')
+    .replace(UNPRINTED, '')
+    .replace(/\u2197/gu, '');
 
 /** A short hash of a text, as the reduced form holds what it does not keep as text. */
 export const hash = (text: string): string =>

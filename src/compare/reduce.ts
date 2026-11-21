@@ -133,7 +133,8 @@ interface PartRule {
 
 /** The labelled parts, in the order a section prints them (FR-005). */
 const RULES: readonly PartRule[] = [
-  { part: 'location', labels: labelPattern(['location']), fact: true, split: /[›»>]/ },
+  // `event-pdf` joins a location's pathways with `→` (T040)
+  { part: 'location', labels: labelPattern(['location']), fact: true, split: /[›»>→]/ },
   { part: 'stId', labels: labelPattern(['stable identifier', 'stable id']), fact: true },
   { part: 'type', labels: labelPattern(['reaction type', 'type']), fact: true },
   {
@@ -163,7 +164,13 @@ const RULES: readonly PartRule[] = [
     split: 'numbered',
     names: true,
   },
-  { part: 'edits', labels: labelPattern(['edit history']), split: 'dated', names: true },
+  // `event-pdf` heads them `Editions` (T040)
+  {
+    part: 'edits',
+    labels: labelPattern(['edit history', 'editions']),
+    split: 'dated',
+    names: true,
+  },
   {
     part: 'entities',
     // today's analysis report: "6 submitted entities found in this pathway, mapping to …"
@@ -438,6 +445,22 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
     // today's report writes a fact `Label: …` and ends it with a full stop, wrapping it to
     // the section's left edge: until that stop, the next line is the fact's, not a summation
     let unended = false;
+    /**
+     * Whether one of the two lines after the k-th begins with the label of a fact after
+     * `part`'s and before the summation.
+     */
+    const laterFact = (k: number, part: PartName): boolean => {
+      for (let n = k + 1; n <= k + 2 && n < end; n++) {
+        const text = lines[n]?.text ?? '';
+        for (const rule of RULES) {
+          // a fact printed before the summation: the events before and after it follow it
+          if (rule.fact !== true || orderOf(rule.part) <= orderOf(part)) continue;
+          if (orderOf(rule.part) >= orderOf('summation')) continue;
+          if (labelled(text, rule.labels) !== null) return true;
+        }
+      }
+      return false;
+    };
     for (let k = start + headingLines.length; k < end; k++) {
       const line = lines[k];
       if (!line) continue;
@@ -478,6 +501,14 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
         (box) => box.page < line.page || (box.page === line.page && box.y1 > line.y)
       );
       const fact = current ? ruleOf(current.part)?.fact === true : true;
+      // `event-pdf` wraps a long fact (a deep location) to the section's left edge: a line
+      // there is the fact's own while another fact's label follows within two lines, not
+      // the summation's start, which would take in every fact after it (T040)
+      if (fact && current && line.x <= left + 1 && laterFact(k, current.part)) {
+        current.texts.push(line.text);
+        current.lines.push(line);
+        continue;
+      }
       if (
         fact &&
         orderOf(current?.part ?? 'name') < orderOf('summation') &&
@@ -499,7 +530,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
             ? reportEditRows(texts)
             : options.report
               ? reportItems(part, texts, own)
-              : items(part, texts),
+              : items(part, texts, own),
       })),
       figure: figureKind(
         own,
@@ -692,7 +723,7 @@ export function reportEntityRows(own: readonly Line[]): string[] {
 }
 
 /** A part's items from its lines' texts, folded; hashed where they name people. */
-function items(part: PartName, texts: readonly string[]): string[] {
+function items(part: PartName, texts: readonly string[], own: readonly Line[] = []): string[] {
   const rule = ruleOf(part);
   let list: string[];
   const split = rule?.split;
@@ -706,18 +737,45 @@ function items(part: PartName, texts: readonly string[]): string[] {
       if (marker.test(read)) found.push(split === 'numbered' ? read.replace(marker, '') : read);
       // before the first item: the table's header, not an item
     }
-    list = found;
+    // `event-pdf` numbers no reference: each begins at the part's left edge, its other lines
+    // indented (T040)
+    list = found.length > 0 || split !== 'numbered' ? found : hanging(own.slice(1));
   } else if (split === 'rows') {
     // each row a line; a first line with no digit is the table's header
     const rows = texts.filter((text) => text.trim() !== '');
     list = rows.filter((text, i) => i > 0 || /\d/.test(text));
   } else if (split instanceof RegExp) {
     list = texts.join(' ').split(split);
+    // a fact wrapped at a hyphen (`event-pdf`'s deep locations, T040) is read as one word:
+    // a hyphen is left out on both sides, which cannot tell a wrap's from a name's
+    if (rule?.fact === true) {
+      return list.map((item) => fold(item).replace(/[-\u00ad\u2010]/g, '')).filter((i) => i !== '');
+    }
   } else {
     list = [texts.join(' ')];
   }
-  const folded = list.map(fold).filter((item) => item !== '');
+  // full stops left out of names and references: `event-pdf` ends an initial with one
+  // (`Surname, I.`), pdf-export does not, and neither is the name's meaning (T040)
+  const stops = part === 'edits' || part === 'references';
+  const folded = list
+    .map(fold)
+    .map((item) => (stops ? item.replace(/\./g, '') : item))
+    // and their hyphens: `event-pdf` breaks a reference's words at a line's end with one
+    .map((item) => (part === 'references' ? item.replace(/[-\u00ad\u2010]/g, '') : item))
+    .filter((item) => item !== '');
   return rule?.names ? folded.map(hash) : folded;
+}
+
+/** A list's items laid out with a hanging indent: each begins at the lines' left edge. */
+function hanging(lines: readonly Line[]): string[] {
+  if (lines.length === 0) return [];
+  const left = Math.min(...lines.map((line) => line.x));
+  const found: string[] = [];
+  for (const line of lines) {
+    if (line.x <= left + 1 || found.length === 0) found.push(line.text);
+    else found[found.length - 1] = `${found.at(-1) ?? ''} ${line.text}`;
+  }
+  return found;
 }
 
 /** Lines before any of these on the cover end its names. */

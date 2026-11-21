@@ -60,6 +60,58 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     await printer.close();
   });
 
+  test("event-pdf's own form (T040): its arrows, a wrapped location, references unnumbered, its Editions", async () => {
+    // As today's book prints a section: its title ending in a link's arrow; `Location:` with
+    // the pathways joined by `→`, long enough to wrap to the left edge at a hyphen, before the
+    // stable identifier and the type; references unnumbered with a hanging indent, initials
+    // ending in a full stop, each ending in the arrow; and the edits headed `Editions`.
+    const deep =
+      'Alpha signalling pathway → Beta signalling events → Gamma and delta binding → Epsilon mito';
+    const theirs = page(
+      `<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Zeta binding \u2197</h2>
+<p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Zeta binding</p>
+<p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
+<p>Zeta binds eta, written for these tests.</p>
+<h3>Literature references</h3>
+<p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding in signal trans-</p>
+<p style="margin:0 0 0 15pt">duction. A journal, 1, 2-3. \u2197</p>
+<p style="margin:0">${t(PEOPLE[1])}. (2003). Another title. A journal, 4, 5-6. \u2197</p>
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}.</p></section>`,
+      'body { width: 380pt }'
+    );
+    const ours = page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Zeta binding</h2>
+<p>Location: ${deep.replace(/ → /g, ' › ')}phagy › Zeta binding</p>
+<p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
+<p>Zeta binds eta, written for these tests.</p>
+<h3>Literature references</h3>
+<p>1. ${t(PEOPLE[0])} (2001). A title about binding in signal transduction. A journal, 1, 2-3.</p>
+<p>2. ${t(PEOPLE[1])} (2003). Another title. A journal, 4, 5-6.</p>
+<h3>Edit history</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}</p><p>2017-02-10 Reviewed, ${t(PEOPLE[2])}</p></section>`);
+    const parts = (r: Reduced) =>
+      Object.fromEntries(
+        (r.sections.find((s) => s.stId === 'R-HSA-9000002')?.parts ?? []).map((p) => [
+          p.part,
+          p.items,
+        ])
+      );
+    const [a, b] = [parts(await reduced(theirs)), parts(await reduced(ours))];
+    // folded: white space left out
+    assert.deepEqual(a['name'], ['Zetabinding']);
+    assert.equal(a['location']?.length, 5);
+    // the facts after the wrapped location are read as facts, not as the summation
+    assert.deepEqual(a['stId'], ['R-HSA-9000002']);
+    assert.deepEqual(a['type'], ['binding']);
+    assert.equal(a['references']?.length, 2);
+    assert.equal(a['edits']?.length, 2);
+    for (const part of ['name', 'location', 'stId', 'type', 'summation', 'references', 'edits']) {
+      assert.deepEqual(a[part], b[part], part);
+    }
+  });
+
   describe('a cover whose title a figure takes in: the title is never printed, the names never', () => {
     const cover = (top: string, names: readonly string[]) =>
       page(`${top}
