@@ -125,6 +125,32 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     }
   });
 
+  test("event-pdf's form: a summation's line beginning with a fact's word is no fact (T040)", async () => {
+    // event-pdf writes every fact with its colon; a summation's line beginning "Disease" was
+    // read as the Diseases fact, and the summation's lines before it as the compartments
+    const section = (diseaseLine: string) =>
+      reduced(
+        page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Eta binding \u2197</h2>
+<p>Location: Alpha signalling pathway \u2192 Eta binding</p>
+<p>Stable identifier: R-HSA-9000003</p><p>Compartments: cytosol</p>
+<p style="margin:13pt 0 0;line-height:1.15">Eta binds theta in the cytosol.<br>${diseaseLine}<br>Written for these tests.</p>
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p></section>`)
+      );
+    const parts = (r: Reduced) =>
+      Object.fromEntries(
+        (r.sections.find((s) => s.stId === 'R-HSA-9000003')?.parts ?? []).map((p) => [
+          p.part,
+          p.items,
+        ])
+      );
+    const a = parts(await section('Disease forms of it are known.'));
+    assert.equal(a['diseases'], undefined, 'no Diseases fact');
+    assert.deepEqual(a['compartments'], ['cytosol']);
+    assert.equal(a['summation']?.length, 1);
+  });
+
   describe('a cover whose title a figure takes in: the title is never printed, the names never', () => {
     const cover = (top: string, names: readonly string[]) =>
       page(`${top}
