@@ -5,6 +5,7 @@
 // service's check: 404, 410, 503); then the report. Errors are the analysis service's JSON,
 // `{"code","reason","messages"}` and a newline, with no path, host, name or submitted
 // identifier in a message; every answer allows any origin, as today's does.
+import type { ReportStatus } from './progress.ts';
 import type { ServerResponse } from 'node:http';
 
 import type { ReportFailure } from './report.ts';
@@ -98,13 +99,24 @@ function page(status: number, retryAfter: number): string {
  * 503 asks for `Retry-After` and is never kept by a cache; for a browser (`page`) it is a
  * page that asks again after that pause.
  */
-export function serviceError(res: ServerResponse, status: number, asPage = false): void {
+export function serviceError(
+  res: ServerResponse,
+  status: number,
+  asPage = false,
+  // a 202's status, and the hold a `Prefer: wait` was given (T029); a page carries neither
+  { status: progress, waitedS }: { status?: ReportStatus; waitedS?: number } = {}
+): void {
   if (res.writableEnded || res.destroyed) return;
   const waiting = status === 202 || status === 503;
   const body =
     waiting && asPage
       ? page(status, RETRY_AFTER_S)
-      : `${JSON.stringify({ code: status, reason: REASONS[status] ?? 'Error', messages: messages(status, RETRY_AFTER_S) })}\n`;
+      : `${JSON.stringify({
+          code: status,
+          reason: REASONS[status] ?? 'Error',
+          messages: messages(status, RETRY_AFTER_S),
+          ...(status === 202 && progress !== undefined ? { status: progress } : {}),
+        })}\n`;
   res
     .writeHead(status, {
       ...CORS,
@@ -112,6 +124,7 @@ export function serviceError(res: ServerResponse, status: number, asPage = false
         waiting && asPage ? 'text/html;charset=UTF-8' : 'application/json;charset=UTF-8',
       'Content-Length': String(Buffer.byteLength(body)),
       ...(waiting ? { 'Retry-After': String(RETRY_AFTER_S), 'Cache-Control': 'no-store' } : {}),
+      ...(waitedS === undefined ? {} : { 'Preference-Applied': `wait=${String(waitedS)}` }),
     })
     .end(body);
 }

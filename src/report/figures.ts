@@ -94,6 +94,8 @@ export interface FigureOptions {
   retryPauseMs?: number;
   /** The report's end: its time budget. */
   signal?: AbortSignal;
+  /** Told the figures to draw, then once as each is done, drawn or missing (T029). */
+  onProgress?: (done: number, total: number) => void;
 }
 
 /**
@@ -103,7 +105,7 @@ export interface FigureOptions {
  */
 export async function drawReportFigures(
   { species, token, figures }: { species: string; token: string; figures: readonly Figure[] },
-  { render, slots, characters, log, timeoutMs, retryPauseMs, signal }: FigureOptions
+  { render, slots, characters, log, timeoutMs, retryPauseMs, signal, onProgress }: FigureOptions
 ): Promise<Map<string, string>> {
   // the client encodes the token once: it is given decoded, as the service issued it
   const decoded = decodeURIComponent(token);
@@ -112,25 +114,32 @@ export async function drawReportFigures(
     ...figures.map((f): [string, FigureRequest] => [figureKey(f), requestOf(f, decoded)]),
   ];
   const drawn = new Map<string, string>();
+  let done = 0;
+  onProgress?.(done, wanted.length);
   await Promise.all(
     wanted.map(([key, request]) =>
-      slots.run(async () => {
-        const answer = await fetchFigure(render, request, {
-          ...(timeoutMs === undefined ? {} : { timeoutMs }),
-          ...(retryPauseMs === undefined ? {} : { retryPauseMs }),
-          ...(signal === undefined ? {} : { signal }),
-        });
-        if ('missing' in answer) {
-          log(`missing-figure ${key}: ${answer.missing}`);
-          return;
-        }
-        try {
-          drawn.set(key, labelsOnRequest(answer.svg, characters));
-        } catch (error) {
-          const why = error instanceof Error ? error.name : 'error';
-          log(`missing-figure ${key}: its labels could not be read (${why})`);
-        }
-      }, signal)
+      slots
+        .run(async () => {
+          const answer = await fetchFigure(render, request, {
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+            ...(retryPauseMs === undefined ? {} : { retryPauseMs }),
+            ...(signal === undefined ? {} : { signal }),
+          });
+          if ('missing' in answer) {
+            log(`missing-figure ${key}: ${answer.missing}`);
+            return;
+          }
+          try {
+            drawn.set(key, labelsOnRequest(answer.svg, characters));
+          } catch (error) {
+            const why = error instanceof Error ? error.name : 'error';
+            log(`missing-figure ${key}: its labels could not be read (${why})`);
+          }
+        }, signal)
+        .finally(() => {
+          done += 1;
+          onProgress?.(done, wanted.length);
+        })
     )
   );
   return drawn;

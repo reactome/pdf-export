@@ -45,6 +45,7 @@ import { emptiedWorkFolder } from './print/temporary.ts';
 import { Slots } from './report/figures.ts';
 import { reportParameters } from './report/model.ts';
 import { Jobs } from './report/jobs.ts';
+import { Times, preferredWaitMs } from './report/progress.ts';
 import { ReportError, checkReport, makeChecked, type ReportServices } from './report/report.ts';
 import {
   FAILURE_STATUS,
@@ -343,6 +344,7 @@ export async function startService(
     size: (pdf) => pdf.byteLength,
     budgetError: () => new Refusal('unavailable', 'the report passed its time budget'),
     ...(options.now === undefined ? {} : { now: options.now }),
+    times: new Times(),
   });
   let active = 0;
   /** Requests whose graph reads were still unsettled past their deadline and grace. */
@@ -774,10 +776,10 @@ export async function startService(
         deadline
       );
       reportJobs.release(checked.release);
-      job = reportJobs.join(checked.key, client, (budget) =>
+      job = reportJobs.join(checked.key, client, (budget, progress) =>
         makeChecked(
           checked,
-          reportServices(budget, Date.now() + limits.reportBudgetMs),
+          { ...reportServices(budget, Date.now() + limits.reportBudgetMs), progress },
           budget
         ).then((made) => made.pdf)
       );
@@ -799,7 +801,10 @@ export async function startService(
       serviceError(res, 503, asPage);
       return;
     }
-    await reportJobs.wait(job, limits.reportWaitMs, deadline);
+    // a caller following the report asks to be held less (`Prefer: wait`, T029), so its
+    // status is never more than that old
+    const preferred = preferredWaitMs(req.headers['prefer'], limits.reportWaitMs);
+    await reportJobs.wait(job, preferred ?? limits.reportWaitMs, deadline);
     if (deadline.aborted) {
       answerFailure(res, deadline.reason, asPage);
       return;
@@ -812,7 +817,11 @@ export async function startService(
       answerFailure(res, job.error, asPage);
       return;
     }
-    serviceError(res, 202, asPage);
+    const status = reportJobs.status(job);
+    serviceError(res, 202, asPage, {
+      ...(status === undefined ? {} : { status }),
+      ...(preferred === undefined ? {} : { waitedS: Math.round(preferred / 1000) }),
+    });
   }
 
   async function answerPdf(

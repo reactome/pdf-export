@@ -627,6 +627,25 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     links followed.
   - T023 (the figures' resource) is its own task; SC-201's listed difference for it goes
     with it.
+- [x] T029 [WA] The report's status in its 202, for WebsiteAngular's spec 031 (the report
+      made and followed on the website's page, not in a new tab; the user, 21 Nov 2026):
+  - **The contract** (reactome/WebsiteAngular `specs/031-analysis-report-download/contracts/report-status.md`):
+    the JSON 202 gains `status`: `state` (`queued`, `making`), `place` when queued (1 the next to start), `stage`
+    (`reading`, `figures`, `printing`) when making, `done` and `total` while drawing
+    figures, `estimate` in whole seconds when known; a field that does not apply is
+    absent. A request may ask to be held less than 30 s with `Prefer: wait=<seconds>`
+    (RFC 7240), 0 to 30, answered with `Preference-Applied`. The address, the 200, the
+    errors, the limits and the browser's page are unchanged.
+  - **The work:** a job's stage and counts (`src/report/jobs.ts`, set from
+    `src/report/report.ts`) and its place; past reports' times and the estimate
+    (`src/report/times.ts`: seconds per figure and other seconds over the last 20
+    reports, none before the first); the status and `Prefer` in `src/serve.ts`;
+    contracts/service.md updated.
+  - **Tests:** each field for a queued and a making report; the estimate absent before
+    the first report, present after; `Prefer: wait=2` answered within about 2 s,
+    `wait=99` held 30 s at most; the browser's page byte-identical for a 202. Each seen
+    failing with its change undone.
+  - **Then:** WebsiteAngular's deployment pins the commit (its spec 031 T006).
 
 ---
 

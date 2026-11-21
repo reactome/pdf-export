@@ -33,6 +33,15 @@ already call. The address and parameters are today's.
   species' database id, `number` after clamping, `resource` after defaulting,
   `importableOnly`), and waits up to 30 s. The same address answers 202 until the
   report is ready, then 200 with the PDF.
+- **Where it is** (T029, for WebsiteAngular's spec 031): a 202's JSON also carries
+  `status`: `state` (`queued` or `making`); `place` when queued, its place in the queue
+  with 1 the next to start; `stage` when being made (`reading`, `figures`, `printing`);
+  `done` and `total` while its figures are drawn; and `estimate`, whole seconds left, from
+  the last 20 reports' times (seconds a figure, and the rest), absent before any report
+  has finished. A field that does not apply is absent. A browser's page carries none of it.
+- **`Prefer: wait=<seconds>`** (RFC 7240, T029): a request held up to that many seconds,
+  0 to the 30, rather than 30, answered with `Preference-Applied: wait=<seconds>`; a value
+  that is not a whole number of seconds is no preference.
 - **A report that ends in an error** (FR-203's: 404 or 410 when the token goes while it
   is made, 500, or 503 including past its budget) answers
   that error to every request then waiting and to the next request, then is forgotten,

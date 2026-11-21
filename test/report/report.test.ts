@@ -14,6 +14,7 @@ import { readSummary } from '../../src/preflight/files.ts';
 import { Printer } from '../../src/print/print.ts';
 import { reportCommand, reportSettings, SettingsError } from '../../src/report/command.ts';
 import { Slots } from '../../src/report/figures.ts';
+import type { ReportProgress } from '../../src/report/progress.ts';
 import {
   ReportError,
   brokenLinks,
@@ -135,6 +136,21 @@ describe('making a report', { skip }, () => {
     resource: undefined,
     importableOnly: false,
     ...over,
+  });
+
+  test('tells its job where it is: reading, each figure counted, then printing (T029)', async () => {
+    const told: ReportProgress[] = [];
+    await makeReport(request(), { ...services(), progress: (p) => told.push(p) });
+    assert.deepEqual(told[0], { stage: 'reading' });
+    assert.deepEqual(told.at(-1), { stage: 'printing' });
+    const figures = told.filter((p) => p.stage === 'figures');
+    const total = figures[0]?.stage === 'figures' ? figures[0].total : 0;
+    assert.ok(total > 0, 'figures to draw');
+    // 0 of the total first, then one more as each is done
+    assert.deepEqual(
+      figures.map((p) => (p.stage === 'figures' ? p.done : -1)),
+      Array.from({ length: total + 1 }, (_, i) => i)
+    );
   });
 
   let made: Awaited<ReturnType<typeof read>> & { pdf: Uint8Array };
