@@ -143,12 +143,14 @@ describe('making a report', { skip }, () => {
     await makeReport(request(), { ...services(), progress: (p) => told.push(p) });
     assert.deepEqual(told[0], { stage: 'reading' });
     assert.deepEqual(told.at(-1), { stage: 'printing' });
-    const figures = told.filter((p) => p.stage === 'figures');
-    const total = figures[0]?.stage === 'figures' ? figures[0].total : 0;
+    const figures = told.filter(
+      (p): p is Extract<ReportProgress, { stage: 'figures' }> => p.stage === 'figures'
+    );
+    const total = figures[0]?.total ?? 0;
     assert.ok(total > 0, 'figures to draw');
     // 0 of the total first, then one more as each is done
     assert.deepEqual(
-      figures.map((p) => (p.stage === 'figures' ? p.done : -1)),
+      figures.map((p) => p.done),
       Array.from({ length: total + 1 }, (_, i) => i)
     );
   });
