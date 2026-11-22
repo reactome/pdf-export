@@ -124,7 +124,7 @@ part, not of PDFs.
 
 These are recorded for `compare --expected` in
 [`expected-98.json`](expected-98.json), each with its reason. With it, release 98's
-comparison (22 Nov 2026, after this change) reports COUNTS (a
+comparison (22 Nov 2026, after this change) reports 323 differences, 319 recorded and 4 not (a
 file's summations split between recorded and not):
 those of the next table, each by its count; no record matched nothing.
 
@@ -151,9 +151,9 @@ those of the next table, each by its count; no record matched nothing.
 
 Each is open in T040 until it is fixed or recorded with its reason:
 
-| Part, kind         | Count             | What is known                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Summation, text    | 8 of 116 sections | Down from 372 with #249 to this change; 78 more are several summations in another order and 25 a table, under Expected. Left: **4** with one summation and the same characters in another order, each with 1 to 10 lines in columns, not tables (2 of them the cytochrome P450 cycle's, whose step numbers are red); **4** that differ by more, of which 2 a summation's table that `event-pdf` prints with ruled cells, not read as the summation's. A dot above (U+02D9, a radical's) that pdf-export prints as a bullet is recorded (FR-017's substitutions). |
+| Part, kind      | Count             | What is known                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Summation, text | 8 of 116 sections | Down from 372 with #249 to this change; 78 more are several summations in another order and 25 a table, under Expected. Left: **4** with one summation and the same characters in another order, each with 1 to 10 lines in columns, not tables (2 of them the cytochrome P450 cycle's, whose step numbers are red); **4** that differ by more, of which 2 a summation's table that `event-pdf` prints with ruled cells, not read as the summation's. A dot above (U+02D9, a radical's) that pdf-export prints as a bullet is recorded (FR-017's substitutions). |
 
 ## Still to do in T040
 
