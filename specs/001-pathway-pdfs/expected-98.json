@@ -172,7 +172,7 @@
       "kind": "extra",
       "file": "Digestion and absorption.pdf",
       "events": ["R-HSA-8963743"],
-      "reason": "A figure in pdf-export's file, none read in event-pdf's. differences.md, Figures, extra."
+      "reason": "event-pdf leaves a diagram out when drawing it fails (Diagrams.insertDiagram catches the error and logs it); Digestion and absorption has an illustration (EHLD), and event-pdf printed no diagram for it, on the cover or in its section; pdf-export prints it. differences.md, Figures, extra."
     },
     {
       "part": "section",
@@ -214,6 +214,13 @@
       "file": "Disease.pdf",
       "events": ["R-HSA-9945017"],
       "reason": "A table in the summation: both print it, its cells wrapped differently, so read line by line their text interleaves in another order; the same characters on both sides, its lines in several columns on both. differences.md, Summation, a table."
+    },
+    {
+      "part": "cover",
+      "kind": "value",
+      "field": "diagram",
+      "file": "Digestion and absorption.pdf",
+      "reason": "event-pdf leaves a diagram out when drawing it fails (Diagrams.insertDiagram catches the error and logs it); Digestion and absorption has an illustration (EHLD), and event-pdf printed no diagram for it, on the cover or in its section; pdf-export prints it. differences.md, Figures, extra."
     }
   ]
 }
