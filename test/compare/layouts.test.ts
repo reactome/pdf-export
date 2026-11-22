@@ -406,6 +406,30 @@ ${label ? `<p>${label}</p>` : ''}
     assert.equal(parts['references']?.length, 1);
   });
 
+  test("a figure's small label just outside its shapes is the figure's; small text further off is read", async () => {
+    // A diagram draws some labels at 5 to 7 pt just past its shapes: read as text, they ran
+    // into the fact above the figure or the summation below it (T040, 22 Nov 2026). Text
+    // as small as 8 pt is a document's own (event-pdf's edit history).
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="110pt" viewBox="0 0 400 110" overflow="visible">
+<text x="150" y="6" font-size="6">Delta label</text>
+<rect x="0" y="20" width="60" height="80" fill="#9ab"/>
+<path d="M60 60 H340" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="340" y="20" width="60" height="80" fill="#9ab"/></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000009</p>
+<p style="margin-bottom: 2pt">Compartments: cytosol</p>
+<div style="line-height: 0">${svg}</div>
+<p style="font-size: 8pt; margin-top: 10pt">Epsilon small, written for these tests.</p>
+</section>`)
+    );
+    const parts = Object.fromEntries((read.sections[0]?.parts ?? []).map((p) => [p.part, p.items]));
+    assert.deepEqual(parts['compartments'], ['cytosol']);
+    assert.ok(!JSON.stringify(read).includes('Delta'), JSON.stringify(read));
+    assert.deepEqual(parts['summation'], ['Epsilonsmall,writtenforthesetests.']);
+  });
+
   test('raised and lowered text is read in its line, in place', async () => {
     // pdf-export prints a summation's <sup> and <sub> on baselines a few points off their
     // line's: they were read as lines of their own, and so in another place (T040)

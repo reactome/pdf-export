@@ -53,6 +53,14 @@ export const STRIP_NODES = 3;
  */
 export const MIN_TEXT_PT = 3;
 
+/**
+ * Text smaller than this within FIGURE_GAP_PT of a figure is the figure's: a diagram draws
+ * some labels at 5 to 7 pt just past its shapes, which ran into the fact above the figure or
+ * the summation below it (T040, 22 Nov 2026). A document's own smallest text is 8 pt
+ * (`event-pdf`'s edit history).
+ */
+export const FIGURE_LABEL_PT = 7.5;
+
 /** A place in a PDF: its page, counted from 0, and a height on it in points from its foot. */
 export interface Spot {
   page: number;
@@ -217,6 +225,9 @@ function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page:
   }
   return boxes;
 }
+
+/** A point as a box, on no page in particular: `near` compares the boxes' sides only. */
+const around = (x: number, y: number): Box => ({ page: 0, x1: x, y1: y, x2: x, y2: y });
 
 /** Two boxes within `gap` of each other. */
 const near = (a: Box, b: Box, gap: number): boolean =>
@@ -501,6 +512,11 @@ export async function readLayout(
         if (size < MIN_TEXT_PT) continue;
         const middle = x + (typeof item.width === 'number' ? item.width / 2 : 0);
         if (figures.some((box) => inside(middle, y, box))) continue;
+        if (
+          size < FIGURE_LABEL_PT &&
+          figures.some((box) => near(box, around(middle, y), FIGURE_GAP_PT))
+        )
+          continue;
         pieces.push({ x, y, size, str: item.str });
       }
       layout.lines.push(...linesOf(pieces, i).filter((line) => line.text.trim() !== ''));
