@@ -406,6 +406,21 @@ ${label ? `<p>${label}</p>` : ''}
     assert.equal(parts['references']?.length, 1);
   });
 
+  test('raised and lowered text is read in its line, in place', async () => {
+    // pdf-export prints a summation's <sup> and <sub> on baselines a few points off their
+    // line's: they were read as lines of their own, and so in another place (T040)
+    const r = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Sigma binding</h2>
+<p>Stable identifier: R-HSA-9000008</p>
+<p>Ca<sup>2+</sup> binds sigma, and H<sub>2</sub>O is released, written for these tests across a line long enough to wrap; then Mg<sup>2+</sup> binds tau.</p>
+</section>`)
+    );
+    assert.deepEqual(r.sections[0]?.parts.find((p) => p.part === 'summation')?.items, [
+      'Ca2+bindssigma,andH2Oisreleased,writtenforthesetestsacrossalinelongenoughtowrap;thenMg2+bindstau.',
+    ]);
+  });
+
   test("a figure's shapes are read as clipped: the fact just above it is read", async () => {
     // A pathway's diagram whose compartments run past its frame, clipped to it: their whole
     // boxes reached 30 pt above the figure and took in the stable identifier's line, so the
