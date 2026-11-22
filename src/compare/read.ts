@@ -403,31 +403,68 @@ interface Piece {
   str: string;
 }
 
-/** A page's pieces as lines: those sharing a baseline, within a point, left to right. */
+/**
+ * Raised or lowered text (a `<sup>`, a `<sub>`) is set smaller than its line, at most this
+ * part of its size...
+ */
+export const RAISED_SIZE = 0.85;
+
+/** ...and its baseline within this part of the line's size above or below the line's. */
+export const RAISED_OFFSET = 0.5;
+
+/**
+ * A page's pieces as lines: those sharing a baseline, within a point, left to right; then a
+ * row of smaller text within RAISED_OFFSET of a line's baseline joins that line, as raised
+ * or lowered text does. pdf-export sets a summation's `<sup>` and `<sub>` a
+ * few points off its line: as lines of their own, they were read in another place (T040).
+ */
 function linesOf(pieces: Piece[], page: number): Line[] {
-  const lines: Line[] = [];
   const sorted = [...pieces].sort((a, b) => b.y - a.y || a.x - b.x);
+  const rows: Piece[][] = [];
   let current: Piece[] = [];
-  const flush = (): void => {
+  for (const piece of sorted) {
     const [first] = current;
-    if (!first) return;
-    const row = current.sort((a, b) => a.x - b.x);
+    if (first && Math.abs(first.y - piece.y) > 1) {
+      rows.push(current);
+      current = [];
+    }
+    current.push(piece);
+  }
+  if (current.length > 0) rows.push(current);
+  const sizeOf = (row: readonly Piece[]): number => Math.max(...row.map((p) => p.size));
+  const yOf = (row: readonly Piece[]): number => row[0]?.y ?? 0;
+  // each smaller row to the larger one it is raised or lowered from: lines are set further
+  // apart than RAISED_OFFSET either way, so there is one at most
+  const into = new Map<number, number>();
+  rows.forEach((row, i) => {
+    const j = rows.findIndex(
+      (other, k) =>
+        k !== i &&
+        sizeOf(row) <= sizeOf(other) * RAISED_SIZE &&
+        Math.abs(yOf(other) - yOf(row)) <= sizeOf(other) * RAISED_OFFSET
+    );
+    if (j >= 0) into.set(i, j);
+  });
+  const joined = rows.map((row, i) => (into.has(i) ? [] : [...row]));
+  for (const [i, j] of into) {
+    // a row raised from one itself raised is not followed: it is left on its own
+    if (into.has(j)) joined[i] = rows[i] ?? [];
+    else joined[j]?.push(...(rows[i] ?? []));
+  }
+  const lines: Line[] = [];
+  rows.forEach((own, i) => {
+    const row = (joined[i] ?? []).sort((a, b) => a.x - b.x);
+    if (row.length === 0) return;
     lines.push({
       page,
-      y: first.y,
+      // its own baseline: a line's, or a row's left on its own
+      y: yOf(own),
       x: Math.min(...row.map((p) => p.x)),
       size: Math.max(...row.map((p) => p.size)),
       text: row.map((p) => p.str).join(''),
       cells: row.map((p) => p.str).filter((str) => str.trim() !== ''),
     });
-    current = [];
-  };
-  for (const piece of sorted) {
-    const [first] = current;
-    if (first && Math.abs(first.y - piece.y) > 1) flush();
-    current.push(piece);
-  }
-  flush();
+  });
   return lines;
 }
 
