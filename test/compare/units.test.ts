@@ -768,6 +768,35 @@ describe('figures and tables', () => {
     assert.equal(figures[0]?.y2, 294.7);
   });
 
+  test("a catalyst drawn below its reaction, its line's circle clipped, joins it", () => {
+    // Immune System, REG3A oligomerising, as pdf-export draws it: the catalyst (LPS) below
+    // the reaction, its line ending in a circle read clipped to 2.4 pt, 11.6 pt short of the
+    // reaction's square
+    const box = (x1: number, y1: number, x2: number, y2: number): Box => ({
+      page: 0,
+      x1,
+      y1,
+      x2,
+      y2,
+    });
+    // in the order the page draws them, the catalyst's line first
+    const shapes = [
+      box(297.9, 679.1, 297.9, 745.9),
+      box(294.4, 743.5, 301.5, 745.9),
+      box(303.2, 762.7, 451.3, 762.7),
+      box(449.5, 759.2, 456.5, 766.2),
+      box(135.9, 762.7, 292.7, 762.7),
+      box(145.7, 758.3, 152.2, 767.1),
+      box(292.7, 757.5, 303.2, 767.9),
+      box(268.8, 644.2, 327.1, 679.1),
+      box(460, 740.9, 538.4, 784.5),
+      box(57.5, 740.9, 135.9, 784.5),
+    ];
+    const figures = figureBoxes(shapes, 595, 842);
+    assert.equal(figures.length, 1);
+    assert.equal(figures[0]?.y1, 644.2);
+  });
+
   test('a rule between two figures, touching neither, joins nothing', () => {
     const rule: Box = { page: 0, x1: 60, y1: 219.75, x2: 500, y2: 220.25 };
     assert.equal(figureBoxes([square(100, 130), rule, square(100, 240)], 595, 842).length, 2);

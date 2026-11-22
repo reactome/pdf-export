@@ -329,11 +329,17 @@ export function figureBoxes(boxes: readonly Shape[], width: number, height: numb
   pieces.forEach((piece, i) => {
     lines.set(root(i), [...(lines.get(root(i)) ?? []), piece]);
   });
-  for (const line of lines.values()) {
-    const touched = clusters.filter((c) => line.some((piece) => near(c, piece, LINE_REACH_PT)));
-    if (touched.length < 2) continue;
-    const merged = [...touched, ...line].reduce(union);
-    clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
+  // until nothing more joins: a merge can bring a line near a cluster, whatever the order
+  // the page draws them in (a catalyst's line drawn before its reaction's)
+  for (let again = true; again;) {
+    again = false;
+    for (const line of lines.values()) {
+      const touched = clusters.filter((c) => line.some((piece) => near(c, piece, LINE_REACH_PT)));
+      if (touched.length < 2) continue;
+      const merged = [...touched, ...line].reduce(union);
+      clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
+      again = true;
+    }
   }
   clusters = clustered(clusters, FIGURE_GAP_PT);
   const nodes = kept.filter(node);
