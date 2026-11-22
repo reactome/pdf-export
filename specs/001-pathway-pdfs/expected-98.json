@@ -211,6 +211,14 @@
       "part": "section",
       "kind": "text",
       "field": "summation",
+      "file": "Immune System.pdf",
+      "events": ["R-HSA-1222556"],
+      "reason": "The graph's U+02D9 (a superoxide radical's dot, O2˙−), which no embedded font draws: pdf-export prints a bullet, the radical's usual sign (FR-017's substitutions, src/layout/characters.ts); event-pdf's file reads U+0307. differences.md, Summation, text."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "summation",
       "file": "Disease.pdf",
       "events": ["R-HSA-9945017"],
       "reason": "A table in the summation: both print it, its cells wrapped differently, so read line by line their text interleaves in another order; the same characters on both sides, its lines in several columns on both. differences.md, Summation, a table."
