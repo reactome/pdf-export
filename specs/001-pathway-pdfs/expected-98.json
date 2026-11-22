@@ -137,7 +137,60 @@
       "part": "section",
       "kind": "text",
       "field": "edits",
-      "reason": "The rows' grouping: event-pdf compares authors as lists as loaded, pdf-export as sets by order. differences.md, Edits, text."
+      "events": [
+        "R-HSA-162587",
+        "R-HSA-162906",
+        "R-HSA-69306",
+        "R-HSA-72203",
+        "R-HSA-72766",
+        "R-HSA-73894",
+        "R-HSA-74160"
+      ],
+      "reason": "An edit's row of more than six people: pdf-export names every person, as the website's pages do; event-pdf cut them at six and et al. only because it printed them through its references' author list (References.getAuthorList). differences.md, Edits, text."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "edits",
+      "events": [
+        "R-HSA-109582",
+        "R-HSA-168799",
+        "R-HSA-181567",
+        "R-HSA-194793",
+        "R-HSA-194796",
+        "R-HSA-194800",
+        "R-HSA-194808",
+        "R-HSA-194809",
+        "R-HSA-194818",
+        "R-HSA-204392",
+        "R-HSA-204465",
+        "R-HSA-204485",
+        "R-HSA-204500",
+        "R-HSA-204549",
+        "R-HSA-204600",
+        "R-HSA-210277",
+        "R-HSA-210283",
+        "R-HSA-210285",
+        "R-HSA-210290",
+        "R-HSA-210291",
+        "R-HSA-210294",
+        "R-HSA-210304",
+        "R-HSA-210990",
+        "R-HSA-210991",
+        "R-HSA-375131",
+        "R-HSA-375133",
+        "R-HSA-375135",
+        "R-HSA-5250606",
+        "R-HSA-5250892",
+        "R-HSA-5658001",
+        "R-HSA-5659879",
+        "R-HSA-5659898",
+        "R-HSA-5659899",
+        "R-HSA-5659922",
+        "R-HSA-5659926",
+        "R-HSA-74752"
+      ],
+      "reason": "Rows of one date in another order: both sort by date, then the first author's surname, event-pdf taking the first of graph-core's list as loaded, pdf-export the first by order (research R2). differences.md, Edits, order."
     },
     {
       "part": "section",
@@ -145,7 +198,7 @@
       "field": "name",
       "file": "Disease.pdf",
       "events": ["R-HSA-9923097", "R-HSA-9923104"],
-      "reason": "The graph holds U+2019, which pdf-export prints; event-pdf's file reads as U+02BC. differences.md."
+      "reason": "The graph holds U+2019, which pdf-export prints; event-pdf's font (Source Serif Pro) draws U+2019 and U+02BC with one glyph, which its file maps back to U+02BC. differences.md."
     },
     {
       "part": "contents",

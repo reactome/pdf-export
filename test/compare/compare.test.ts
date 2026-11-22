@@ -79,8 +79,10 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
     return printReference(printer, doc, { analysis, ...options });
   };
   /** The differences between a reference and pdf-export's sample, briefly. */
-  const differences = async (ref: Uint8Array) =>
-    compareReduced('sample.pdf', await reduced(ref), oursReduced).map(brief);
+  const differences = async (ref: Uint8Array) => differencesFrom(ref, oursReduced);
+  /** The differences between a reference and a reduced PDF, briefly. */
+  const differencesFrom = async (ref: Uint8Array, mine: Reduced) =>
+    compareReduced('sample.pdf', await reduced(ref), mine).map(brief);
 
   before(async () => {
     folder = mkdtempSync(join(tmpdir(), 'pdf-export-compare-'));
@@ -326,6 +328,41 @@ describe('compare (FR-012)', { timeout: 300_000 }, () => {
     doc.places.push({ full: false, anchor: `s-${R1.stId}`, event: R1, path: [], depth: 1 });
     const other = await reduced(await printOurs(printer, doc, analysis));
     assert.deepEqual(compareReduced('x', oursReduced, other).map(brief), ['short-entries count']);
+  });
+
+  test('a short entry whose long name wraps: its first lines are not read into the section before', async () => {
+    const doc = sampleDocument();
+    const long = `${R1.name}, ${'a placeholder named at great length '.repeat(4).trim()}`;
+    doc.places.push({
+      full: false,
+      anchor: `s-${R1.stId}`,
+      event: { ...R1, name: long },
+      path: [],
+      depth: 1,
+    });
+    const other = await reduced(await printOurs(printer, doc, analysis));
+    assert.deepEqual(compareReduced('x', oursReduced, other).map(brief), ['short-entries count']);
+  });
+
+  test("an edit history running on to the next page: Chromium's repeated header is no row's", async () => {
+    const many = (doc: Document) => {
+      for (const place of doc.places) {
+        if (!place.full || place.section.event.stId !== R1.stId) continue;
+        place.section.edits = Array.from({ length: 90 }, (_, i) => ({
+          date: `20${String(10 + Math.floor(i / 12))}-${String((i % 12) + 1).padStart(2, '0')}-01`,
+          kinds: ['reviewed'],
+          authors: [PEOPLE[i % PEOPLE.length] ?? null],
+        }));
+      }
+    };
+    const doc = sampleDocument();
+    many(doc);
+    const mine = await reduced(await printOurs(printer, doc, analysis));
+    const edits = mine.sections
+      .find((s) => s.stId === R1.stId)
+      ?.parts.find((p) => p.part === 'edits');
+    assert.equal(edits?.items.length, 90);
+    assert.deepEqual(await differencesFrom(await reference(many), mine), [RESOURCE]);
   });
 
   describe('the command', () => {
