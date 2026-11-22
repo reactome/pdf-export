@@ -155,32 +155,64 @@ export interface Shape extends Box {
   image?: boolean;
 }
 
-/** The shapes a page paints: images, and painted paths, each as its box. */
+/** Two boxes' overlap, or null where they do not overlap. */
+function overlap(a: Box, b: Box): Box | null {
+  const box = {
+    page: a.page,
+    x1: Math.max(a.x1, b.x1),
+    y1: Math.max(a.y1, b.y1),
+    x2: Math.min(a.x2, b.x2),
+    y2: Math.min(a.y2, b.y2),
+  };
+  return box.x1 <= box.x2 && box.y1 <= box.y2 ? box : null;
+}
+
+/**
+ * The shapes a page paints: images, and painted paths, each as its box, cut to the clip in
+ * force (the boxes of the paths clipped to, as pdf.js gives them after `clip`). A diagram's
+ * compartments may run past its frame, clipped to it: their whole boxes reached the line
+ * above the figure, and a section's stable identifier was read as the figure's (T040).
+ */
 function shapes(fnArray: readonly number[], argsArray: readonly unknown[], page: number): Shape[] {
   const boxes: Shape[] = [];
   let ctm: Matrix = IDENTITY;
-  const stack: Matrix[] = [];
+  let clip: Box | null = null;
+  let clipping = false;
+  const stack: { ctm: Matrix; clip: Box | null }[] = [];
+  const push = (box: Shape): void => {
+    const cut = clip === null ? box : overlap(box, clip);
+    if (cut) boxes.push({ ...box, ...cut });
+  };
   for (let i = 0; i < fnArray.length; i++) {
     const fn = fnArray[i];
     const args = argsArray[i];
     if (fn === OPS.save || fn === OPS.paintFormXObjectBegin) {
-      stack.push(ctm);
+      stack.push({ ctm, clip });
       const matrix: unknown =
         fn === OPS.paintFormXObjectBegin && Array.isArray(args) ? args[0] : null;
       if (isMatrix(matrix)) ctm = multiply(matrix, ctm);
     } else if (fn === OPS.restore || fn === OPS.paintFormXObjectEnd) {
-      ctm = stack.pop() ?? IDENTITY;
+      ({ ctm, clip } = stack.pop() ?? { ctm: IDENTITY, clip: null });
     } else if (fn === OPS.transform && isMatrix(args)) {
       ctm = multiply(args, ctm);
+    } else if (fn === OPS.clip || fn === OPS.eoClip) {
+      clipping = true;
     } else if (fn === OPS.constructPath && Array.isArray(args)) {
       // [how it is painted, its drawing, its box]: a path only clipped to is not drawn
       const parts: unknown[] = args;
       const [paint, , minMax] = parts;
-      if (paint === OPS.endPath) continue;
       const rect = numbersOf(minMax);
-      if (rect?.length === 4 && rect.every(Number.isFinite)) boxes.push(through(rect, ctm, page));
+      const box =
+        rect?.length === 4 && rect.every(Number.isFinite) ? through(rect, ctm, page) : null;
+      if (clipping && box) {
+        // an empty clip leaves nothing painted after it, until it is restored
+        clip = clip === null ? box : (overlap(clip, box) ?? { ...box, x2: box.x1 - 1 });
+      }
+      clipping = false;
+      if (paint === OPS.endPath) continue;
+      if (box) push(box);
     } else if (fn !== undefined && IMAGES.has(fn)) {
-      boxes.push({ ...through([0, 0, 1, 1], ctm, page), image: true });
+      push({ ...through([0, 0, 1, 1], ctm, page), image: true });
     }
   }
   return boxes;
