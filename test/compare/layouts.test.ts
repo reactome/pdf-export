@@ -377,6 +377,29 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test("a figure's shapes are read as clipped: the fact just above it is read", async () => {
+    // A pathway's diagram whose compartments run past its frame, clipped to it: their whole
+    // boxes reached 30 pt above the figure and took in the stable identifier's line, so the
+    // section was not found (T040, 22 Nov 2026)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="120pt" viewBox="0 0 400 120">
+<rect x="0" y="0" width="400" height="120" fill="none" stroke="#333" stroke-width="0.75"/>
+<rect x="60" y="-40" width="100" height="150" fill="#9ab"/>
+<rect x="240" y="-40" width="100" height="150" fill="#9ab"/></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p style="margin: 0">Location: Alpha signalling pathway \u2192 Beta binds gamma</p>
+<p style="margin: 2pt 0 4pt">Stable identifier: R-HSA-9000006</p>
+<div style="line-height: 0">${svg}</div>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    assert.deepEqual(
+      read.sections.map((s) => s.stId),
+      ['R-HSA-9000006']
+    );
+  });
+
   test('a reaction drawn in one row, short and wide with its images, is a figure', async () => {
     // As pdf-export draws a reaction of a few nodes in a row (T040, 22 Nov 2026): 481 by
     // 38 pt with two images, under FIGURE_MIN_PT tall; its labels were read into the fact
