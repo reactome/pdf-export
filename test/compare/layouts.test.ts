@@ -377,6 +377,81 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test('a reaction drawn in one row, short and wide with its images, is a figure', async () => {
+    // As pdf-export draws a reaction of a few nodes in a row (T040, 22 Nov 2026): 481 by
+    // 38 pt with two images, under FIGURE_MIN_PT tall; its labels were read into the fact
+    // before it, a compartment's name running on into the nodes' names.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="38pt" viewBox="0 0 400 38">
+<rect x="0" y="4" width="60" height="30" fill="#9ab"/><text x="6" y="22" font-size="7">Delta node</text>
+<image href="${png(1, 1)}" x="150" y="4" width="64" height="30"/>
+<path d="M60 19 H340" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="340" y="4" width="60" height="30" fill="#9ab"/><text x="346" y="22" font-size="7">Delta other</text></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<p>Compartments: cytosol</p>
+<p>${svg}</p>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    assert.ok(!JSON.stringify(read).includes('Delta'), JSON.stringify(read));
+    assert.deepEqual(read.sections[0]?.parts.find((p) => p.part === 'compartments')?.items, [
+      'cytosol',
+    ]);
+  });
+
+  test('a reaction drawn in one row of vector nodes, without images, is a figure', async () => {
+    // As `event-pdf` draws one (T040, 22 Nov 2026): 467 by 42 pt, its nodes painted paths
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400pt" height="38pt" viewBox="0 0 400 38">
+<rect x="0" y="4" width="60" height="30" fill="#9ab"/><text x="6" y="22" font-size="7">Delta node</text>
+<rect x="170" y="14" width="10" height="10" fill="#333"/>
+<path d="M60 19 H340" stroke="#333" stroke-width="0.75" fill="none"/>
+<rect x="340" y="4" width="60" height="30" fill="#9ab"/><text x="346" y="22" font-size="7">Delta other</text></svg>`;
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<p>Compartments: cytosol</p>
+<p>${svg}</p>
+<p>A summation, written for these tests.</p>
+</section>`)
+    );
+    assert.ok(!JSON.stringify(read).includes('Delta'), JSON.stringify(read));
+  });
+
+  test("a column of small icons beside entries is no figure: the entries' text is read", async () => {
+    // `event-pdf`'s contents set a 9 pt icon before each entry, indented by its depth: a
+    // column 29 to 49 pt wide of many images, which a strip of any direction took for a figure,
+    // leaving out a short entry whose middle fell inside it (T040, 22 Nov 2026)
+    const rows = Array.from(
+      { length: 20 },
+      (_, i) =>
+        `<p style="margin: 0 0 0 ${String((i % 2) * 20)}pt; line-height: 14pt"><img src="${png(1, 1)}" style="width: 9pt; height: 9pt"> Nu${String(i)}</p>`
+    ).join('');
+    const read = await readLayout(
+      await printer.print(
+        page(`<p style="font-size: 28pt">Alpha signalling pathway</p>${rows}`),
+        false
+      )
+    );
+    assert.equal(read.figures.length, 0, JSON.stringify(read.figures));
+    assert.equal(read.lines.filter((l) => /^\s*Nu\d+/.test(l.text)).length, 20);
+  });
+
+  test('a short shaded band without an image is no figure: its text is read', async () => {
+    // FIGURE_STRIP_PT is for a cluster holding an image: a band 400 by 30 pt, as a table's
+    // shaded header or a note's box, keeps its text
+    const read = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Beta binds gamma</h2>
+<p>Stable identifier: R-HSA-9000002</p>
+<div style="width: 400pt; height: 30pt; background: #9ab"><p style="margin: 0; padding: 8pt">Epsilon in a band, written for these tests.</p></div>
+</section>`)
+    );
+    assert.ok(JSON.stringify(read).includes('Epsiloninaband'), JSON.stringify(read));
+  });
+
   test("a summation's line that begins with a fact's words is the summation's, in pdf-export's layout", async () => {
     // pdf-export prints a fact's label as a piece of its own (<dt>), without a colon. Prose
     // that wraps to begin "followed by …" or "inferred from …" was read as that fact, and the

@@ -12,8 +12,9 @@
 //   at least a few points each way clustered within FIGURE_GAP_PT of each other, and lines
 //   (thin paths, and the small shapes they pass through) joining clusters only where a line
 //   touches two or more, as a diagram's connector does; a cluster at least FIGURE_MIN_PT
-//   each way is a figure. A raster diagram is one image; a vector one is many paths. A
-//   table with shaded cells can still be read as one, its text then left out (figureBoxes).
+//   each way is a figure, or one holding an image or a few shapes FIGURE_STRIP_PT tall (a
+//   reaction in one row). A raster diagram is one image; a vector one is many paths. A table with shaded
+//   cells can still be read as one, its text then left out (figureBoxes).
 import { getDocument, OPS, VerbosityLevel } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { annotationRect, isPageRef, numbersOf, textTransform } from '../print/pdfjs.ts';
@@ -32,6 +33,18 @@ export const FIGURE_GAP_PT = 30;
 
 /** A figure is at least this wide and this tall: a logo's mark or a bullet is not. */
 export const FIGURE_MIN_PT = 60;
+
+/**
+ * A cluster holding an image, or STRIP_NODES shapes, is a figure at FIGURE_MIN_PT wide and
+ * this tall: a reaction drawn in one row is about 480 by 38 to 50 pt in pdf-export's files
+ * (a few nodes and their images) and 466 by 42 to 57 in `event-pdf`'s (painted paths, or
+ * images). Not a column, as of the small icons `event-pdf`'s contents set before each
+ * entry, 29 to 49 pt wide; nor one shaded band, as a table's header (T040, 22 Nov 2026).
+ */
+export const FIGURE_STRIP_PT = 20;
+
+/** The shapes a figure FIGURE_STRIP_PT tall holds, if it holds no image: a reaction's. */
+export const STRIP_NODES = 3;
 
 /**
  * Text smaller than this is no one's to read: a diagram's label drawn at the diagram's zoom
@@ -236,10 +249,11 @@ const TOUCH_PT = 1;
  *   a table's hairline borders touching only its one shaded header, a rule beside a figure,
  *   or a rule ending at a mark.
  *
- * A cluster at least FIGURE_MIN_PT each way is a figure, unless its shapes are a table's
- * shaded cells in rows (`banded`): today's analysis report shades its tables'
- * cells so (spec 002 T019), and its rows would otherwise be read as a figure and their text
- * left out. A table shaded otherwise can still be read as one.
+ * A cluster at least FIGURE_MIN_PT each way is a figure (one holding an image or STRIP_NODES
+ * shapes, FIGURE_MIN_PT wide and FIGURE_STRIP_PT tall), unless its shapes are a table's shaded cells in rows
+ * (`banded`): today's analysis report shades its tables' cells so (spec 002 T019), and its
+ * rows would otherwise be read as a figure and their text left out. A table shaded otherwise
+ * can still be read as one.
  */
 export function figureBoxes(boxes: readonly Shape[], width: number, height: number): Box[] {
   const kept = boxes.filter((b) => (b.x2 - b.x1) * (b.y2 - b.y1) < 0.9 * width * height);
@@ -272,12 +286,16 @@ export function figureBoxes(boxes: readonly Shape[], width: number, height: numb
   }
   clusters = clustered(clusters, FIGURE_GAP_PT);
   const nodes = kept.filter(node);
-  return clusters.filter(
-    (c) =>
-      c.x2 - c.x1 >= FIGURE_MIN_PT &&
-      c.y2 - c.y1 >= FIGURE_MIN_PT &&
-      !banded(nodes.filter((b) => inside(b.x1, b.y1, c) && inside(b.x2, b.y2, c)))
-  );
+  return clusters.filter((c) => {
+    const members = nodes.filter((b) => inside(b.x1, b.y1, c) && inside(b.x2, b.y2, c));
+    const [w, h] = [c.x2 - c.x1, c.y2 - c.y1];
+    const size =
+      (w >= FIGURE_MIN_PT && h >= FIGURE_MIN_PT) ||
+      (w >= FIGURE_MIN_PT &&
+        h >= FIGURE_STRIP_PT &&
+        (members.some((b) => b.image === true) || members.length >= STRIP_NODES));
+    return size && !banded(members);
+  });
 }
 
 /**
