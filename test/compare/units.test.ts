@@ -742,6 +742,32 @@ describe('figures and tables', () => {
     assert.equal((figures[0]?.x2 ?? 0) - (figures[0]?.x1 ?? 0), 400);
   });
 
+  test("a catalyst's line, stopping short of its node, joins the node to the reaction", () => {
+    // Hemostasis, ADAMTS13 cleaving VWF, as pdf-export draws it: a reaction in one row, and
+    // above it the catalyst, under FIGURE_MIN_PT wide, its line ending 5.2 pt below it
+    const box = (x1: number, y1: number, x2: number, y2: number): Box => ({
+      page: 0,
+      x1,
+      y1,
+      x2,
+      y2,
+    });
+    const shapes = [
+      box(57.4, 144, 135.9, 187.5),
+      box(135.9, 165.8, 292.7, 165.8),
+      box(292.7, 160.5, 303.2, 171),
+      box(294.4, 176.2, 301.5, 183.3),
+      box(303.2, 165.8, 451.3, 165.8),
+      box(460, 144, 538.5, 187.5),
+      box(297.9, 183.3, 297.9, 249.4),
+      box(268.8, 254.6, 327.1, 289.5),
+      box(278.8, 284.3, 289.2, 294.7),
+    ];
+    const figures = figureBoxes(shapes, 595, 842);
+    assert.equal(figures.length, 1);
+    assert.equal(figures[0]?.y2, 294.7);
+  });
+
   test('a rule between two figures, touching neither, joins nothing', () => {
     const rule: Box = { page: 0, x1: 60, y1: 219.75, x2: 500, y2: 220.25 };
     assert.equal(figureBoxes([square(100, 130), rule, square(100, 240)], 595, 842).length, 2);

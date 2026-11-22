@@ -62,6 +62,11 @@ difference's reason where it is known (SC-002). No names: the comparison prints 
   some labels at 5 to 7 pt just past its shapes, which ran into the summation below it or
   the fact above; a document's own smallest text is 8 pt (`event-pdf`'s edit history).
   Summations 44 to 38.
+- **This change:** a line joins a node it comes within 6 pt of. A catalyst's line stops
+  short of its node (5.2 pt in pdf-export's files), so a catalyst under 60 pt wide, drawn
+  above its reaction, stood apart from the figure and its 5 pt labels were read into the
+  fact above (ADAMTS13 cleaving VWF, in Hemostasis and Disease). Compartments 2 to 0,
+  diseases 1 to 0, summations 13 to 12 (a label read into one of Developmental Biology's).
 
 ## What the comparison learned of `event-pdf`'s form
 
@@ -97,7 +102,7 @@ part, not of PDFs.
 
 These are recorded for `compare --expected` in
 [`expected-98.json`](expected-98.json), each with its reason. With it, release 98's
-comparison (22 Nov 2026, after #261) reports 376 differences, 336 recorded and 40 not (a
+comparison (22 Nov 2026, after this change) reports 374 differences, 336 recorded and 38 not (a
 file's summations split between recorded and not):
 those of the next table, each by its count; no record matched nothing.
 
@@ -123,12 +128,11 @@ those of the next table, each by its count; no record matched nothing.
 
 Each is open in T040 until it is fixed or recorded with its reason:
 
-| Part, kind                      | Count              | What is known                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Summation, text                 | 13 of 116 sections | Down from 372 with #249 to #259; 78 more are several summations in another order and 25 a table, under Expected. Left: **5** with one summation and the same characters in another order, each with 1 to 10 lines in columns, not tables (one a diagram's label read into its summation); **6** that differ by more, of which 2 a summation's table that `event-pdf` prints with ruled cells, not read as the summation's; **2** by a character: a combining dot above (U+0307) in `event-pdf`'s alone, three capitals in pdf-export's alone. |
-| Compartments and diseases, text | 2 and 1            | Down from 189 and 109 with #249 to #253. In each, a diagram's 5 pt labels read into the fact above it in pdf-export's file: the figure is read as only its lowest band (43 pt of a drawing about 160 pt tall), its upper part, where the labels are, holding no shape the reader counts.                                                                                                                                                                                                                                                      |
-| Edits, order                    | 31                 | Not checked: dates that tie, or the edit history's grouping.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Cover, names count              | 29                 | In every file: which people the cover names, by count; the rules of each not yet compared.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Part, kind         | Count              | What is known                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Summation, text    | 12 of 116 sections | Down from 372 with #249 to this change; 78 more are several summations in another order and 25 a table, under Expected. Left: **4** with one summation and the same characters in another order, each with 1 to 10 lines in columns, not tables; **6** that differ by more, of which 2 a summation's table that `event-pdf` prints with ruled cells, not read as the summation's; **2** by a character: a combining dot above (U+0307) in `event-pdf`'s alone, three capitals in pdf-export's alone. |
+| Edits, order       | 31                 | Not checked: dates that tie, or the edit history's grouping.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Cover, names count | 29                 | In every file: which people the cover names, by count; the rules of each not yet compared.                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Still to do in T040
 
