@@ -177,6 +177,20 @@ test("a summation's HTML keeps its formatting, tables and web links, and loses a
   }
 });
 
+test("a summation's coloured text is marked to print in the theme's red; a font's face goes", () => {
+  // release 98's form: a cycle's steps numbered in red, as the website shows them
+  const clean = sanitiseSummation(
+    '<p><font color=red>(1)</font> The enzyme binds. <font face="Arial">Plain</font></p>'
+  );
+  assert.equal(
+    clean,
+    '<p><span class="coloured">(1)</span> The enzyme binds. <span>Plain</span></p>'
+  );
+  assert.equal(sanitiseSummation(clean), clean);
+  // a class of the summation's own is no mark
+  assert.equal(sanitiseSummation('<span class="x">t</span>'), '<span>t</span>');
+});
+
 test('an author with no name prints empty, where the old code joined a null: the history and the cover', () => {
   const day = '2026-01-01 10:00:00';
   const unnamed = { dbId: 3, name: null, surname: null };

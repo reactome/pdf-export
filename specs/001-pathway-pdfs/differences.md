@@ -159,9 +159,25 @@ those of the next table, each by its count; no record matched nothing.
 
 None: every difference on release 98 is recorded above, with its reason.
 
+## Decided on the summations' look
+
+The book prints a summation's HTML as the website's pages show it (`sanitiseSummation`,
+`src/model/rules.ts`), with these decided by the project's owner on 22 Nov 2026, from a
+survey of release 98's 18,657 human summations (3,342 with markup, every tag a real
+HTML tag):
+
+| What                                   | In the graph                                                                    | pdf-export                                                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Coloured text (2 summations, 12 marks) | `<font color=red>`: a cycle's steps, as its figure numbers them                 | red, the theme's error colour (SC-009: the theme's colours only), as the website shows it (this change)            |
+| A font's face (2 summations)           | `<font face="Arial">`                                                           | the book's own typeface                                                                                            |
+| A table's borders (27 summations)      | `<table border="1">`: a box round every cell, on the website and in `event-pdf` | a thin rule under each row, as the book's other tables: the cells' text the same, the look the book's own (FR-015) |
+| A radical's dot (1 summation)          | U+02D9 (`O2˙−`), which none of the book's typefaces draws                       | a bullet (`O2•−`), the radical's usual sign (FR-017's substitutions)                                               |
+
+The single-event PDFs are not compared with `event-pdf`'s: they are made by the code that
+makes the book's sections, which the book's comparison covers, and the service's own
+tests cover the rest.
+
 ## Still to do in T040
 
-- A sample of single-event PDFs against `event-pdf`'s, and a reaction's with a token
-  (research R10).
 - Done: every row recorded, `expected-98.json` complete, so the comparison exits 0 on
   release 98 and 1 on anything new.
