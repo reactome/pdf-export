@@ -135,6 +135,12 @@ interface PartRule {
   split?: RegExp | 'numbered' | 'dated' | 'rows';
   /** Whether its items name people, and so are held as hashes. */
   names?: boolean;
+  /**
+   * A heading: its label is one only alone on its line, as both layouts print it. A
+   * summation wrapped so a line begins "references to …" was read as the references' heading
+   * (T040).
+   */
+  heading?: boolean;
 }
 
 /** The labelled parts, in the order a section prints them (FR-005). */
@@ -176,6 +182,7 @@ const RULES: readonly PartRule[] = [
     labels: labelPattern(['literature references', 'references']),
     split: 'numbered',
     names: true,
+    heading: true,
   },
   // `event-pdf` heads them `Editions` (T040)
   {
@@ -183,6 +190,7 @@ const RULES: readonly PartRule[] = [
     labels: labelPattern(['edit history', 'editions']),
     split: 'dated',
     names: true,
+    heading: true,
   },
   {
     part: 'entities',
@@ -328,6 +336,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   // to begin "followed by …" or "inferred from …" stays prose (T040)
   const factLabel = (line: Line, rule: (typeof RULES)[number]): string | null => {
     const rest = labelled(line.text, rule.labels);
+    if (rest !== null && rule.heading === true) return rest.trim() === '' ? rest : null;
     if (rest === null || rule.fact !== true) return rest;
     const read = plain(line.text);
     if (/:\s*$/.test(read.slice(0, read.length - rest.length))) return rest;
