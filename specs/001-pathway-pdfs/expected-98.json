@@ -1,0 +1,178 @@
+{
+  "differences": [
+    {
+      "part": "sections",
+      "kind": "order",
+      "reason": "The order of lists: event-pdf writes a pathway's children in the database's order, pdf-export in the curators' (hasEvent's order). differences.md, Sections, order."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "compartments",
+      "reason": "The order of lists, for compartments. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "references",
+      "reason": "The order of lists, for literature. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "diseases",
+      "reason": "The order of lists, for diseases. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "inferredFrom",
+      "reason": "event-pdf writes inferredFrom, a java.util.Set in graph-core, in that set's order; pdf-export in the graph's. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "summation",
+      "events": [
+        "R-HSA-114553",
+        "R-HSA-1169307",
+        "R-HSA-1183003",
+        "R-HSA-1183058",
+        "R-HSA-1225919",
+        "R-HSA-1368140",
+        "R-HSA-140599",
+        "R-HSA-1445143",
+        "R-HSA-1458485",
+        "R-HSA-1592234",
+        "R-HSA-1592247",
+        "R-HSA-1605535",
+        "R-HSA-1629787",
+        "R-HSA-1655827",
+        "R-HSA-1655828",
+        "R-HSA-1655830",
+        "R-HSA-1655837",
+        "R-HSA-1655839",
+        "R-HSA-1655843",
+        "R-HSA-1655844",
+        "R-HSA-1655845",
+        "R-HSA-1655849",
+        "R-HSA-1655852",
+        "R-HSA-166016",
+        "R-HSA-166091",
+        "R-HSA-166271",
+        "R-HSA-168053",
+        "R-HSA-168166",
+        "R-HSA-168909",
+        "R-HSA-168935",
+        "R-HSA-1791121",
+        "R-HSA-191072",
+        "R-HSA-192916",
+        "R-HSA-202233",
+        "R-HSA-2316352",
+        "R-HSA-2404199",
+        "R-HSA-265682",
+        "R-HSA-2889036",
+        "R-HSA-3249390",
+        "R-HSA-381283",
+        "R-HSA-381337",
+        "R-HSA-383313",
+        "R-HSA-400342",
+        "R-HSA-416985",
+        "R-HSA-422088",
+        "R-HSA-448427",
+        "R-HSA-448703",
+        "R-HSA-451634",
+        "R-HSA-452838",
+        "R-HSA-480301",
+        "R-HSA-5250947",
+        "R-HSA-549364",
+        "R-HSA-549475",
+        "R-HSA-560472",
+        "R-HSA-560491",
+        "R-HSA-560493",
+        "R-HSA-560510",
+        "R-HSA-5617454",
+        "R-HSA-5617471",
+        "R-HSA-73718",
+        "R-HSA-73739",
+        "R-HSA-9013979",
+        "R-HSA-909726",
+        "R-HSA-912458",
+        "R-HSA-9610942",
+        "R-HSA-9653724",
+        "R-HSA-9687435",
+        "R-HSA-975115",
+        "R-HSA-975852",
+        "R-HSA-983707",
+        "R-HSA-9909561",
+        "R-HSA-9932070"
+      ],
+      "reason": "An event's several summations in another order: event-pdf as graph-core loads the list, pdf-export by order. differences.md, Summation, order."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "location",
+      "reason": "A recurring event's location is the path to where its section is written, each book at its first place in its own order of lists. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "references",
+      "reason": "Authors in the publication's order; which five show; a book's ISBN. differences.md, References, text."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "before",
+      "reason": "The order of lists, the events before. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "after",
+      "reason": "The order of lists, the events after. differences.md."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "edits",
+      "reason": "The rows' grouping: event-pdf compares authors as lists as loaded, pdf-export as sets by order. differences.md, Edits, text."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "name",
+      "file": "Disease.pdf",
+      "events": ["R-HSA-9923097", "R-HSA-9923104"],
+      "reason": "The graph holds U+2019, which pdf-export prints; event-pdf's file reads as U+02BC. differences.md."
+    },
+    {
+      "part": "contents",
+      "kind": "missing",
+      "reason": "The contents list is pdf-export's own, event-pdf's after the sections. differences.md."
+    },
+    {
+      "part": "contents",
+      "kind": "extra",
+      "reason": "The contents list is pdf-export's own. differences.md."
+    },
+    {
+      "part": "contents",
+      "kind": "target",
+      "reason": "An entry's target as each prints it. differences.md."
+    },
+    {
+      "part": "short-entries",
+      "kind": "count",
+      "reason": "Short entries where an event recurs in one PDF, where event-pdf writes nothing. differences.md."
+    },
+    {
+      "part": "figure",
+      "kind": "extra",
+      "file": "Digestion and absorption.pdf",
+      "events": ["R-HSA-8963743"],
+      "reason": "A figure in pdf-export's file, none read in event-pdf's. differences.md, Figures, extra."
+    }
+  ]
+}
