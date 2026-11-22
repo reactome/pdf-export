@@ -146,7 +146,7 @@
         "R-HSA-73894",
         "R-HSA-74160"
       ],
-      "reason": "An edit's row of more than six people: event-pdf writes the first six and et al. (References.getAuthorList), pdf-export every one; the same six first on both sides. differences.md, Edits, text."
+      "reason": "An edit's row of more than six people: pdf-export names every person, as the website's pages do; event-pdf cut them at six and et al. only because it printed them through its references' author list (References.getAuthorList). differences.md, Edits, text."
     },
     {
       "part": "section",
