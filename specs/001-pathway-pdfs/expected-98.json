@@ -137,7 +137,22 @@
       "part": "section",
       "kind": "text",
       "field": "edits",
-      "reason": "The rows' grouping: event-pdf compares authors as lists as loaded, pdf-export as sets by order. differences.md, Edits, text."
+      "events": [
+        "R-HSA-162587",
+        "R-HSA-162906",
+        "R-HSA-69306",
+        "R-HSA-72203",
+        "R-HSA-72766",
+        "R-HSA-73894",
+        "R-HSA-74160"
+      ],
+      "reason": "An edit's row of more than six people: event-pdf writes the first six and et al. (References.getAuthorList), pdf-export every one; the same six first on both sides. differences.md, Edits, text."
+    },
+    {
+      "part": "section",
+      "kind": "order",
+      "field": "edits",
+      "reason": "Rows of one date in another order: both sort by date, then the first author's surname, event-pdf taking the first of graph-core's list as loaded, pdf-export the first by order (research R2). differences.md, Edits, order."
     },
     {
       "part": "section",
@@ -145,7 +160,7 @@
       "field": "name",
       "file": "Disease.pdf",
       "events": ["R-HSA-9923097", "R-HSA-9923104"],
-      "reason": "The graph holds U+2019, which pdf-export prints; event-pdf's file reads as U+02BC. differences.md."
+      "reason": "The graph holds U+2019, which pdf-export prints; event-pdf's font (Source Serif Pro) draws U+2019 and U+02BC with one glyph, which its file maps back to U+02BC. differences.md."
     },
     {
       "part": "contents",

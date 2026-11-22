@@ -84,13 +84,17 @@ export function hashNames(names: readonly string[]): Hashed {
  * The cover's names from their text. Where the names are written with U+2060 between their
  * characters (research R2), each name is a run of characters joined by U+2060 or no-break
  * spaces, and whatever else stands between runs parts them; otherwise names are parted by
- * semicolons, as pdf-export writes them.
+ * semicolons, as pdf-export writes them, or, with none, by a comma after a full stop, as
+ * `event-pdf`'s files read: it ends each name with one (`CoverPage.getName`) and parts them
+ * with commas, its U+2060 not in the text read (T040). A name's closing full stops are left
+ * out, pdf-export writing none.
  */
 export function coverNames(text: string): string[] {
   if (text.includes('\u2060')) {
     return text.match(/[^\s\u2060\u00a0](?:[\u2060\u00a0]+[^\s\u2060\u00a0])+/gu) ?? [];
   }
-  return text.split(';');
+  const names = text.includes(';') ? text.split(';') : text.split(/(?<=\.)\s*,/);
+  return names.map((name) => name.trim().replace(/\.+$/, ''));
 }
 
 export const PART_NAMES = [
@@ -225,6 +229,18 @@ function labelled(text: string, labels: readonly RegExp[]): string | null {
 const STABLE_ID = /R-[A-Z]{3}-\d+/;
 const STABLE_ID_AT_END = /R-[A-Z]{3}-\d+$/;
 
+/** A line holding nothing but a stable identifier or its end, wrapped there alone. */
+const ID_PIECE = /^(?:R-)?(?:[A-Z]{3}-)?\d+$/;
+
+/** The most lines a short entry's name and identifier are read over, wrapped. */
+const SHORT_ENTRY_LINES = 4;
+
+/**
+ * pdf-export's edit history's header, which Chromium repeats atop each page a table runs on
+ * to: read there, it joined the row before it (T040).
+ */
+const EDITS_HEADER = /^\s*date\s*action\s*names\s*$/i;
+
 /** A heading is set at least this much larger than its body text (as check-book reads it). */
 export const HEADING_RATIO = 11.25 / 10.5;
 
@@ -351,6 +367,32 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   };
   const internalOn = (line: Line): Link | undefined =>
     linksOn(line.page).find((link) => link.uri === null && linkOn(line, link.box));
+  /**
+   * Where a short entry beginning at the k-th line ends, or null where none begins there: an
+   * event's name linked to its section, then its stable identifier, over up to
+   * SHORT_ENTRY_LINES lines. Its first line is linked; each line to the one ending in the
+   * identifier is linked to the same place, but the identifier, or its end, wrapped to a
+   * line of its own, is outside the link. Read otherwise until T040, a wrapped entry's lines joined
+   * the part before it, a section's edit history among them.
+   */
+  const shortEntryEnd = (k: number, end: number): number | null => {
+    const first = lines[k];
+    const landing = first ? internalOn(first)?.landing : undefined;
+    if (!first || !landing) return null;
+    let joined = '';
+    for (let n = k; n < Math.min(end, k + SHORT_ENTRY_LINES); n++) {
+      const line = lines[n];
+      if (!line) return null;
+      const there = internalOn(line)?.landing;
+      const same = there?.page === landing.page && there.y === landing.y;
+      const text = fold(line.text);
+      joined += text;
+      // the identifier may wrap whole or broken at a hyphen (`R-` then `HSA-…`)
+      if (STABLE_ID_AT_END.test(joined) && (same || ID_PIECE.test(text))) return n;
+      if (!same) return null;
+    }
+    return null;
+  };
 
   // each section, at its stable identifier's label; its name the heading above it, above its
   // location where that comes first
@@ -558,8 +600,10 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
         continue;
       }
       // a short entry: an event's name and stable identifier, linked to its section
-      if (STABLE_ID_AT_END.test(fold(line.text)) && internalOn(line)) {
+      const entryEnd = shortEntryEnd(k, end);
+      if (entryEnd !== null) {
         shortEntries++;
+        k = entryEnd;
         continue;
       }
       const afterFigure = own.some(
@@ -637,6 +681,7 @@ export function reduce(layout: Layout, options: ReduceOptions = {}): Reduced {
   return {
     cover: cover(
       lines.filter((line) => line.page === 0),
+      lines.slice(afterCover, Math.min(firstSection, ...front.values())),
       figuresOn(0)
     ),
     introduction: introduction(
@@ -802,6 +847,7 @@ function items(part: PartName, texts: readonly string[], own: readonly Line[] = 
     const found: string[] = [];
     for (const text of texts) {
       const read = plain(text);
+      if (split === 'dated' && EDITS_HEADER.test(read)) continue;
       const last = found.pop();
       if (last !== undefined) found.push(marker.test(read) ? last : last + read);
       if (marker.test(read)) found.push(split === 'numbered' ? read.replace(marker, '') : read);
@@ -859,12 +905,16 @@ function hanging(lines: readonly Line[]): string[] {
   return found;
 }
 
-/** Lines before any of these on the cover end its names. */
+/**
+ * Lines before any of these on the cover end its names, read folded: a date alone on its
+ * line (`19/10/2026`, `20 November 2026`), not any digit, a name being able to hold one
+ * (`Surname IN, 3rd`, T040).
+ */
 const AFTER_NAMES = new RegExp(
-  `\\d|institut|universit|licen[cs]|creative\\s*commons|excerpt|copyright|©|${INSTITUTIONS.map(
+  `^\\d{1,2}(?:/\\d{1,2}/|\\p{L}+)\\d{4}$|institut|universit|licen[cs]|creative\\s*commons|public\\s*domain|excerpt|copyright|©|${INSTITUTIONS.map(
     (i) => fold(i).slice(0, 12)
   ).join('|')}`,
-  'i'
+  'iu'
 );
 
 /** The cover's label before its names: pdf-export's, or a word that says what they are. */
@@ -872,9 +922,16 @@ const NAMES_LABEL = /^\s*(?:authored|authors?|contributors?|edited|editors?|cura
 
 /**
  * The cover. Its title is its largest text, held as a hash and a length: where a figure took
- * in the real title, the largest text left could be the names.
+ * in the real title, the largest text left could be the names. `next` is what follows the
+ * cover's page before the first front part or section: where the names have not ended on
+ * the cover's page, they and the rest of the cover run on there, as in both books' files of
+ * a pathway with many people (T040).
  */
-function cover(page: readonly Line[], figures: readonly Box[]): Reduced['cover'] {
+function cover(
+  page: readonly Line[],
+  next: readonly Line[],
+  figures: readonly Box[]
+): Reduced['cover'] {
   const largest = Math.max(0, ...page.map((line) => line.size));
   const first = page.findIndex((line) => Math.abs(line.size - largest) < 0.5);
   let last = first;
@@ -883,22 +940,33 @@ function cover(page: readonly Line[], figures: readonly Box[]): Reduced['cover']
   const title = fold(titleLines.map((line) => line.text).join(''));
   const below = titleLines.at(-1);
   const diagram = figures.some((box) => box.page === 0 && below !== undefined && box.y2 < below.y);
-  const excerpt = page.some((line) => /excerpt/i.test(plain(line.text)));
 
-  // the names: after their label, up to what follows them; or the lines written with U+2060
+  // the names: after their label, or with none (`event-pdf`'s files, T040) after the title, up
+  // to what follows them, on the next page where they run on
   const contributors = fold(CONTRIBUTORS).toLowerCase();
   const at = page.findIndex(
     (line) => fold(line.text).toLowerCase() === contributors || NAMES_LABEL.test(plain(line.text))
   );
-  let region: Line[] = [];
-  if (at >= 0) {
-    for (const line of page.slice(at + 1)) {
+  const start = at >= 0 ? at + 1 : first < 0 ? page.length : last + 1;
+  const region: Line[] = [];
+  let ended = false;
+  for (const line of page.slice(start)) {
+    if (AFTER_NAMES.test(fold(line.text))) {
+      ended = true;
+      break;
+    }
+    region.push(line);
+  }
+  const runsOn = !ended && region.length > 0;
+  if (runsOn) {
+    for (const line of next) {
       if (AFTER_NAMES.test(fold(line.text))) break;
       region.push(line);
     }
-  } else {
-    region = page.filter((line) => line.text.includes('\u2060'));
   }
+  const excerpt = [...page, ...(runsOn ? next : [])].some((line) =>
+    /excerpt/i.test(plain(line.text))
+  );
   return {
     title: withhold(title),
     diagram,
