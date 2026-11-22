@@ -173,6 +173,47 @@
       "file": "Digestion and absorption.pdf",
       "events": ["R-HSA-8963743"],
       "reason": "A figure in pdf-export's file, none read in event-pdf's. differences.md, Figures, extra."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "summation",
+      "file": "Developmental Biology.pdf",
+      "events": [
+        "R-HSA-9725621",
+        "R-HSA-9727354",
+        "R-HSA-9727355",
+        "R-HSA-9727359",
+        "R-HSA-9820464",
+        "R-HSA-9853402",
+        "R-HSA-9909305",
+        "R-HSA-9909325",
+        "R-HSA-9909347",
+        "R-HSA-9910607",
+        "R-HSA-9910608",
+        "R-HSA-9911210",
+        "R-HSA-9911214",
+        "R-HSA-9911215",
+        "R-HSA-9925817",
+        "R-HSA-9925879",
+        "R-HSA-9925892",
+        "R-HSA-9927423",
+        "R-HSA-9927428",
+        "R-HSA-9927438",
+        "R-HSA-9960175",
+        "R-HSA-9960183",
+        "R-HSA-9968665",
+        "R-HSA-9982455"
+      ],
+      "reason": "A table in the summation: both print it, its cells wrapped differently, so read line by line their text interleaves in another order; the same characters on both sides, its lines in several columns on both. differences.md, Summation, a table."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "summation",
+      "file": "Disease.pdf",
+      "events": ["R-HSA-9945017"],
+      "reason": "A table in the summation: both print it, its cells wrapped differently, so read line by line their text interleaves in another order; the same characters on both sides, its lines in several columns on both. differences.md, Summation, a table."
     }
   ]
 }
