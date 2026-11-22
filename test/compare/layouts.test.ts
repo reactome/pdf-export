@@ -377,6 +377,35 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test("event-pdf's form: a summation's line beginning with a heading's word is the summation's (T040)", async () => {
+    // A summation wrapped so a line begins "references to …" was read as the references'
+    // heading: the summation ended there, and its lines and the facts after it were read as
+    // references (T040, 22 Nov 2026)
+    const r = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Omicron binding \u2197</h2>
+<p>Location: Alpha signalling pathway \u2192 Omicron binding</p>
+<p>Stable identifier: R-HSA-9000007</p>
+<p style="margin:13pt 0 0;line-height:1.15">Omicron binds pi, as shown in<br>references to its work, written for these tests.</p>
+<p style="margin:9pt 0 0">Preceded by: Rho binding</p>
+<h3>Literature references</h3>
+<p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding. A journal, 1, 2-3. \u2197</p>
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p></section>`)
+    );
+    const parts = Object.fromEntries(
+      (r.sections.find((s) => s.stId === 'R-HSA-9000007')?.parts ?? []).map((p) => [
+        p.part,
+        p.items,
+      ])
+    );
+    assert.deepEqual(parts['summation'], [
+      'Omicronbindspi,asshowninreferencestoitswork,writtenforthesetests.',
+    ]);
+    assert.deepEqual(parts['before'], ['Rhobinding']);
+    assert.equal(parts['references']?.length, 1);
+  });
+
   test("a figure's shapes are read as clipped: the fact just above it is read", async () => {
     // A pathway's diagram whose compartments run past its frame, clipped to it: their whole
     // boxes reached 30 pt above the figure and took in the stable identifier's line, so the
