@@ -276,8 +276,15 @@ function clustered(boxes: readonly Box[], gap: number): Box[] {
  */
 const NODE_PT = 4;
 
-/** How near one piece of a line must come to another, or to a shape, to touch it. */
+/** How near one piece of a line must come to another to touch it. */
 const TOUCH_PT = 1;
+
+/**
+ * How near a line must come to a node to join it. A catalyst's line stops short of its node:
+ * 5.2 pt in pdf-export's files (Hemostasis, ADAMTS13 cleaving VWF), whose node, under
+ * FIGURE_MIN_PT wide, would otherwise stand apart and its labels read as text.
+ */
+export const LINE_REACH_PT = 6;
 
 /**
  * The figures among a page's shapes.
@@ -287,7 +294,8 @@ const TOUCH_PT = 1;
  * - **Lines:** thin paths, and waypoints smaller than NODE_PT, are pieces of lines: pieces
  *   that touch are one line, so a connector drawn in segments, or clipped at the reaction's
  *   square it passes through, is one line.
- * - **Joining:** a line joins the clusters it touches only where it touches two or more, as
+ * - **Joining:** a line joins the clusters it comes within LINE_REACH_PT of only where it
+ *   reaches two or more, as
  *   a connector joins a diagram's nodes. A line touching one cluster or none joins nothing:
  *   a table's hairline borders touching only its one shaded header, a rule beside a figure,
  *   or a rule ending at a mark.
@@ -322,7 +330,7 @@ export function figureBoxes(boxes: readonly Shape[], width: number, height: numb
     lines.set(root(i), [...(lines.get(root(i)) ?? []), piece]);
   });
   for (const line of lines.values()) {
-    const touched = clusters.filter((c) => line.some((piece) => near(c, piece, TOUCH_PT)));
+    const touched = clusters.filter((c) => line.some((piece) => near(c, piece, LINE_REACH_PT)));
     if (touched.length < 2) continue;
     const merged = [...touched, ...line].reduce(union);
     clusters = [...clusters.filter((c) => !touched.includes(c)), merged];
