@@ -112,10 +112,16 @@ export const PART_NAMES = [
 
 export type PartName = (typeof PART_NAMES)[number];
 
-/** A label at a line's start, whole and case aside, then a colon, white space or its end. */
+/**
+ * A label at a line's start, whole and case aside, then a colon, white space or its end; its
+ * letters each may be followed by one space, as `event-pdf` justifies a fact's line by
+ * spreading its letters, read as `P r e c e d e d b y :` (T040).
+ */
 const labelPattern = (labels: readonly string[]): RegExp[] =>
   labels.map((label) => {
-    const words = label.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const words = label
+      .split(' ')
+      .map((w) => Array.from(w, (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s?'));
     return new RegExp(`^\\s*${words.join('\\s*')}\\s*(?::|\\s|$)`, 'i');
   });
 
@@ -144,7 +150,14 @@ const RULES: readonly PartRule[] = [
     split: /,/,
   },
   { part: 'diseases', labels: labelPattern(['diseases', 'disease']), fact: true, split: /,/ },
-  { part: 'inferredFrom', labels: labelPattern(['inferred from']), fact: true, split: /;/ },
+  // pdf-export parts its entries by `;`, `event-pdf` by `,`: there, a comma after an entry's
+  // species, `(Mus musculus)`, as a name's own commas fall within the name (T040)
+  {
+    part: 'inferredFrom',
+    labels: labelPattern(['inferred from']),
+    fact: true,
+    split: /;|(?<=\([A-Z][^()]*\))\s*,/,
+  },
   { part: 'summation', labels: [] },
   {
     part: 'before',
@@ -818,6 +831,9 @@ function items(part: PartName, texts: readonly string[], own: readonly Line[] = 
         ? item.replace(/[-\u00ad\u2010]/g, '')
         : item
     )
+    // and a list's bullets in a summation: `event-pdf` writes them as text, pdf-export's are
+    // the list's markers, which are not read as text (T040)
+    .map((item) => (part === 'summation' ? item.replace(/\u2022/g, '') : item))
     .filter((item) => item !== '');
   return rule?.names ? folded.map(hash) : folded;
 }

@@ -64,7 +64,8 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     // As today's book prints a section: its title ending in a link's arrow; `Location:` with
     // the pathways joined by `→`, long enough to wrap to the left edge at a hyphen, before the
     // stable identifier and the type; references unnumbered with a hanging indent, initials
-    // ending in a full stop, each ending in the arrow; and the edits headed `Editions`.
+    // ending in a full stop, each ending in the arrow; the events inferred from parted by commas;
+    // and the edits headed `Editions`.
     const deep =
       'Alpha signalling pathway → Beta signalling events → Gamma and delta binding → Epsilon mito';
     const theirs = page(
@@ -73,7 +74,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
 <section class="front"><h2>Zeta bind-<br>ing \u2197</h2>
 <p style="margin:0">Location: ${deep}-</p><p style="margin:0">phagy → Theta and iota receptor binding events → Kappa</p><p style="margin:0">→ Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
-<p style="margin:0;line-height:1.5">Inferred from: Zeta binding (Mus musculus); Zeta binding (Rattus norvegicus); Zeta binding (Danio rerio)</p>
+<p style="margin:0;line-height:1.5">Inferred from: Zeta (a, b) (Mus musculus), Zeta binding (Rattus norvegicus), Zeta binding (Danio rerio)</p>
 <p style="margin:13pt 0 0;line-height:1.15">Zeta binds eta, writ-<br>ten for these tests.</p>
 <h3>Literature references</h3>
 <p style="margin:0">${t(PEOPLE[0])}. (2001). A title about binding in signal trans-</p>
@@ -87,7 +88,7 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
 <section class="front"><h2>Zeta binding</h2>
 <p>Location: ${deep.replace(/ → /g, ' › ')}phagy › Theta and iota receptor binding events › Kappa › Zeta binding</p>
 <p>Stable identifier: R-HSA-9000002</p><p>Type: binding</p>
-<p>Inferred from: Zeta binding (Mus musculus); Zeta binding (Rattus norvegicus); Zeta binding (Danio rerio)</p>
+<p>Inferred from: Zeta (a, b) (Mus musculus); Zeta binding (Rattus norvegicus); Zeta binding (Danio rerio)</p>
 <p>Zeta binds eta, written for these tests.</p>
 <h3>Literature references</h3>
 <p>1. ${t(PEOPLE[0])} (2001). A title about binding in signal transduction. A journal, 1, 2-3.</p>
@@ -109,7 +110,8 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     assert.deepEqual(a['type'], ['binding']);
     assert.equal(a['references']?.length, 2);
     assert.equal(a['edits']?.length, 2);
-    // an inferred-from wrapped at a fact's spacing, the last fact before the summation
+    // an inferred-from wrapped at a fact's spacing, the last fact before the summation; its
+    // entries parted by commas, as `event-pdf` writes them, and not at a name's own comma
     assert.equal(a['inferredFrom']?.length, 3);
     for (const part of [
       'name',
@@ -149,6 +151,57 @@ describe('compare on other layouts', { timeout: 300_000 }, () => {
     assert.equal(a['diseases'], undefined, 'no Diseases fact');
     assert.deepEqual(a['compartments'], ['cytosol']);
     assert.equal(a['summation']?.length, 1);
+  });
+
+  test("event-pdf's form: a fact's label spread letter by letter is its label (T040)", async () => {
+    // event-pdf justifies a fact's line by spreading its letters, read as `P r e c e d e d
+    // b y :`: the label was not known, and the fact was read as the summation's end
+    const r = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Iota binding \u2197</h2>
+<p>Location: Alpha signalling pathway \u2192 Iota binding</p>
+<p>Stable identifier: R-HSA-9000004</p>
+<p style="margin:13pt 0 0;line-height:1.15">Iota binds kappa, written for these tests.</p>
+<p style="margin:9pt 0 0;letter-spacing:4pt">Preceded by: Kappa binding</p>
+<p style="margin:9pt 0 0">Followed by: Lambda binding</p>
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p></section>`)
+    );
+    const parts = Object.fromEntries(
+      (r.sections.find((s) => s.stId === 'R-HSA-9000004')?.parts ?? []).map((p) => [
+        p.part,
+        p.items,
+      ])
+    );
+    assert.deepEqual(parts['summation'], ['Iotabindskappa,writtenforthesetests.']);
+    assert.deepEqual(parts['before'], ['Kappabinding']);
+    assert.deepEqual(parts['after'], ['Lambdabinding']);
+  });
+
+  test("a summation's list: event-pdf's bullets are text, pdf-export's markers are not (T040)", async () => {
+    const summation = async (list: string) =>
+      (
+        await reduced(
+          page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h1>Introduction</h1><p>Release 98.</p></section>
+<section class="front"><h2>Mu binding</h2>
+<p>Location: Alpha signalling pathway → Mu binding</p>
+<p>Stable identifier: R-HSA-9000005</p>
+${list}
+<h3>Editions</h3><p>2016-08-15 Authored, ${t(PEOPLE[1])}.</p></section>`)
+        )
+      ).sections
+        .find((s) => s.stId === 'R-HSA-9000005')
+        ?.parts.filter((p) => p.part === 'summation')
+        .flatMap((p) => p.items);
+    const theirs = await summation(
+      '<p style="margin:13pt 0 0;line-height:1.15">Mu binds:<br>• nu, first;<br>• xi, second.</p>'
+    );
+    const ours = await summation(
+      '<p style="margin:13pt 0 0">Mu binds:</p><ul style="margin:0"><li>nu, first;</li><li>xi, second.</li></ul>'
+    );
+    assert.deepEqual(theirs, ['Mubinds:nu,first;xi,second.']);
+    assert.deepEqual(ours, theirs);
   });
 
   describe('a cover whose title a figure takes in: the title is never printed, the names never', () => {
