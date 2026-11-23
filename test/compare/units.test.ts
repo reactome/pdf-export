@@ -27,12 +27,14 @@ import {
 } from '../../src/compare/output.ts';
 import {
   figureBoxes,
+  linesOf,
   readLayout,
   type Box,
   type Shape,
   type Layout,
   type Line,
   type Link,
+  type Piece,
 } from '../../src/compare/read.ts';
 import { hash, reduce, type Reduced, type ReducedSection } from '../../src/compare/reduce.ts';
 import { CONTRIBUTORS } from '../../src/layout/text.ts';
@@ -937,5 +939,49 @@ describe("a section's bounds", () => {
     assert.equal(reduce(layout(1)).sections[0]?.figure, 'figure');
     assert.equal(reduce(layout(2)).sections[0]?.figure, 'figure');
     assert.equal(reduce(layout(3)).sections[0]?.figure, 'figure');
+  });
+});
+
+describe('lines', () => {
+  const piece = (x: number, end: number, y: number, str: string): Piece => ({
+    x,
+    end,
+    y,
+    size: 10,
+    str,
+  });
+
+  test("raised text at its line's own size joins its line, in place", () => {
+    // event-pdf's form, as read from release 98 (Metabolism of proteins): a summation's
+    // `<sup>` at the line's 10 pt, raised 3.3 pt, between two pieces of its line
+    const lines = linesOf(
+      [
+        piece(75, 319.4, 424.3, 'binds Ca'),
+        piece(319.4, 332.5, 427.6, '2+ '),
+        piece(332.5, 474.7, 424.3, 'in a pocket.'),
+      ],
+      0
+    );
+    assert.deepEqual(
+      lines.map((l) => l.text),
+      ['binds Ca2+ in a pocket.']
+    );
+  });
+
+  test("a page number at its entry's size, 2 pt above it, well to its right, is its own", () => {
+    // event-pdf's index, as read from release 98 (Autophagy): the entry, a space pdf.js
+    // gives as wide as the gap to its page number, and the number 2 pt above
+    const lines = linesOf(
+      [
+        piece(90, 133.6, 721.4, 'Autophagy'),
+        piece(133.6, 538.5, 721.4, ' '),
+        piece(538.5, 543, 723.4, '9'),
+      ],
+      0
+    );
+    assert.deepEqual(
+      lines.map((l) => l.text),
+      ['9', 'Autophagy ']
+    );
   });
 });

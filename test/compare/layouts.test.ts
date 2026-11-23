@@ -445,6 +445,21 @@ ${label ? `<p>${label}</p>` : ''}
     ]);
   });
 
+  test("raised text at its line's own size, as event-pdf sets it, is read in its line", async () => {
+    // event-pdf prints a summation's <sup> at the line's size, raised 3.3 pt in 10 pt text: it
+    // was read as a row of its own, before its line (T040)
+    const r = await reduced(
+      page(`<p style="font-size: 28pt">Alpha signalling pathway</p>
+<section class="front"><h2>Sigma binding</h2>
+<p>Stable identifier: R-HSA-9000008</p>
+<p style="font-size: 10pt; line-height: 11.5pt">Sigma binds tau, written for these tests, then Ca<span style="vertical-align: 3.3pt">2+</span> binds sigma.</p>
+</section>`)
+    );
+    assert.deepEqual(r.sections[0]?.parts.find((p) => p.part === 'summation')?.items, [
+      'Sigmabindstau,writtenforthesetests,thenCa2+bindssigma.',
+    ]);
+  });
+
   test("a figure's shapes are read as clipped: the fact just above it is read", async () => {
     // A pathway's diagram whose compartments run past its frame, clipped to it: their whole
     // boxes reached 30 pt above the figure and took in the stable identifier's line, so the
