@@ -767,11 +767,12 @@ passes.
     paths. **Left:** the times on the machine the release uses (the book's 18 min on release
     98 is this host's; the figures' wait on WebsiteAngular's spec 018 T010), and the switch
     from `event-pdf`, for the release's owners. The planted faults are CI's (`ci/image/run.sh`).
-- [ ] T040 [US5] The comparison with `event-pdf`, run on the private copy.
+- [x] T040 [US5] The comparison with `event-pdf`, run on the private copy. (#239, #249–#267, this PR)
   - Compare the new book with today's 29 files, and a sample of single-event PDFs with today's.
   - Record each difference by part, kind and count, with its reason, in `specs/001-pathway-pdfs/differences.md`, with no names (SC-002).
   - Include the reaction overlay that the render service cannot draw yet (research R10), for single-event PDFs of reactions with a token.
   - **The book, 20–21 Nov 2026:** compared with release 98's 29 files (#239, and the PR adding `differences.md`). `compare` learned `event-pdf`'s own form from its real files, letters masked (a title's arrow, `→`, `Editions`, unnumbered references, wrapped locations, initials' full stops, names parted by commas), which took 19,816 titles and 15,023 sections' facts out of the differences. 570 remain, each by part and kind in `differences.md`: most explained (the order of lists; a reference's authors in the publication's order; a book's publisher and ISBN; names' form in the edit history), the rest listed there as open. Still open: those rows, the single-event sample, and the records as `--expected`.
+  - **Done, 23 Nov 2026:** every difference on release 98 recorded with its reason (#252–#267): none a fault in what pdf-export prints against the graph. The comparison reports 320 differences, all recorded, and exits 0. Each misreading found was fixed in `compare`, and each difference in how the books are made is recorded in `differences.md` and `expected-98.json`. The summations' look was decided by the project's owner, 22 Nov 2026 (`differences.md`): coloured text printed in the theme's red (this PR), tables ruled, a radical's dot a bullet. **Single-event PDFs are not compared with `event-pdf`'s**, also by that decision: they are made by the code that makes the book's sections, and the service's own tests cover the rest. So the reaction overlay above is not compared either.
 
 ---
 
