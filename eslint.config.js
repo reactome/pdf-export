@@ -34,6 +34,13 @@ export default tseslint.config(
       ],
     },
   },
+  // neo4j-driver types a driver's and a session's settings as classes, Config and
+  // SessionConfig, which it exports as types alone: an object literal is the only form there
+  // is to give, so typescript-eslint's check of class instances is off where they are given.
+  {
+    files: ['src/graph/connection.ts', 'test/graph/fixture.test.ts'],
+    rules: { '@typescript-eslint/no-unsafe-class-instance-assignment': 'off' },
+  },
   // Every exported function says what it returns, and so does every function in `src/`
   // whose type is not given by where it is used.
   {
