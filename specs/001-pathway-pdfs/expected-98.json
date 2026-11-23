@@ -264,6 +264,14 @@
       "part": "section",
       "kind": "text",
       "field": "summation",
+      "file": "Developmental Biology.pdf",
+      "events": ["R-HSA-9910605", "R-HSA-9910610", "R-HSA-9985092"],
+      "reason": "A table in the summation runs on to another page in one book and not the other, and its header row is printed again there: the one side's extra letters are exactly the header's (6 capitals, 41 lower case), event-pdf's in R-HSA-9910605 and R-HSA-9910610, pdf-export's in R-HSA-9985092. differences.md, Summation, a table's header repeated."
+    },
+    {
+      "part": "section",
+      "kind": "text",
+      "field": "summation",
       "file": "Immune System.pdf",
       "events": ["R-HSA-1222556"],
       "reason": "The graph's U+02D9 (a superoxide radical's dot, O2˙−), which no embedded font draws: pdf-export prints a bullet, the radical's usual sign (FR-017's substitutions, src/layout/characters.ts); event-pdf's file reads U+0307. differences.md, Summation, text."
