@@ -26,12 +26,12 @@
     "@types/fontkit": "2.0.9",
     "@types/node": "24.19.2",
     "@types/sanitize-html": "2.16.2",
-    "eslint": "10.13.0",
+    "eslint": "10.15.0",
     "ngx-reactome-style": "github:reactome/ngx-reactome-base#74c0891a8d27ed79ec1a9ca0aa573cb99242a208",
-    "prettier": "3.9.10",
-    "sass": "1.97.3",
+    "prettier": "3.10.1",
+    "sass": "1.108.2",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.72.1"
+    "typescript-eslint": "8.73.0"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "2.11.1",
@@ -42,8 +42,8 @@
     "@fontsource/roboto-mono": "5.3.0",
     "fontkit": "2.0.4",
     "neo4j-driver": "5.28.3",
-    "pdfjs-dist": "6.4.299",
-    "playwright-core": "1.64.1",
-    "sanitize-html": "2.18.1"
+    "pdfjs-dist": "6.5.438",
+    "playwright-core": "1.65.1",
+    "sanitize-html": "2.18.2"
   }
 }
