@@ -421,8 +421,11 @@ async function land(doc: PdfJs, dest: unknown): Promise<Spot | null> {
   }
 }
 
-interface Piece {
+/** A piece of text as pdf.js gives it: exported for the tests. */
+export interface Piece {
   x: number;
+  /** Its right edge, from pdf.js's width (its left edge where pdf.js gives none). */
+  end: number;
   y: number;
   size: number;
   str: string;
@@ -442,8 +445,13 @@ export const RAISED_OFFSET = 0.5;
  * row of smaller text within RAISED_OFFSET of a line's baseline joins that line, as raised
  * or lowered text does. pdf-export sets a summation's `<sup>` and `<sub>` a
  * few points off its line: as lines of their own, they were read in another place (T040).
+ * `event-pdf` sets them at the line's own size, raised 3.3 pt in 10 pt text: a row of
+ * text no larger and shorter than a line, within RAISED_OFFSET of it, joins it too, where
+ * it starts within the line or where it ends (within RAISED_OFFSET of its size), as a
+ * `<sup>` does; not one well to its right, as `event-pdf`'s index sets its page numbers,
+ * 2 pt above their entries.
  */
-function linesOf(pieces: Piece[], page: number): Line[] {
+export function linesOf(pieces: Piece[], page: number): Line[] {
   const sorted = [...pieces].sort((a, b) => b.y - a.y || a.x - b.x);
   const rows: Piece[][] = [];
   let current: Piece[] = [];
@@ -458,6 +466,15 @@ function linesOf(pieces: Piece[], page: number): Line[] {
   if (current.length > 0) rows.push(current);
   const sizeOf = (row: readonly Piece[]): number => Math.max(...row.map((p) => p.size));
   const yOf = (row: readonly Piece[]): number => row[0]?.y ?? 0;
+  const within = (row: readonly Piece[], line: readonly Piece[]): boolean => {
+    const start = Math.min(...row.map((p) => p.x));
+    const from = Math.min(...line.map((p) => p.x));
+    // its last mark: not a space, which event-pdf's index stretches to its page number
+    const to = Math.max(...line.filter((p) => p.str.trim() !== '').map((p) => p.end));
+    return start >= from - 1 && start <= to + sizeOf(line) * RAISED_OFFSET;
+  };
+  const lengthOf = (row: readonly Piece[]): number =>
+    row.reduce((n, p) => n + p.str.trim().length, 0);
   // each smaller row to the larger one it is raised or lowered from: lines are set further
   // apart than RAISED_OFFSET either way, so there is one at most
   const into = new Map<number, number>();
@@ -465,7 +482,10 @@ function linesOf(pieces: Piece[], page: number): Line[] {
     const j = rows.findIndex(
       (other, k) =>
         k !== i &&
-        sizeOf(row) <= sizeOf(other) * RAISED_SIZE &&
+        (sizeOf(row) <= sizeOf(other) * RAISED_SIZE ||
+          (sizeOf(row) <= sizeOf(other) &&
+            lengthOf(row) < lengthOf(other) &&
+            within(row, other))) &&
         Math.abs(yOf(other) - yOf(row)) <= sizeOf(other) * RAISED_OFFSET
     );
     if (j >= 0) into.set(i, j);
@@ -531,7 +551,8 @@ export async function readLayout(
           figures.some((box) => near(box, around(middle, y), FIGURE_GAP_PT))
         )
           continue;
-        pieces.push({ x, y, size, str: item.str });
+        const end = x + (typeof item.width === 'number' ? item.width : 0);
+        pieces.push({ x, end, y, size, str: item.str });
       }
       layout.lines.push(...linesOf(pieces, i).filter((line) => line.text.trim() !== ''));
       const annotations: unknown[] = await page.getAnnotations();

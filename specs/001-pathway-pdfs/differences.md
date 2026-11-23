@@ -71,7 +71,7 @@ difference's reason where it is known (SC-002). No names: the comparison prints 
   in the order the page draws it, so a catalyst's line drawn before its reaction's lines
   had joined the reaction's nodes into one figure reached only its own node (Immune System,
   REG3A oligomerising, its catalyst LPS drawn below the reaction). Summations 12 to 9, one more recorded.
-- **This change:** the cover's names and the edit history, read as both books write them.
+- **#265:** the cover's names and the edit history, read as both books write them.
   **(a)** `event-pdf`'s cover has no label before its names, ends each with a full stop and
   parts them with commas (`CoverPage.render`, `getName`); its U+2060 is not in the text
   pdf.js reads. Its names were read as none: now those after the title, to the
@@ -85,6 +85,13 @@ difference's reason where it is known (SC-002). No names: the comparison prints 
   outside the name's link, was read into the part before it, a section's edit history. Edits, text 1,149 to 7, of
   which (d) 1,100 (7 of them now in another order only) and (e) 42; edits, order 31 to 38, sections whose rows
   were otherwise the same.
+- **This change:** `event-pdf`'s raised text is read in its line. It sets a summation's
+  `<sup>` at the line's own size, 10 pt, raised 3.3 pt, which #258's rule (smaller text
+  only) left as a row of its own, read before its line: a row no larger and shorter than a
+  line, within half a size of it, now joins it where it starts within the line or at its
+  end. Not a page number well to the right of its entry, set 2 pt above it, as
+  `event-pdf`'s index does, nor where the space between them, which pdf.js gives as wide as
+  the gap, would reach it. Summations 8 to 3; the contents read as before.
 
 ## What the comparison learned of `event-pdf`'s form
 
@@ -124,7 +131,7 @@ part, not of PDFs.
 
 These are recorded for `compare --expected` in
 [`expected-98.json`](expected-98.json), each with its reason. With it, release 98's
-comparison (22 Nov 2026, after this change) reports 323 differences, 319 recorded and 4 not (a
+comparison (22 Nov 2026, after this change) reports 320 differences, 319 recorded and 1 not (a
 file's summations split between recorded and not):
 those of the next table, each by its count; no record matched nothing.
 
@@ -151,9 +158,9 @@ those of the next table, each by its count; no record matched nothing.
 
 Each is open in T040 until it is fixed or recorded with its reason:
 
-| Part, kind      | Count             | What is known                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Summation, text | 8 of 116 sections | Down from 372 with #249 to this change; 78 more are several summations in another order and 25 a table, under Expected. Left: **4** with one summation and the same characters in another order, each with 1 to 10 lines in columns, not tables (2 of them the cytochrome P450 cycle's, whose step numbers are red); **4** that differ by more, of which 2 a summation's table that `event-pdf` prints with ruled cells, not read as the summation's. A dot above (U+02D9, a radical's) that pdf-export prints as a bullet is recorded (FR-017's substitutions). |
+| Part, kind      | Count             | What is known                                                                                                                                                                                                                                                             |
+| --------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Summation, text | 3 of 116 sections | Down from 372 with #249 to this change; 78 more are several summations in another order and 25 a table, under Expected. Left: **3** in Developmental Biology, each a summation holding a table with a caption, two of them with two `<table>` tags opened and one closed. |
 
 ## Still to do in T040
 
