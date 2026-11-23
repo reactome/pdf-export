@@ -103,12 +103,20 @@ function byCodeUnitsOrNull(a: string | null, b: string | null): number {
   return a === null || b === null ? 0 : byCodeUnits(a, b);
 }
 
+/** The class of a summation's coloured text (`<font color>`), printed in the theme's red. */
+export const COLOURED = 'coloured';
+
 /**
  * A summation's HTML, as the website shows it (Angular's default sanitiser, through which
  * its pages render summations, keeps text formatting, lists and tables): those tags, and
  * links to web addresses only. Scripts, styles, images and event handlers go; any other
  * tag keeps its text; a link that is relative, or to a place in the page, keeps its text
  * and loses its address, which in a PDF would point nowhere or at a section's anchor.
+ *
+ * A coloured `<font>` (release 98: red, the steps of a cycle its figure numbers, in two
+ * summations) is a span marked `coloured`, which the pages print in the theme's error
+ * colour, red (SC-009: the theme's colours only); its face and size go, as the book's
+ * typefaces are its own (T040).
  */
 export function sanitiseSummation(html: string): string {
   return sanitizeHtml(html, {
@@ -117,10 +125,25 @@ export function sanitiseSummation(html: string): string {
       ...['ul', 'ol', 'li', 'a'],
       ...['table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'],
     ],
-    allowedAttributes: { a: ['href'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] },
+    allowedAttributes: {
+      a: ['href'],
+      span: ['class'],
+      td: ['colspan', 'rowspan'],
+      th: ['colspan', 'rowspan'],
+    },
+    allowedClasses: { span: [COLOURED] },
     allowedSchemes: ['http', 'https'],
     allowProtocolRelative: false,
     transformTags: {
+      // a span keeps no class but the mark, so that sanitising twice changes nothing
+      span: (tagName, attribs) => ({
+        tagName,
+        attribs: attribs['class'] === COLOURED ? { class: COLOURED } : {},
+      }),
+      font: (_tagName, attribs) =>
+        attribs['color']
+          ? { tagName: 'span', attribs: { class: COLOURED } }
+          : { tagName: 'span', attribs: {} },
       a: (tagName, attribs) => ({
         tagName,
         attribs: /^https?:\/\//i.test(attribs['href'] ?? '') ? { href: attribs['href'] ?? '' } : {},

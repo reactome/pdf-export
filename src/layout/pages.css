@@ -203,6 +203,10 @@ h6 {
   margin: 0 auto;
 }
 
+/* a summation's coloured text (src/model/rules.ts, COLOURED): the theme's red */
+.summation .coloured {
+  color: var(--mat-sys-error);
+}
 .summation table,
 table.edits,
 table.found,
