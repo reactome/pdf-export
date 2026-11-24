@@ -619,7 +619,7 @@ passes.
 
 **Goal:** SC-008.
 
-- [ ] T034 [US3] The figure comparison, `src/check/figures.ts` (SC-008).
+- [x] T034 [US3] The figure comparison, `src/check/figures.ts` (SC-008). (#230, #271, this PR)
   - Both sides are rasterised at one scale with pdf.js in Chromium: the PDF's figure, and the render service's SVG printed alone on a page with the same `@font-face` rules.
   - At most 1% of their pixels may differ.
 
@@ -650,7 +650,20 @@ passes.
     - **The box.** `figureBox` took the first link to the figure's address; a reaction's figure
       links to the reaction's page, as its heading may (2 or 3 such links beside 45 of the 55
       reaction figures). It takes the largest.
-  - Left: the book's half (a sample of T031's book).
+  - **The book's half, run 24 Nov 2026 (this PR).** Release 98's book made afresh: `figures`
+    (19,076 figures, none missing, 2 h 16 min at four at once on an 8-core host, through
+    WebsiteAngular's render service reading the release's files; T031's run took 5 h 47 min,
+    before spec 018's page reuse), then `book` (29 PDFs, 22 min, `check-book` passing). A
+    seeded random sample of 150 of the figures' folder, each SVG put through `labelsOnRequest`
+    as the book inlines it, printed alone, and compared with each place the book links to its
+    event, the closest taken. **149 within the bound**, the largest 0.90%. The one over, 1.27%
+    (R-HSA-8936481), is the instrument's: every differing pixel is in the bottom 3 rows, where
+    the figure's link box stops 1.5 pt short of the figure, near the foot of its page;
+    cropped to the figure's whole height, 0.000% differ. The book prints the figure whole.
+    So SC-008 holds on the book, and on the single-event PDFs above. Not changed here: a
+    figure's box read from its link can be shorter than the figure where the link is cut
+    at the page's foot; a later use of `figureBox` that needs the exact box should take the
+    figure's own size (`figureHtml`) instead.
 
 ---
 
