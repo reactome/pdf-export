@@ -634,6 +634,23 @@ passes.
     same means for both, and the fonts are those the PDFs embed. On the fixture book, a
     pathway's diagram (780 by 240 px, about 65,800 inked on each side): 0 differing; the SVG
     with a selection's outlines, 13.5%; with an overlay's fills, 95.3%.
+  - **The single-event half, run 24 Nov 2026 (#PR).** Ten of the service's PDFs (release 98), each
+    figure drawn as `serve` draws it: the document by `buildSingle` at depth 1, the request as
+    `figureRequest` makes it, the labels by `labelsOnRequest`, in the service's container with
+    its own graph settings. **All 111 figures within the bound**, the largest 0.93%: 24 diagrams,
+    31 ancestors' diagrams, 11 illustrations, 45 reactions. The events: R-HSA-69620, -1640170,
+    -156580, -1280218, -9820460, -109606, -3700989, -376176, -8953750, -445717.
+  - Two faults in the comparison, found by that run and fixed here (`test/check/figures.test.ts`,
+    each test failing without its fix):
+    - **The crop.** `rasterise` cut the PDF's page at the box's corner rounded to a pixel, the
+      figure up to half a pixel off the one printed alone; a diagram's thin lines then differed
+      everywhere (7-9.6% on nine figures that were the same drawing, the render service's SVG
+      identical twice over). The page is now drawn offset by where the box starts, fractions
+      and all.
+    - **The box.** `figureBox` took the first link to the figure's address; a reaction's figure
+      links to the reaction's page, as its heading may (2 or 3 such links beside 45 of the 55
+      reaction figures). It takes the largest.
+  - Left: the book's half (a sample of T031's book).
 
 ---
 
