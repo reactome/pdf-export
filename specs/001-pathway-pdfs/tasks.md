@@ -634,7 +634,7 @@ passes.
     same means for both, and the fonts are those the PDFs embed. On the fixture book, a
     pathway's diagram (780 by 240 px, about 65,800 inked on each side): 0 differing; the SVG
     with a selection's outlines, 13.5%; with an overlay's fills, 95.3%.
-  - **The single-event half, run 24 Nov 2026 (#PR).** Ten of the service's PDFs (release 98), each
+  - **The single-event half, run 24 Nov 2026 (#271).** Ten of the service's PDFs (release 98), each
     figure drawn as `serve` draws it: the document by `buildSingle` at depth 1, the request as
     `figureRequest` makes it, the labels by `labelsOnRequest`, in the service's container with
     its own graph settings. **All 111 figures within the bound**, the largest 0.93%: 24 diagrams,
