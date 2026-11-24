@@ -52,7 +52,10 @@ const isRect = (value: unknown): value is Rect =>
 
 /**
  * Where a PDF draws the figure whose link ends with `address` (src/layout/html.ts's
- * `figure`): its page (1-based) and its box. Null when no page links to it.
+ * `figure`): its page (1-based) and its box. Null when no page links to it. The largest
+ * such link is the figure's: a reaction's figure links to the reaction's page, and so may
+ * its section's heading or a mention of it, which the first link found could be (2 or 3
+ * links to the same page beside 45 of the 55 reaction figures in T034's run).
  */
 export async function figureBox(
   pdf: Uint8Array,
@@ -61,6 +64,7 @@ export async function figureBox(
   const task = getDocument({ data: new Uint8Array(pdf), verbosity: VerbosityLevel.ERRORS });
   try {
     const doc = await task.promise;
+    let largest: { page: number; rect: Rect; area: number } | null = null;
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
       const annotations: unknown = await page.getAnnotations();
@@ -70,11 +74,12 @@ export async function figureBox(
         const url = annotation['url'];
         const rect = annotation['rect'];
         if (typeof url === 'string' && url.endsWith(address) && isRect(rect)) {
-          return { page: n, rect };
+          const area = Math.abs((rect[2] - rect[0]) * (rect[3] - rect[1]));
+          if (!largest || area > largest.area) largest = { page: n, rect, area };
         }
       }
     }
-    return null;
+    return largest && { page: largest.page, rect: largest.rect };
   } finally {
     await task.destroy();
   }
@@ -91,22 +96,31 @@ export async function rasterise(
   try {
     const doc = await task.promise;
     const page = await doc.getPage(pageNumber);
-    const viewport = page.getViewport({ scale });
-    const [width, height] = [Math.ceil(viewport.width), Math.ceil(viewport.height)];
     const canvases: unknown = doc.canvasFactory;
     if (!isCanvases(canvases)) throw new Error('pdf.js has no canvas to draw on');
-    const { canvas, context } = canvases.create(width, height);
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-    if (!rect) return { width, height, data: context.getImageData(0, 0, width, height).data };
-    // the box in the canvas's pixels: x from the page's left edge, y down from its top (the
-    // book's pages are not rotated)
+    if (!rect) {
+      const viewport = page.getViewport({ scale });
+      const [width, height] = [Math.ceil(viewport.width), Math.ceil(viewport.height)];
+      const { canvas, context } = canvases.create(width, height);
+      await page.render({ canvas, canvasContext: context, viewport }).promise;
+      return { width, height, data: context.getImageData(0, 0, width, height).data };
+    }
+    // The box drawn alone, its corner exactly on the canvas's first pixel: the page is
+    // offset by where the box starts, fractions and all (x from the page's left edge, y down
+    // from its top; the book's pages are not rotated). Cropping a whole page at the box's
+    // rounded corner put the figure up to half a pixel off the one printed alone, which on a
+    // diagram's thin lines is every line: 7-9% of the pixels differed on figures that were
+    // the same drawing (T034's run, 24 Nov 2026).
     const [viewLeft = 0, , , viewTop = 0] = page.view;
     const [x1, y1, x2, y2] = rect;
-    const left = Math.round((Math.min(x1, x2) - viewLeft) * scale);
-    const top = Math.round((viewTop - Math.max(y1, y2)) * scale);
-    const w = Math.round(Math.abs(x2 - x1) * scale);
-    const h = Math.round(Math.abs(y2 - y1) * scale);
-    return { width: w, height: h, data: context.getImageData(left, top, w, h).data };
+    const left = (Math.min(x1, x2) - viewLeft) * scale;
+    const top = (viewTop - Math.max(y1, y2)) * scale;
+    const width = Math.round(Math.abs(x2 - x1) * scale);
+    const height = Math.round(Math.abs(y2 - y1) * scale);
+    const viewport = page.getViewport({ scale, offsetX: -left, offsetY: -top });
+    const { canvas, context } = canvases.create(width, height);
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    return { width, height, data: context.getImageData(0, 0, width, height).data };
   } finally {
     await task.destroy();
   }
