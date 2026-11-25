@@ -106,6 +106,9 @@ function byCodeUnitsOrNull(a: string | null, b: string | null): number {
 /** The class of a summation's coloured text (`<font color>`), printed in the theme's red. */
 export const COLOURED = 'coloured';
 
+/** A font's colour that is red, by name, as release 98's summations write it. */
+const RED = /^\s*red\s*$/i;
+
 /**
  * A summation's HTML, as the website shows it (Angular's default sanitiser, through which
  * its pages render summations, keeps text formatting, lists and tables): those tags, and
@@ -118,9 +121,6 @@ export const COLOURED = 'coloured';
  * colour, red (SC-009: the theme's colours only); its face and size go, as the book's
  * typefaces are its own (T040).
  */
-/** A font's colour that is red: by name, or as #f00 or #ff0000. */
-const RED = /^\s*(red|#f00|#ff0000)\s*$/i;
-
 export function sanitiseSummation(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
