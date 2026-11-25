@@ -638,7 +638,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     errors, the limits and the browser's page are unchanged.
   - **The work:** a job's stage and counts (`src/report/jobs.ts`, set from
     `src/report/report.ts`) and its place; past reports' times and the estimate
-    (`src/report/times.ts`: seconds per figure and other seconds over the last 20
+    (`src/report/progress.ts`: seconds per figure and other seconds over the last 20
     reports, none before the first); the status and `Prefer` in `src/serve.ts`;
     contracts/service.md updated.
   - **Tests:** each field for a queued and a making report; the estimate absent before
@@ -646,7 +646,7 @@ compare-report <today's.pdf> <new.pdf> [--expected <file>]`, reading both with s
     `wait=99` held 30 s at most; the browser's page byte-identical for a 202. Each seen
     failing with its change undone.
   - **Then:** WebsiteAngular's deployment pins the commit (its spec 031 T006).
-  - **Done** in #244.
+  - **Done** in #244. Review of 25 Nov: through the service only `wait=0` is tested; `wait=2` and `wait=99` are tested on `preferredWaitMs` (`test/report/progress.test.ts`), not as hold times. A browser's page now also carries no `Preference-Applied`, as the contract says (`test/report/route.test.ts`).
 
 ---
 

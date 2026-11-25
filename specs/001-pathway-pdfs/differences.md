@@ -180,4 +180,9 @@ tests cover the rest.
 ## Still to do in T040
 
 - Done: every row recorded, `expected-98.json` complete, so the comparison exits 0 on
-  release 98 and 1 on anything new.
+  release 98 and 1 on any new kind of difference.
+- Not yet: a new difference of a kind a record covers whole. 13 of its 23 records name
+  no events (the order of lists, and `text` in a section's location, references, events
+  before and after; the contents' `missing`, `extra` and `target`; short entries), so a
+  build that later dropped some references or contents entries from many sections would
+  still exit 0 (review of 25 Nov). T046 narrows them to the events release 98 has.

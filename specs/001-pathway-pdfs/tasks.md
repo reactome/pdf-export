@@ -833,6 +833,7 @@ passes.
     exception left: 168 packages checked, none offending.
 - [ ] T044 Remove the scratch baselines once T033, T039 and T040 are recorded: `event-pdf`'s book and single-event PDFs, the release's files and the private graph copy. They are kept outside the repository, and they hold names.
 - [ ] T045 Check the success criteria, SC-001 to SC-010, and record the result here.
+- [ ] T046 Narrow `expected-98.json`'s records that cover a kind of difference whole (13 of 23, differences.md, Still to do in T040) to the events release 98's comparison lists for each, from the next full comparison run, so a new difference inside those kinds exits 1. Found in the review of 25 Nov.
 
 ---
 

@@ -557,6 +557,12 @@ describe('the report in the background, at its address', { skip }, () => {
     const plain = await fetch(address(21));
     assert.equal(plain.headers.get('preference-applied'), null);
     await plain.body?.cancel();
+    // nor on a browser's page, which carries none of the status (contracts/service.md)
+    const page = await fetch(address(21), { headers: { Prefer: 'wait=0', Accept: 'text/html' } });
+    assert.equal(page.status, 202);
+    assert.match(page.headers.get('content-type') ?? '', /text\/html/);
+    assert.equal(page.headers.get('preference-applied'), null);
+    await page.body?.cancel();
   });
 
   test('a browser waiting is given a page that asks again', async () => {

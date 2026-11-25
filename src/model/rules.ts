@@ -106,6 +106,9 @@ function byCodeUnitsOrNull(a: string | null, b: string | null): number {
 /** The class of a summation's coloured text (`<font color>`), printed in the theme's red. */
 export const COLOURED = 'coloured';
 
+/** A font's colour that is red, by name, as release 98's summations write it. */
+const RED = /^\s*red\s*$/i;
+
 /**
  * A summation's HTML, as the website shows it (Angular's default sanitiser, through which
  * its pages render summations, keeps text formatting, lists and tables): those tags, and
@@ -140,8 +143,10 @@ export function sanitiseSummation(html: string): string {
         tagName,
         attribs: attribs['class'] === COLOURED ? { class: COLOURED } : {},
       }),
+      // red, as release 98's summations colour a cycle's steps, is the mark; another
+      // colour is not printed in the theme's red, and goes
       font: (_tagName, attribs) =>
-        attribs['color']
+        RED.test(attribs['color'] ?? '')
           ? { tagName: 'span', attribs: { class: COLOURED } }
           : { tagName: 'span', attribs: {} },
       a: (tagName, attribs) => ({
