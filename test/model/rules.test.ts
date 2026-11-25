@@ -189,6 +189,17 @@ test("a summation's coloured text is marked to print in the theme's red; a font'
   assert.equal(sanitiseSummation(clean), clean);
   // a class of the summation's own is no mark
   assert.equal(sanitiseSummation('<span class="x">t</span>'), '<span>t</span>');
+  // red in any spelling is the mark; another colour is not printed red (review of 25 Nov)
+  assert.equal(
+    sanitiseSummation('<font color="#FF0000">a</font>'),
+    '<span class="coloured">a</span>'
+  );
+  assert.equal(
+    sanitiseSummation('<font color=" Red ">a</font>'),
+    '<span class="coloured">a</span>'
+  );
+  assert.equal(sanitiseSummation('<font color="blue">b</font>'), '<span>b</span>');
+  assert.equal(sanitiseSummation('<font color="#000">c</font>'), '<span>c</span>');
 });
 
 test('an author with no name prints empty, where the old code joined a null: the history and the cover', () => {

@@ -118,6 +118,9 @@ export const COLOURED = 'coloured';
  * colour, red (SC-009: the theme's colours only); its face and size go, as the book's
  * typefaces are its own (T040).
  */
+/** A font's colour that is red: by name, or as #f00 or #ff0000. */
+const RED = /^\s*(red|#f00|#ff0000)\s*$/i;
+
 export function sanitiseSummation(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: [
@@ -140,8 +143,10 @@ export function sanitiseSummation(html: string): string {
         tagName,
         attribs: attribs['class'] === COLOURED ? { class: COLOURED } : {},
       }),
+      // red, as release 98's summations colour a cycle's steps, is the mark; another
+      // colour is not printed in the theme's red, and goes
       font: (_tagName, attribs) =>
-        attribs['color']
+        RED.test(attribs['color'] ?? '')
           ? { tagName: 'span', attribs: { class: COLOURED } }
           : { tagName: 'span', attribs: {} },
       a: (tagName, attribs) => ({

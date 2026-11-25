@@ -80,19 +80,19 @@ export class Printer {
     signal?.throwIfAborted();
     const file = join(this.#folder, `${this.#prefix}-${String(++this.#count)}.html`);
     const page = await this.#browser.newPage();
-    // The page is this process's own, from a file: its figures are inlined and its fonts
-    // are files. Nothing it prints is fetched, so any other request is refused: what a
-    // page's text could make the browser fetch (CSS written into it, review of 20 Nov)
-    // reaches nothing.
-    await page.route(
-      (url) => url.protocol !== 'file:',
-      (route) => route.abort('blockedbyclient')
-    );
     const stop = (): void => {
       void page.close().catch(() => undefined);
     };
     signal?.addEventListener('abort', stop, { once: true });
     try {
+      // The page is this process's own, from a file: its figures are inlined and its fonts
+      // are files. Nothing it prints is fetched, so any other request is refused: what a
+      // page's text could make the browser fetch (CSS written into it, review of 20 Nov)
+      // reaches nothing. Inside the try, so a page whose route fails is still closed.
+      await page.route(
+        (url) => url.protocol !== 'file:',
+        (route) => route.abort('blockedbyclient')
+      );
       signal?.throwIfAborted();
       writeFileSync(file, html);
       await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });

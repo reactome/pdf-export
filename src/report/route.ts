@@ -124,7 +124,10 @@ export function serviceError(
         waiting && asPage ? 'text/html;charset=UTF-8' : 'application/json;charset=UTF-8',
       'Content-Length': String(Buffer.byteLength(body)),
       ...(waiting ? { 'Retry-After': String(RETRY_AFTER_S), 'Cache-Control': 'no-store' } : {}),
-      ...(waitedS === undefined ? {} : { 'Preference-Applied': `wait=${String(waitedS)}` }),
+      // a browser's page carries none of the status, this with it (contracts/service.md)
+      ...(waitedS === undefined || (waiting && asPage)
+        ? {}
+        : { 'Preference-Applied': `wait=${String(waitedS)}` }),
     })
     .end(body);
 }
