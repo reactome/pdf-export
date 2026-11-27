@@ -20,18 +20,18 @@
     "check": "npm run typecheck && npm run lint && npm run format && npm test && node ci/licences.ts"
   },
   "devDependencies": {
-    "@angular/cdk": "21.2.14",
-    "@angular/material": "21.2.14",
+    "@angular/cdk": "22.3.0",
+    "@angular/material": "22.3.0",
     "@eslint/js": "10.0.1",
     "@types/fontkit": "2.0.9",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.7",
     "@types/sanitize-html": "2.16.2",
     "eslint": "10.15.0",
     "ngx-reactome-style": "github:reactome/ngx-reactome-base#74c0891a8d27ed79ec1a9ca0aa573cb99242a208",
     "prettier": "3.10.1",
     "sass": "1.108.2",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.73.0"
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.74.0"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "2.11.1",
@@ -40,8 +40,8 @@
     "@fontsource/noto-sans-symbols-2": "5.3.0",
     "@fontsource/roboto": "5.3.0",
     "@fontsource/roboto-mono": "5.3.0",
-    "fontkit": "2.0.4",
-    "neo4j-driver": "5.28.3",
+    "fontkit": "3.0.0",
+    "neo4j-driver": "6.3.2",
     "pdfjs-dist": "6.5.438",
     "playwright-core": "1.65.1",
     "sanitize-html": "2.18.2"
